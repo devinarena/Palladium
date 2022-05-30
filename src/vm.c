@@ -32,10 +32,12 @@ static void runtimeError(const char* format, ...) {
 void initVM() {
   resetStack();
   vm.objects = NULL;
+  initTable(&vm.strings);
 }
 
 void freeVM() {
   freeObjects();
+  freeTable(&vm.strings);
 }
 
 void push(Value value) {
@@ -118,7 +120,7 @@ static InterpretResult run() {
         break;
       }
       case OP_NULL: {
-        push(NULL_VAL());
+        push(NULL_VAL);
         break;
       }
       case OP_TRUE: {
