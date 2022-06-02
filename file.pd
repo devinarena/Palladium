@@ -1,1 +1,5 @@
-"heyy" == "hey"
+{
+    var a = 1;
+    var b = 3;
+    print a + b;
+}
