@@ -15,6 +15,9 @@
         "new": "c",
         "ostream": "c",
         "stdexcept": "c",
-        "streambuf": "c"
+        "streambuf": "c",
+        "numeric": "c",
+        "typeinfo": "c",
+        "bit": "c"
     }
 }

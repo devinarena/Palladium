@@ -1,5 +1,9 @@
-{
-    var a = 1;
-    var b = 3;
-    print a < b;
+
+fun fib(x) {
+    if (x < 2) ret x;
+    ret fib(x - 2) + fib(x - 1);
 }
+
+var start = clock();
+print fib(37);
+print (clock() - start);
