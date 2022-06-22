@@ -18,6 +18,9 @@
         "streambuf": "c",
         "numeric": "c",
         "typeinfo": "c",
-        "bit": "c"
+        "bit": "c",
+        "compiler.h": "c",
+        "chunk.h": "c",
+        "compare": "c"
     }
 }

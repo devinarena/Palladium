@@ -1,9 +1,15 @@
+class CoffeeMaker {
+  init(coffee) {
+    this.coffee = coffee;
+  }
 
-fun fib(x) {
-    if (x < 2) ret x;
-    ret fib(x - 2) + fib(x - 1);
+  brew() {
+    print "Enjoy your cup of " + this.coffee;
+
+    // No reusing the grounds!
+    this.coffee = null;
+  }
 }
 
-var start = clock();
-print fib(37);
-print (clock() - start);
+var maker = CoffeeMaker("coffee and chicory");
+print maker;
