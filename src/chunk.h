@@ -1,9 +1,17 @@
+
+/**
+ * @file chunk.h
+ * @author Devin Arena
+ * @brief Chunks contain a list of bytecode instructions processed by the VM.
+ * @since 6/22/2022
+ **/
+
 #ifndef PALLADIUM_CHUNK_H
 #define PALLADIUM_CHUNK_H
 
 #include "common.h"
 #include "value.h"
-
+// VM Operations
 typedef enum {
   OP_NULL,
   OP_FALSE,

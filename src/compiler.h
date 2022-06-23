@@ -1,9 +1,8 @@
-
 /**
  * @file compiler.h
  * @author Devin Arena
- * @brief Compiler for Palladium.
- * @since 5/20/2022
+ * @brief Compiles tokens parsed by the scanner into opcodes.
+ * @since 6/22/2022
  **/
 
 #ifndef PALLADIUM_COMPILER_H
