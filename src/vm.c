@@ -113,7 +113,6 @@ static bool call(ObjClosure* closure, int argCount) {
 }
 
 static bool callValue(Value callee, int argCount) {
-  printValue(callee);
   if (IS_OBJ(callee)) {
     switch (OBJ_TYPE(callee)) {
       case OBJ_BOUND_METHOD: {

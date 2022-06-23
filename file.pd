@@ -12,4 +12,4 @@ class CoffeeMaker {
 }
 
 var maker = CoffeeMaker("coffee and chicory");
-print maker;
+maker.brew();
