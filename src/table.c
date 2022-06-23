@@ -150,7 +150,6 @@ void tableRemoveWhite(Table* table) {
   for (int i = 0; i < table->capacity; i++) {
     Entry* entry = &table->entries[i];
     if (entry->key != NULL && !entry->key->obj.isMarked) {
-      printf("\n\n\n%s\n\n\n", entry->key->chars);
       tableDelete(table, entry->key);
     }
   }

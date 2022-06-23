@@ -683,7 +683,6 @@ static void literal(bool canAssign) {
  * @param canAssign bool if the variable can be assigned to
  */
 static void namedVariable(Token name, bool canAssign) {
-  printf("namedVariable: %.*s\n", name.length, name.start);
   uint8_t getOp, setOp;
   int arg = resolveLocal(current, &name);
 
@@ -899,6 +898,9 @@ static void this_(bool canAssign) {
   variable(false);
 }
 
+// A lookup table for all currently supported keywords and their parse rules.
+// Some keywords have prefix rules, some have infix rules, and some have both.
+// Also contains the rules precedence to determine if assigning is valid.
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
@@ -942,10 +944,22 @@ ParseRule rules[] = {
     [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
 };
 
+/**
+ * @brief Helper for grabbing the ParseRule for a token type.
+ *
+ * @param type TokenType the token type to get the ParseRule for.
+ * @return ParseRule* the parse from the table for the token type.
+ */
 static ParseRule* getRule(TokenType type) {
   return &rules[type];
 }
 
+/**
+ * @brief Looks up the ParseRule for the current token and calls its prefix
+ * rule. If its low enough precedence, it will call the infix rule.
+ *
+ * @param precedence
+ */
 static void parsePrecedence(Precedence precedence) {
   advance();
   ParseFn prefixRule = getRule(parser.previous.type)->prefix;
@@ -963,11 +977,15 @@ static void parsePrecedence(Precedence precedence) {
     infixRule(canAssign);
   }
 
-  if (canAssign && match(TOKEN_EQUAL)) {
+  if (!canAssign && match(TOKEN_EQUAL)) {
     parseError("Invalid assignment target.");
   }
 }
 
+/**
+ * @brief Descent for parsing a block of code (e.g. a function body). Simply
+ * check for declarations until we reach a right brace or EOF.
+ */
 static void block() {
   while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
     declaration();
@@ -976,11 +994,20 @@ static void block() {
   consume(TOKEN_RIGHT_BRACE, "Expect '}' after block.");
 }
 
+/**
+ * @brief Descent for parsing a function. Creates a new compiler and new scope
+ * for the function
+ *
+ * @param type
+ */
 static void function(FunctionType type) {
+  // Each function gets its own compiler.
   Compiler compiler;
   initCompiler(&compiler, type);
+  // Enter into a new scope.
   beginScope();
 
+  // Generate the parameter list.
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
@@ -993,11 +1020,13 @@ static void function(FunctionType type) {
     } while (match(TOKEN_COMMA));
   }
 
+  // Generate function body
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after parameters.");
   consume(TOKEN_LEFT_BRACE, "Expect '{' after function body.");
 
   block();
 
+  // Generate a return statement and handle upvalues.
   ObjFunction* function = endCompiler();
   emitBytes(OP_CLOSURE, makeConstant(OBJ_VAL(function)));
 
@@ -1007,10 +1036,16 @@ static void function(FunctionType type) {
   }
 }
 
+/**
+ * @brief Descent for parsing a class method. Methods are functions that are
+ * defined within a class.
+ */
 static void method() {
+  // method name is the current token.
   consume(TOKEN_IDENTIFIER, "Expect method name.");
   uint8_t constant = identifierConstant(&parser.previous);
 
+  // init() is reserved for initializing a class.
   FunctionType type = TYPE_METHOD;
   if (parser.previous.length == 4 &&
       memcmp(parser.previous.start, "init", 4) == 0) {
@@ -1020,6 +1055,10 @@ static void method() {
   emitBytes(OP_METHOD, constant);
 }
 
+/**
+ * @brief Descent for parsing a class declaration. Creates a new class and
+ * handles all OOP functionality.
+ */
 static void classDeclaration() {
   consume(TOKEN_IDENTIFIER, "Expect class name.");
   Token className = parser.previous;
@@ -1031,6 +1070,7 @@ static void classDeclaration() {
 
   ClassCompiler classCompiler;
   classCompiler.enclosing = currentClass;
+  classCompiler.hasSuperclass = false;
   currentClass = &classCompiler;
 
   if (match(TOKEN_LESS)) {
@@ -1065,15 +1105,23 @@ static void classDeclaration() {
   currentClass = currentClass->enclosing;
 }
 
+/**
+ * @brief Descent for declaration of a function, just calls function() while
+ * also initializing its identifier.
+ */
 static void funDeclaration() {
-  uint8_t global = parseVariable("Expect function name.");
+  uint8_t variable = parseVariable("Expect function name.");
   markInitialized();
   function(TYPE_FUNCTION);
-  defineVariable(global);
+  defineVariable(variable);
 }
 
+/**
+ * @brief Descent for declaration of a variable. Creates a new variable and
+ * defines it in the current scope.
+ */
 static void varDeclaration() {
-  uint8_t global = parseVariable("Expect variable name.");
+  uint8_t variable = parseVariable("Expect variable name.");
 
   if (match(TOKEN_EQUAL)) {
     expression();
@@ -1083,9 +1131,13 @@ static void varDeclaration() {
 
   consume(TOKEN_SEMICOLON, "Expect ';' after variable declaration.");
 
-  defineVariable(global);
+  defineVariable(variable);
 }
 
+/**
+ * @brief Top-level recursive descent case. Lines of code must be statements or
+ * declarations.
+ */
 static void declaration() {
   if (match(TOKEN_CLASS)) {
     classDeclaration();
@@ -1102,12 +1154,18 @@ static void declaration() {
   }
 }
 
+/**
+ * @brief Descent for expression statement such as a variable assignment.
+ */
 static void expressionStatement() {
   expression();
   consume(TOKEN_SEMICOLON, "Expect ';' after expression.");
   emitByte(OP_POP);
 }
 
+/**
+ * @brief Descent for if-else control statements.
+ */
 static void ifStatement() {
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'if'.");
   expression();
@@ -1129,12 +1187,20 @@ static void ifStatement() {
   patchJump(elseJump);
 }
 
+/**
+ * @brief Descent for print statement. Compiles and expression and emits a print
+ * opcode.
+ */
 static void printStatement() {
   expression();
   consume(TOKEN_SEMICOLON, "Expect ';' after value.");
   emitByte(OP_PRINT);
 }
 
+/**
+ * @brief Descent for a return statement. Compiles an expression and emits a
+ * return opcode or NULL if no expression is provided.
+ */
 static void returnStatement() {
   if (current->type == TYPE_SCRIPT) {
     parseError("Cannot return from top-level code.");
@@ -1152,6 +1218,11 @@ static void returnStatement() {
   }
 }
 
+/**
+ * @brief Descent for a while control statement. Handles the generation of
+ * jumps.
+ *
+ */
 static void whileStatement() {
   int loopStart = currentChunk()->count;
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'while'.");
@@ -1167,6 +1238,10 @@ static void whileStatement() {
   emitByte(OP_POP);
 }
 
+/**
+ * @brief Descent for a for statement. Handles the generation of jumps, the
+ * initializer, increment, and the body.
+ */
 static void forStatement() {
   beginScope();
   consume(TOKEN_LEFT_PAREN, "Expect '(' after 'for'.");
@@ -1212,6 +1287,10 @@ static void forStatement() {
   endScope();
 }
 
+/**
+ * @brief Top-level descent rule for statements. Handles non-declarative
+ * statements.
+ */
 static void statement() {
   if (match(TOKEN_PRINT)) {
     printStatement();
@@ -1232,6 +1311,12 @@ static void statement() {
   }
 }
 
+/**
+ * @brief Compiles source code into a top-level script compiler.
+ *
+ * @param source const char* The source code to compile.
+ * @return ObjFunction* the resulting function from compiling the source.
+ */
 ObjFunction* compile(const char* source) {
   initScanner(source);
   Compiler compiler;
@@ -1250,6 +1335,10 @@ ObjFunction* compile(const char* source) {
   return parser.hadError ? NULL : function;
 }
 
+/**
+ * @brief Traverses objects marks them as gray. This is used for the mark-sweep
+ * garbage collector.
+ */
 void markCompilerRoots() {
   Compiler* compiler = current;
   while (compiler != NULL) {
