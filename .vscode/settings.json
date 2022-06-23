@@ -1,0 +1,8 @@
+{
+    "files.associations": {
+        "compare": "c",
+        "type_traits": "c",
+        "dynamic_array.h": "c",
+        "cstdlib": "c"
+    }
+}
