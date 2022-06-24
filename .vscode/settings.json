@@ -22,6 +22,8 @@
         "compiler.h": "c",
         "chunk.h": "c",
         "compare": "c",
-        "memory.h": "c"
+        "memory.h": "c",
+        "cmath": "c",
+        "concepts": "c"
     }
 }

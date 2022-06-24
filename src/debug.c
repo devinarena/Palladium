@@ -11,6 +11,13 @@
 #include "object.h"
 #include "value.h"
 
+/**
+ * @brief Disassembles a chunk instruction by instruction, printing the opcode
+ * and operands.
+ *
+ * @param chunk Chunk* the chunk being disassembled.
+ * @param name const char* the name of the chunk.
+ */
 void disassembleChunk(Chunk* chunk, const char* name) {
   printf("== %s ==\n", name);
 
@@ -19,6 +26,41 @@ void disassembleChunk(Chunk* chunk, const char* name) {
   }
 }
 
+/**
+ * @brief Simply displays the name of an instruction.
+ *
+ * @param name const char* the name of the instruction.
+ * @param offset the offset of the instruction.
+ * @return int the offset of the next instruction.
+ */
+static int simpleInstruction(const char* name, int offset) {
+  printf("%s\n", name);
+  return offset + 1;
+}
+
+/**
+ * @brief Displays the name of an instruction and a one byte operand.
+ *
+ * @param name const char* the name of the instruction.
+ * @param chunk Chunk* the chunk being disassembled.
+ * @param offset the offset of the instruction.
+ * @return int the offset of the next instruction.
+ */
+static int byteInstruction(const char* name, Chunk* chunk, int offset) {
+  uint8_t slot = chunk->code[offset + 1];
+  printf("%-16s %4d\n", name, slot);
+  return offset + 2;
+}
+
+/**
+ * @brief Constant instructions also show the name, index, and value of the
+ * constant.
+ *
+ * @param name const char* the name of the instruction.
+ * @param chunk Chunk* the chunk being disassembled.
+ * @param offset the offset of the instruction.
+ * @return int the offset of the next instruction.
+ */
 static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   uint8_t constant = chunk->code[offset + 1];
   printf("%-16s %4d '", name, constant);
@@ -28,6 +70,15 @@ static int constantInstruction(const char* name, Chunk* chunk, int offset) {
   return offset + 2;
 }
 
+/**
+ * @brief Displays the name and operands as well as argument count for an invoke
+ * instruction.
+ *
+ * @param name const char* the name of the instruction.
+ * @param chunk Chunk* the chunk being disassembled.
+ * @param offset the offset of the instruction.
+ * @return int the offset of the next instruction.
+ */
 static int invokeInstruction(const char* name, Chunk* chunk, int offset) {
   uint8_t constant = chunk->code[offset + 1];
   uint8_t argCount = chunk->code[offset + 2];
@@ -38,17 +89,16 @@ static int invokeInstruction(const char* name, Chunk* chunk, int offset) {
   return offset + 3;
 }
 
-static int simpleInstruction(const char* name, int offset) {
-  printf("%s\n", name);
-  return offset + 1;
-}
-
-static int byteInstruction(const char* name, Chunk* chunk, int offset) {
-  uint8_t slot = chunk->code[offset + 1];
-  printf("%-16s %4d\n", name, slot);
-  return offset + 2;
-}
-
+/**
+ * @brief Displays the name and two byte position operands for a jump
+ * instruction.
+ *
+ * @param name const char* the name of the instruction.
+ * @param sign int the sign of the jump.
+ * @param chunk Chunk* the chunk being disassembled.
+ * @param offset the offset of the instruction.
+ * @return int the offset of the next instruction.
+ */
 static int jumpInstruction(const char* name,
                            int sign,
                            Chunk* chunk,
@@ -59,6 +109,14 @@ static int jumpInstruction(const char* name,
   return offset + 3;
 }
 
+/**
+ * @brief Disassembles a single instruction, printing it in a nicely formatted
+ * way.
+ *
+ * @param chunk Chunk* the chunk being disassembled.
+ * @param offset the offset of the instruction.
+ * @return int the offset of the next instruction.
+ */
 int disassembleInstruction(Chunk* chunk, int offset) {
   printf("%04d ", offset);
 

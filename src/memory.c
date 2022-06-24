@@ -19,19 +19,26 @@
 
 #define GC_HEAP_GROWTH_FACTOR 2
 
+/**
+ * @brief Reallocates memory at a pointer to a new size. Also may trigger a GC.
+ *
+ * @param pointer void* the pointer to reallocate.
+ * @param oldSize size_t the old size of the pointer.
+ * @param newSize size_t the new size of the pointer.
+ * @return void* the reallocated pointer.
+ */
 void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
   vm.bytesAllocated += (newSize - oldSize);
 
   if (newSize > oldSize) {
 #ifdef DEBUG_STRESS_GC
     collectGarbage();
+#else
+    if (vm.bytesAllocated > vm.nextGC) {
+      collectGarbage();
+    }
 #endif
   }
-#ifndef DEBUG_STRESS_GC
-  if (vm.bytesAllocated > vm.nextGC) {
-    collectGarbage();
-  }
-#endif
 
   if (newSize == 0) {
     free(pointer);
@@ -44,6 +51,12 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
   return result;
 }
 
+/**
+ * @brief Marks an object as gray. This is used for the mark-sweep garbage
+ * collector.
+ *
+ * @param obj Object* the object to mark.
+ */
 void markObject(Obj* obj) {
   if (obj == NULL || obj->isMarked)
     return;
@@ -64,18 +77,35 @@ void markObject(Obj* obj) {
   vm.grayStack[vm.grayCount++] = obj;
 }
 
+/**
+ * @brief Attempts to mark a Value as gray. This is used for the mark-sweep
+ * garbage collector.
+ *
+ * @param value Value the value to mark.
+ */
 void markValue(Value value) {
   if (IS_OBJ(value)) {
     markObject(AS_OBJ(value));
   }
 }
 
+/**
+ * @brief Marks an array of values as gray. This is used for the mark-sweep
+ * garbage collector.
+ *
+ * @param array ValueArray* the array of values to mark.
+ */
 static void markArray(ValueArray* array) {
   for (int i = 0; i < array->count; i++) {
     markValue(array->values[i]);
   }
 }
 
+/**
+ * @brief Blackens an object. Black objects will not be freed from memory.
+ *
+ * @param obj Obj* the object to blacken.
+ */
 static void blackenObject(Obj* obj) {
 #ifdef DEBUG_LOG_GC
   printf("%p blacken %d\n", (void*)obj, obj->type);
@@ -119,6 +149,11 @@ static void blackenObject(Obj* obj) {
   }
 }
 
+/**
+ * @brief Frees an object from memory deleting any allocated memory.
+ *
+ * @param object Obj* the object to free.
+ */
 static void freeObject(Obj* object) {
 #ifdef DEBUG_LOG_GC
   printf("%p free %d\n", (void*)object, object->type);
@@ -169,6 +204,9 @@ static void freeObject(Obj* object) {
   }
 }
 
+/**
+ * @brief Free all objects in the VM.
+ */
 void freeObjects() {
   Obj* obj = vm.objects;
   while (obj != NULL) {
@@ -180,6 +218,10 @@ void freeObjects() {
   free(vm.grayStack);
 }
 
+/**
+ * @brief Mark roots of the VM (obvious memory to keep) as gray.
+ *
+ */
 static void markRoots() {
   for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
     markValue(*slot);
@@ -199,6 +241,10 @@ static void markRoots() {
   markCompilerRoots();
 }
 
+/**
+ * @brief Trace references to grayed objects, blackening them. Prevents them
+ * from being freed.
+ */
 static void traceReferences() {
   while (vm.grayCount > 0) {
     Obj* obj = vm.grayStack[--vm.grayCount];
@@ -206,6 +252,10 @@ static void traceReferences() {
   }
 }
 
+/**
+ * @brief Remove all allocated white objects from memory. This is the garbage
+ * collector.
+ */
 static void sweep() {
   Obj* previous = NULL;
   Obj* object = vm.objects;
@@ -228,11 +278,14 @@ static void sweep() {
   }
 }
 
+/**
+ * @brief Runs the entire mark-sweep garbage collector.
+ */
 void collectGarbage() {
 #ifdef DEBUG_LOG_GC
   printf("-- GC begin\n");
 #endif
-size_t before = vm.bytesAllocated;
+  size_t before = vm.bytesAllocated;
 
   markRoots();
   traceReferences();
@@ -243,6 +296,7 @@ size_t before = vm.bytesAllocated;
 
 #ifdef DEBUG_LOG_GC
   printf("-- GC end\n");
-  printf("    collected %zu bytes (from %zu to %zu) next at %zu\n", before - vm.bytesAllocated, before, vm.bytesAllocated, vm.nextGC);
+  printf("    collected %zu bytes (from %zu to %zu) next at %zu\n",
+         before - vm.bytesAllocated, before, vm.bytesAllocated, vm.nextGC);
 #endif
 }

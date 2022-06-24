@@ -24,8 +24,8 @@ typedef enum { VAL_BOOL, VAL_NULL, VAL_NUMBER, VAL_OBJ } ValueType;
 #define SIGN_BIT ((uint64_t)0x8000000000000000)
 #define QNAN ((uint64_t)0x7ffc000000000000)
 #define TAG_NULL 1   // 01
-#define TAG_TRUE 2   // 10
-#define TAG_FALSE 3  // 11
+#define TAG_FALSE 2   // 10
+#define TAG_TRUE 3  // 11
 
 typedef uint64_t Value;
 

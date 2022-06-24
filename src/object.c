@@ -18,6 +18,14 @@
 #define ALLOCATE_OBJ(type, objectType) \
   (type*)allocateObject(sizeof(type), objectType)
 
+/**
+ * @brief Allocates a basic object in memory and inserts it at the head of the
+ * VM heap.
+ *
+ * @param size size_t the size of the object.
+ * @param type ObjectType the type of the object.
+ * @return Obj* the allocated object.
+ */
 static Obj* allocateObject(size_t size, ObjType type) {
   Obj* object = (Obj*)reallocate(NULL, 0, size);
   object->type = type;
@@ -25,14 +33,19 @@ static Obj* allocateObject(size_t size, ObjType type) {
 
   object->next = vm.objects;
   vm.objects = object;
-  
-  #ifdef DEBUG_LOG_GC
-  printf("%p allocate %zu for %d\n", (void*) object, size, type);
-  #endif
+
+#ifdef DEBUG_LOG_GC
+  printf("%p allocate %zu for %d\n", (void*)object, size, type);
+#endif
 
   return object;
 }
 
+/**
+ * @brief Allocates a new function object.
+ *
+ * @return ObjFunction* the allocated function object.
+ */
 ObjFunction* newFunction() {
   ObjFunction* function = ALLOCATE_OBJ(ObjFunction, OBJ_FUNCTION);
   function->arity = 0;
@@ -42,12 +55,24 @@ ObjFunction* newFunction() {
   return function;
 }
 
+/**
+ * @brief Allocates a new native function object.
+ *
+ * @param function NativeFunction the native function to wrap.
+ * @return ObjNative* the allocated native function object.
+ */
 ObjNative* newNative(NativeFn function) {
   ObjNative* native = ALLOCATE_OBJ(ObjNative, OBJ_NATIVE);
   native->function = function;
   return native;
 }
 
+/**
+ * @brief Allocates a new class object.
+ *
+ * @param name const char* the name of the class.
+ * @return ObjClass* the allocated class object.
+ */
 ObjClass* newClass(ObjString* name) {
   ObjClass* clazz = ALLOCATE_OBJ(ObjClass, OBJ_CLASS);
   clazz->name = name;
@@ -55,6 +80,12 @@ ObjClass* newClass(ObjString* name) {
   return clazz;
 }
 
+/**
+ * @brief Allocates a new instance object.
+ *
+ * @param clazz ObjClass* the class of the instance.
+ * @return ObjInstance* the allocated instance object.
+ */
 ObjInstance* newInstance(ObjClass* clazz) {
   ObjInstance* instance = ALLOCATE_OBJ(ObjInstance, OBJ_INSTANCE);
   instance->clazz = clazz;
@@ -62,6 +93,12 @@ ObjInstance* newInstance(ObjClass* clazz) {
   return instance;
 }
 
+/**
+ * @brief Allocates a new upvalue object.
+ *
+ * @param closed Value* the closed value.
+ * @return ObjUpvalue* the allocated upvalue object.
+ */
 ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
   ObjBoundMethod* boundMethod = ALLOCATE_OBJ(ObjBoundMethod, OBJ_BOUND_METHOD);
   boundMethod->receiver = receiver;
@@ -69,6 +106,11 @@ ObjBoundMethod* newBoundMethod(Value receiver, ObjClosure* method) {
   return boundMethod;
 }
 
+/**
+ * @brief Allocates a new closure object.
+ *
+ * @param function ObjFunction* the function to bind.
+ */
 ObjClosure* newClosure(ObjFunction* function) {
   ObjUpvalue** upvalues = ALLOCATE(ObjUpvalue*, function->upvalueCount);
   for (int i = 0; i < function->upvalueCount; i++) {
@@ -82,6 +124,12 @@ ObjClosure* newClosure(ObjFunction* function) {
   return closure;
 }
 
+/**
+ * @brief Allocates a new string object.
+ *
+ * @param chars const char* the characters of the string.
+ * @param length int the length of the string.
+ */
 static ObjString* allocateString(char* chars, int length, uint32_t hash) {
   ObjString* string = ALLOCATE_OBJ(ObjString, OBJ_STRING);
   string->length = length;
@@ -93,6 +141,14 @@ static ObjString* allocateString(char* chars, int length, uint32_t hash) {
   return string;
 }
 
+/**
+ * @brief Hash function for a string. Runs a basic hash function on the string
+ * and returns the hash.
+ *
+ * @param key const char* the characters of the string.
+ * @param length int the length of the string.
+ * @return uint32_t the hash of the string.
+ */
 static uint32_t hashString(const char* key, int length) {
   uint32_t hash = 2166136261u;
 
@@ -104,6 +160,13 @@ static uint32_t hashString(const char* key, int length) {
   return hash;
 }
 
+/**
+ * @brief Allocates a string object with ownership of the C string.
+ *
+ * @param chars const char* the characters of the string.
+ * @param length int the length of the string.
+ * @return ObjString* the allocated string object.
+ */
 ObjString* takeString(char* chars, int length) {
   uint32_t hash = hashString(chars, length);
   ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
@@ -116,6 +179,13 @@ ObjString* takeString(char* chars, int length) {
   return allocateString(chars, length, hash);
 }
 
+/**
+ * @brief Allocates a string object with a copy of the C string.
+ *
+ * @param chars const char* the characters of the string.
+ * @param length int the length of the string.
+ * @return ObjString* the allocated string object.
+ */
 ObjString* copyString(const char* chars, int length) {
   uint32_t hash = hashString(chars, length);
   ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
@@ -128,6 +198,12 @@ ObjString* copyString(const char* chars, int length) {
   return allocateString(heapChars, length, hash);
 }
 
+/**
+ * @brief Allocates a new upvalue object.
+ *
+ * @param slot Value* the slot to bind.
+ * @return ObjUpvalue* the allocated upvalue object.
+ */
 ObjUpvalue* newUpvalue(Value* slot) {
   ObjUpvalue* upvalue = ALLOCATE_OBJ(ObjUpvalue, OBJ_UPVALUE);
   upvalue->location = slot;
@@ -136,6 +212,12 @@ ObjUpvalue* newUpvalue(Value* slot) {
   return upvalue;
 }
 
+/**
+ * @brief Prints the contents of a function <script> for top level, otherwise
+ * the functions name.
+ *
+ * @param function ObjFunction* the function to print.
+ */
 static void printFunction(ObjFunction* function) {
   if (function->name == NULL) {
     printf("<script>");
@@ -144,6 +226,11 @@ static void printFunction(ObjFunction* function) {
   printf("<function %s>", function->name->chars);
 }
 
+/**
+ * @brief Handles printing dynamic objects.
+ * 
+ * @param value Value the value to print.
+ */
 void printObject(Value value) {
   switch (OBJ_TYPE(value)) {
     case OBJ_FUNCTION: {

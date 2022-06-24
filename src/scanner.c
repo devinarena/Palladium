@@ -15,39 +15,87 @@ typedef struct {
 
 Scanner scanner;
 
+/**
+ * @brief Initializes the scanner with the source string.
+ *
+ * @param source const char* The source string to scan.
+ */
 void initScanner(const char* source) {
   scanner.start = source;
   scanner.current = source;
   scanner.line = 1;
 }
 
+/**
+ * @brief Helper for determining if a character is a digit.
+ *
+ * @param c char The character to check.
+ * @return bool True if the character is a digit, false otherwise.
+ */
 static bool isDigit(char c) {
   return c >= '0' && c <= '9';
 }
 
+/**
+ * @brief Helper for determining if a character is a letter.
+ *
+ * @param c char The character to check.
+ * @return bool True if the character is a letter, false otherwise.
+ */
 static bool isAlpha(char c) {
   return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || c == '_';
 }
 
+/**
+ * @brief Helper for determining if we are at the end of the source string.
+ *
+ * @return bool True if the current character is a null terminator, false
+ * otherwise.
+ */
 static bool isAtEnd() {
   return *scanner.current == '\0';
 }
 
+/**
+ * @brief Advance the scanner to the next character, returning the current one.
+ *
+ * @return char The current character BEFORE advancing.
+ */
 static char advance() {
   scanner.current++;
   return scanner.current[-1];
 }
 
+/**
+ * @brief Returns the current character.
+ *
+ * @return char the current character.
+ */
 static char peek() {
   return *scanner.current;
 }
 
+/**
+ * @brief Returns the next character, or null terminator if at the end of the
+ * source.
+ *
+ * @return char the next character.
+ */
 static char peekNext() {
   if (isAtEnd())
     return '\0';
   return scanner.current[1];
 }
 
+/**
+ * @brief Advances the scanner if the current character is equal to the given
+ * one. Returns true if the current character is equal to the given one, false
+ * otherwise.
+ *
+ * @param expected char The character to compare to.
+ * @return bool True if the current character is equal to the given one, false
+ * otherwise.
+ */
 static bool match(char expected) {
   if (isAtEnd())
     return false;
@@ -57,6 +105,12 @@ static bool match(char expected) {
   return true;
 }
 
+/**
+ * @brief Creates a token from the given type at the current scanner position.
+ *
+ * @param type TokenType The type of token to create.
+ * @return Token The created token.
+ */
 static Token makeToken(TokenType type) {
   Token token;
   token.type = type;
@@ -66,6 +120,12 @@ static Token makeToken(TokenType type) {
   return token;
 }
 
+/**
+ * @brief Creates an error token with the given message.
+ *
+ * @param message const char* The message to include in the error.
+ * @return Token The error token.
+ */
 static Token errorToken(const char* message) {
   Token token;
   token.type = TOKEN_ERROR;
@@ -75,6 +135,48 @@ static Token errorToken(const char* message) {
   return token;
 }
 
+/**
+ * @brief Handles number token creatopm.
+ *
+ * @return Token The created number token.
+ */
+static Token number() {
+  while (isDigit(peek()))
+    advance();
+
+  if (peek() == '.' && isDigit(peekNext())) {
+    advance();
+
+    while (isDigit(peek()))
+      advance();
+  }
+
+  return makeToken(TOKEN_NUMBER);
+}
+
+/**
+ * @brief Handles string token creation.
+ *
+ * @return Token The created string token.
+ */
+static Token string() {
+  while (peek() != '"' && !isAtEnd()) {
+    if (peek() == '\n')
+      scanner.line++;
+    advance();
+  }
+
+  if (isAtEnd())
+    return errorToken("Unterminated string.");
+
+  // The closing ".
+  advance();
+  return makeToken(TOKEN_STRING);
+}
+
+/**
+ * @brief Skips whitespace characters and comments.
+ */
 static void skipWhitespace() {
   while (true) {
     char c = peek();
@@ -102,6 +204,15 @@ static void skipWhitespace() {
   }
 }
 
+/**
+ * @brief Determines if the token is a keyword or identifier.
+ *
+ * @param start const char* The start of the token.
+ * @param length int The length of the token.
+ * @param rest const char* The rest of the token.
+ * @param type TokenType The type of the token.
+ * @return TokenType The type of the token.
+ */
 static TokenType checkKeyword(int start,
                               int length,
                               const char* rest,
@@ -114,6 +225,11 @@ static TokenType checkKeyword(int start,
   return TOKEN_IDENTIFIER;
 }
 
+/**
+ * @brief Returns the keyword type for the given token or an identifier.
+ *
+ * @return TokenType The type of the token.
+ */
 static TokenType identifierType() {
   switch (scanner.start[0]) {
     case 'a':
@@ -137,7 +253,15 @@ static TokenType identifierType() {
       }
       break;
     case 'i':
-      return checkKeyword(1, 1, "f", TOKEN_IF);
+      switch (scanner.start[1]) {
+        case 'f':
+          return TOKEN_IF;
+        case 'n':
+          return checkKeyword(2, 1, "t", TOKEN_INT);
+        default:
+          return TOKEN_IDENTIFIER;
+      }
+      break;
     case 'n':
       return checkKeyword(1, 3, "ull", TOKEN_NULL);
     case 'o':
@@ -169,6 +293,11 @@ static TokenType identifierType() {
   }
 }
 
+/**
+ * @brief Handles identifier token creation.
+ *
+ * @return Token The created identifier token.
+ */
 static Token identifier() {
   while (isAlpha(peek()) || isDigit(peek()))
     advance();
@@ -176,35 +305,11 @@ static Token identifier() {
   return makeToken(identifierType());
 }
 
-static Token number() {
-  while (isDigit(peek()))
-    advance();
-
-  if (peek() == '.' && isDigit(peekNext())) {
-    advance();
-
-    while (isDigit(peek()))
-      advance();
-  }
-
-  return makeToken(TOKEN_NUMBER);
-}
-
-static Token string() {
-  while (peek() != '"' && !isAtEnd()) {
-    if (peek() == '\n')
-      scanner.line++;
-    advance();
-  }
-
-  if (isAtEnd())
-    return errorToken("Unterminated string.");
-
-  // The closing ".
-  advance();
-  return makeToken(TOKEN_STRING);
-}
-
+/**
+ * @brief Scans the next token in the file, producing EOF if none are left.
+ *
+ * @return Token The next token in the file.
+ */
 Token scanToken() {
   skipWhitespace();
   scanner.start = scanner.current;
