@@ -38,3 +38,14 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 
   return newPointer;
 }
+
+void freeObject(Object* object) {
+  switch(object->type) {
+    case ObjectString: {
+      ObjString* str = (ObjString*)object;
+      FREE_ARRAY(char, str->chars, str->length + 1);
+      FREE(ObjectString, object);
+      break;
+    }
+  }
+}

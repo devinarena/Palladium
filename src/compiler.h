@@ -10,8 +10,8 @@
 #define PALLADIUM_COMPILER_H
 
 #include "commons.h"
-#include "scanner.h"
 #include "chunk.h"
+#include "object.h"
 
 bool compile(const char* source, Chunk* chunk);
 

@@ -13,6 +13,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#define DEBUG_PRINT_OPCODES
+#define DEBUG_TRACE_EXEC
+
 #define PALLADIUM_DEBUG
 
 #endif

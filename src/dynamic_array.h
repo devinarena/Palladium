@@ -25,30 +25,39 @@
     int capacity;           \
   }
 
-#define INIT_DYNAMIC_ARRAY(type, pointer) \
-  do {                                    \
-    (pointer)->data = NULL;               \
-    (pointer)->count = 0;                 \
-    (pointer)->capacity = 0;              \
+#define INIT_DYNAMIC_ARRAY(type, array) \
+  do {                                  \
+    (array).data = NULL;                \
+    (array).count = 0;                  \
+    (array).capacity = 0;               \
   } while (false)
 
-#define FREE_DYNAMIC_ARRAY(type, pointer)                   \
-  do {                                                      \
-    FREE_ARRAY(type, (pointer)->data, (pointer)->capacity); \
-    (pointer)->data = NULL;                                 \
-    (pointer)->count = 0;                                   \
-    (pointer)->capacity = 0;                                \
+#define FREE_DYNAMIC_ARRAY(type, array)               \
+  do {                                                \
+    FREE_ARRAY(type, (array).data, (array).capacity); \
+    (array).data = NULL;                              \
+    (array).count = 0;                                \
+    (array).capacity = 0;                             \
   } while (false)
 
-#define INSERT_DYNAMIC_ARRAY(type, pointer, value)                             \
-  do {                                                                         \
-    if (pointer->capacity < (pointer)->count + 1) {                            \
-      int oldCapacity = (pointer)->capacity;                                   \
-      (pointer)->capacity = GROW_CAPACITY(oldCapacity);                        \
-      (pointer)->data =                                                        \
-          GROW_ARRAY(type, (pointer)->data, oldCapacity, (pointer)->capacity); \
-    }                                                                          \
-    (pointer)->data[(pointer)->count++] = value;                               \
+#define INSERT_DYNAMIC_ARRAY(type, array, value)                         \
+  do {                                                                   \
+    if ((array).capacity < (array).count + 1) {                          \
+      int oldCapacity = (array).capacity;                                \
+      (array).capacity = GROW_CAPACITY(oldCapacity);                     \
+      (array).data =                                                     \
+          GROW_ARRAY(type, (array).data, oldCapacity, (array).capacity); \
+    }                                                                    \
+    (array).data[(array).count++] = value;                               \
+  } while (false)
+
+#define INSERT_DYNAMIC_ARRAY_AT(type, array, index, value) \
+  do {                                                     \
+    if ((array).count <= (index)) {                        \
+      INSERT_DYNAMIC_ARRAY(type, array, value);            \
+    } else {                                               \
+      (array).data[(index)] = (value);                     \
+    }                                                      \
   } while (false)
 
 #endif

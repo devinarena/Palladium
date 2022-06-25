@@ -3,6 +3,15 @@
         "compare": "c",
         "type_traits": "c",
         "dynamic_array.h": "c",
-        "cstdlib": "c"
+        "cstdlib": "c",
+        "STDLIB.H": "cpp",
+        "value.h": "c",
+        "new": "c",
+        "typeinfo": "c",
+        "vm.h": "c",
+        "object.h": "c",
+        "commons.h": "c",
+        "memory.h": "c",
+        "disassembler.h": "c"
     }
 }

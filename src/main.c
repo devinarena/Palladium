@@ -10,8 +10,7 @@
 #include <string.h>
 
 #include "chunk.h"
-#include "disassembler.h"
-#include "scanner.h"
+#include "vm.h"
 
 /**
  * @brief Reads a file from the specified path, returning the contents as a
@@ -68,14 +67,7 @@ static char* readFile(const char* path) {
 static void runFile(const char* path) {
   char* source = readFile(path);
 
-  Chunk chunk;
-  initChunk(&chunk);
-
-  // read source
-  initScanner(source);
-
-  disassembleChunk(&chunk, "test chunk");
-  freeChunk(&chunk);
+  interpret(source);
 }
 
 int main(int argc, const char* argv[]) {

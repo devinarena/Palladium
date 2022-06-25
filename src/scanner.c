@@ -202,8 +202,8 @@ static TokenType identifierType() {
   switch (scanner.start[0]) {
     case 'a':
       return checkKeyword(1, 2, "nd", TOKEN_AND);
-    case 'c':
-      return checkKeyword(1, 4, "lass", TOKEN_CLASS);
+    case 'd':
+      return checkKeyword(1, 5, "ouble", TOKEN_DOUBLE);
     case 'e':
       return checkKeyword(1, 3, "lse", TOKEN_ELSE);
     case 'f':
@@ -221,7 +221,15 @@ static TokenType identifierType() {
       }
       break;
     case 'i':
-      return checkKeyword(1, 1, "f", TOKEN_IF);
+      switch (scanner.start[1]) {
+        case 'f':
+          return checkKeyword(1, 1, "f", TOKEN_IF);
+        case 'n':
+          return checkKeyword(2, 1, "t", TOKEN_INT);
+        default:
+          return TOKEN_IDENTIFIER;
+      }
+      break;
     case 'n':
       return checkKeyword(1, 3, "ull", TOKEN_NULL);
     case 'o':
@@ -230,22 +238,10 @@ static TokenType identifierType() {
       return checkKeyword(1, 4, "rint", TOKEN_PRINT);
     case 'r':
       return checkKeyword(1, 2, "et", TOKEN_RETURN);
-    case 's':
-      return checkKeyword(1, 4, "uper", TOKEN_SUPER);
     case 't':
-      if (scanner.current - scanner.start > 1) {
-        switch (scanner.start[1]) {
-          case 'h':
-            return checkKeyword(2, 2, "is", TOKEN_THIS);
-          case 'r':
-            return checkKeyword(2, 2, "ue", TOKEN_TRUE);
-          default:
-            return TOKEN_IDENTIFIER;
-        }
-      }
-      break;
+      return checkKeyword(2, 2, "ue", TOKEN_TRUE);
     case 'v':
-      return checkKeyword(1, 2, "ar", TOKEN_VAR);
+      return checkKeyword(1, 3, "oid", TOKEN_VOID);
     case 'w':
       return checkKeyword(1, 4, "hile", TOKEN_WHILE);
     default:
@@ -282,9 +278,11 @@ static Token number() {
 
     while (isDigit(peek()))
       advance();
+
+    return makeToken(TOKEN_NUMBER_FLOATING);
   }
 
-  return makeToken(TOKEN_NUMBER);
+  return makeToken(TOKEN_NUMBER_INTEGER);
 }
 
 /**
@@ -352,7 +350,8 @@ Token scanToken() {
       return makeToken(TOKEN_SLASH);
     case '*':
       return makeToken(TOKEN_STAR);
-
+    case '&':
+      return makeToken(TOKEN_REFERENCE);
     case '!':
       return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=':
@@ -361,6 +360,13 @@ Token scanToken() {
       return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
     case '>':
       return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+    case '\'': {
+      advance();
+      Token tchar = makeToken(TOKEN_CHARACTER);
+      if (!match('\''))
+        return errorToken("Expected ' after character.");
+      return tchar;
+    }
 
     case '"':
       return string();

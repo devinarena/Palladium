@@ -11,16 +11,7 @@
 
 #include "commons.h"
 #include "dynamic_array.h"
-
-// Helper macro for adding a constant to the correct dynamic array.
-#define ADD_CONSTANT(chunk, type, value, index)                  \
-  do {                                                           \
-    INSERT_DYNAMIC_ARRAY(type, (&(chunk)->const_##type), value); \
-    (*index) = (chunk)->const_##type.count - 1;                  \
-  } while (false)
-
-// VM Primitives
-typedef enum { PRIMITIVE_INTEGER, PRIMITIVE_DOUBLE } PrimitiveType;
+#include "value.h"
 
 /**
  * @brief Chunks will store a list of bytecode instructions and constants. Each
@@ -31,15 +22,42 @@ typedef struct {
   int capacity;
   uint8_t* code;
   uint32_t* lines;
-  DYNAMIC_ARRAY(int) const_int;
+  DYNAMIC_ARRAY(Value) constants;
 } Chunk;
 
 void initChunk(Chunk* chunk);
 void writeToChunk(Chunk* chunk, uint8_t byte, uint32_t line);
 void freeChunk(Chunk* chunk);
-void printConstant(Chunk* chunk, int index, PrimitiveType type);
+int addConstant(Chunk* chunk, Value value);
 
 // VM OpCodes
-typedef enum { OP_RETURN, OP_CONSTANT, OP_PRINT } OpCode;
+typedef enum {
+  OP_RETURN,
+  OP_NULL,
+  // Unary
+  OP_NOT_NUMBER,
+  OP_NOT_BOOL,
+  OP_NEGATE_INT,
+  OP_NEGATE_DOUBLE,
+  OP_REFERENCE,
+  OP_DEREFERENCE,
+  // Binary
+  OP_ADD_INT,
+  OP_ADD_DOUBLE,
+  OP_SUB_INT,
+  OP_SUB_DOUBLE,
+  OP_MUL_INT,
+  OP_MUL_DOUBLE,
+  OP_DIV_INT,
+  OP_DIV_DOUBLE,
+  OP_EQUALITY,
+  // Constants
+  OP_CONSTANT_INT,
+  OP_CONSTANT_DOUBLE,
+  OP_CONSTANT_BOOL,
+  OP_CONSTANT_CHARACTER,
+  OP_CONSTANT_STRING,
+  OP_PRINT
+} OpCode;
 
 #endif

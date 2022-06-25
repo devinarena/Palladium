@@ -22,7 +22,7 @@ void initChunk(Chunk* chunk) {
   chunk->lines = NULL;
   chunk->count = 0;
   chunk->capacity = 0;
-  INIT_DYNAMIC_ARRAY(int, &chunk->const_int);
+  INIT_DYNAMIC_ARRAY(Value, chunk->constants);
 }
 
 /**
@@ -56,24 +56,18 @@ void writeToChunk(Chunk* chunk, uint8_t byte, uint32_t line) {
 void freeChunk(Chunk* chunk) {
   FREE_ARRAY(uint8_t, chunk->code, chunk->capacity);
   FREE_ARRAY(uint32_t, chunk->lines, chunk->capacity);
-  FREE_DYNAMIC_ARRAY(int, &chunk->const_int);
+  FREE_DYNAMIC_ARRAY(Value, chunk->constants);
   initChunk(chunk);
 }
 
 /**
- * @brief Helper method for printing the specified content to standard output.
+ * @brief Adds a constant's pointer to the chunk's constant array. Constants can
+ * be integers, doubles, or objects. PASS THE POINTER TO THE CONSTANT.
  *
- * @param chunk Chunk* the chunk to print to
- * @param index int the index of the constant
- * @param type PrimitiveType the type of the constant
+ * @param chunk Chunk* The chunk to add the constant to.
+ * @param pointer Value The pointer to the constant.
  */
-void printConstant(Chunk* chunk, int index, PrimitiveType type) {
-  switch (type) {
-    case PRIMITIVE_INTEGER:
-      printf("%d", chunk->const_int.data[index]);
-      break;
-    default:
-      printf("Unknown constant type\n");
-      exit(1);
-  }
+int addConstant(Chunk* chunk, Value value) {
+  INSERT_DYNAMIC_ARRAY(Value, chunk->constants, value);
+  return chunk->constants.count - 1;
 }
