@@ -29,6 +29,7 @@ typedef struct {
 
 typedef struct {
   Chunk* current;
+  int scopeDepth;
 } Compiler;
 
 typedef enum {
@@ -63,6 +64,7 @@ Compiler* compiler;
  */
 static void initCompiler(Compiler* compiler, Chunk* chunk) {
   compiler->current = chunk;
+  compiler->scopeDepth = 0;
 }
 
 /**
@@ -133,6 +135,19 @@ static void consume(TokenType type, const char* message) {
 
   parseError(message);
 }
+
+/**
+ * @brief Checks the current token for the specified type. Returns true if it
+ * matches, false otherwise.
+ *
+ * @param type TokenType the type to check for.
+ * @return bool true if the current token matches the specified type, false
+ * otherwise
+ */
+bool check(TokenType type) {
+  return parser.current.type == type;
+}
+
 /**
  * @brief Consumes the current token if it matches the specfied type. Returns if
  * it matches.
@@ -141,7 +156,7 @@ static void consume(TokenType type, const char* message) {
  * @return bool true if the token matches, false otherwise.
  */
 bool match(TokenType type) {
-  if (parser.current.type == type) {
+  if (check(type)) {
     advance();
     return true;
   }
@@ -284,6 +299,17 @@ bool typesEqual(ValueType a, ValueType b, bool useNum) {
 }
 
 /**
+ * @brief Increments scope depth.
+ */
+static void pushScope() {
+  compiler->scopeDepth++;
+}
+
+static void popScope() {
+  compiler->scopeDepth--;
+}
+
+/**
  * @brief Handles shutting down the compiler. Emits a return opcode.
  */
 static void endCompiler() {
@@ -296,6 +322,7 @@ static void parsePrecedence(Precedence prec);
 static ParseRule* getRule(TokenType type);
 static void expression();
 static void statement();
+static void declaration();
 
 /**
  * @brief Adds the parsed integer to the chunk's constants and outputs
@@ -684,11 +711,27 @@ static void printStatement() {
 }
 
 /**
+ * @brief Descent case for parsing blocks. Recursively calls declaration while
+ * not at the end of the block.
+ */
+static void block() {
+  while (!check(TOKEN_RIGHT_BRACE) && !check(TOKEN_EOF)) {
+    declaration();
+  }
+
+  consume(TOKEN_RIGHT_BRACE, "Expected '}' after block.");
+}
+
+/**
  * @brief Descent case for parsing statements, e.g. print, if, while, etc.
  */
 static void statement() {
   if (match(TOKEN_PRINT)) {
     printStatement();
+  } else if (match(TOKEN_LEFT_BRACE)) {
+    pushScope();
+    block();
+    popScope();
   } else {
     parseError("Expected statement.");
   }
