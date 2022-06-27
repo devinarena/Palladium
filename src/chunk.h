@@ -34,6 +34,7 @@ int addConstant(Chunk* chunk, Value value);
 typedef enum {
   OP_RETURN,
   OP_NULL,
+  OP_SWAP,
   // Unary
   OP_NOT_NUMBER,
   OP_NOT_BOOL,
@@ -41,6 +42,7 @@ typedef enum {
   OP_NEGATE_DOUBLE,
   OP_REFERENCE,
   OP_DEREFERENCE,
+  OP_ARITHMETIC_CAST_INT_DOUBLE,
   // Binary
   OP_ADD_INT,
   OP_ADD_DOUBLE,
@@ -50,6 +52,14 @@ typedef enum {
   OP_MUL_DOUBLE,
   OP_DIV_INT,
   OP_DIV_DOUBLE,
+  OP_GREATER_INT,
+  OP_GREATER_DOUBLE,
+  OP_LESS_INT,
+  OP_LESS_DOUBLE,
+  OP_GREATER_EQUAL_INT,
+  OP_GREATER_EQUAL_DOUBLE,
+  OP_LESS_EQUAL_INT,
+  OP_LESS_EQUAL_DOUBLE,
   OP_EQUALITY,
   // Constants
   OP_CONSTANT_INT,
@@ -57,6 +67,10 @@ typedef enum {
   OP_CONSTANT_BOOL,
   OP_CONSTANT_CHARACTER,
   OP_CONSTANT_STRING,
+  // Variables
+  OP_GLOBAL_GET,
+  OP_GLOBAL_SET,
+  OP_GLOBAL_DEFINE,
   OP_PRINT
 } OpCode;
 

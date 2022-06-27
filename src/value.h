@@ -19,6 +19,8 @@
 #define IS_CHARACTER(value) (value.type == VALUE_CHARACTER)
 #define IS_POINTER(value) (value.type == VALUE_POINTER)
 #define IS_OBJECT(value) (value.type == VALUE_OBJECT)
+#define IS_NUMBER(value) isNumberValue(value)
+#define IS_NUMBER_TYPE(valueType) isNumberType(valueType)
 
 #define TO_BOOL(value) (value.data.boolean)
 #define TO_INTEGER(value) (value.data.integer)
@@ -35,6 +37,7 @@
 #define FROM_POINTER(value) ((Value){VALUE_POINTER, {.pointer = value}})
 #define FROM_OBJECT(obj) ((Value){VALUE_OBJECT, {.object = (Object*)obj}})
 
+// note: types must go in order of cast priority ascending
 typedef enum {
   VALUE_NULL,
   VALUE_INTEGER,
@@ -62,5 +65,13 @@ typedef struct {
 
 void printValue(Value value);
 bool valuesEqual(Value a, Value b);
+
+static inline bool isNumberValue(Value value) {
+  return IS_INTEGER(value) || IS_DOUBLE(value);
+}
+
+static inline bool isNumberType(ValueType type) {
+  return type == VALUE_INTEGER || type == VALUE_DOUBLE;
+}
 
 #endif

@@ -12,6 +12,7 @@
 #include "compiler.h"
 #include "dynamic_array.h"
 #include "scanner.h"
+#include "table.h"
 #ifdef DEBUG_PRINT_OPCODES
 #include "disassembler.h"
 #endif
@@ -21,8 +22,9 @@ typedef struct {
   Token previous;
   bool hadError;
   bool panicMode;
-  DYNAMIC_ARRAY(TokenType) typeStack;
-  TokenType* typeStackTop;
+  DYNAMIC_ARRAY(ValueType) typeStack;
+  ValueType* typeStackTop;
+  Table globalTypes;
 } Parser;
 
 typedef struct {
@@ -182,21 +184,22 @@ static void synchronize() {
 /**
  * @brief Pushes a type onto the type stack for type checking.
  *
- * @param type TokenType the type to push.
+ * @param type ValueType the type to push.
  */
-static void pushType(TokenType type) {
+static void pushType(ValueType type) {
   uint8_t dist = (parser.typeStackTop - parser.typeStack.data);
-  INSERT_DYNAMIC_ARRAY_AT(TokenType, parser.typeStack, parser.typeStack.count,
-                          type);
+  INSERT_DYNAMIC_ARRAY_AT(ValueType, parser.typeStack, dist, type);
   parser.typeStackTop = parser.typeStack.data + dist + 1;
 }
 
 /**
  * @brief Pops a type from the type stack for type checking.
  *
- * @return TokenType the type popped.
+ * @return ValueType the type popped.
  */
-static TokenType popType() {
+static ValueType popType() {
+  if (parser.typeStackTop == parser.typeStack.data)
+    return VALUE_NULL;
   parser.typeStackTop--;
   return *parser.typeStackTop;
 }
@@ -204,10 +207,22 @@ static TokenType popType() {
 /**
  * @brief Peeks at the top of the type stack for type checking.
  *
- * @return TokenType the type at the top of the stack.
+ * @return ValueType the type at the top of the stack.
  */
-static TokenType peekType() {
+static ValueType peekType() {
+  if (parser.typeStackTop == parser.typeStack.data)
+    return VALUE_NULL;
   return *(parser.typeStackTop - 1);
+}
+
+/**
+ * @brief Swaps the top two types on the type stack for type checking.
+ */
+static void swapTypes() {
+  ValueType a = popType();
+  ValueType b = popType();
+  pushType(a);
+  pushType(b);
 }
 
 /**
@@ -252,16 +267,15 @@ static void emitConstant(int opcode, Value constant) {
 /**
  * @brief Helper for comparing two tokens.
  *
- * @param a TokenType the first TokenType to compare
- * @param b TokenType the second TokenType to compare
+ * @param a ValueType the first ValueType to compare
+ * @param b ValueType the second ValueType to compare
  * @param useNum if we should consider ints and floats to be equal
  *
- * @return bool true if the TokenTypes are equal, false otherwise
+ * @return bool true if the ValueTypes are equal, false otherwise
  */
-bool typesEqual(TokenType a, TokenType b, bool useNum) {
+bool typesEqual(ValueType a, ValueType b, bool useNum) {
   if (useNum) {
-    if ((a == TOKEN_NUMBER_INTEGER || a == TOKEN_NUMBER_FLOATING) &&
-        (b == TOKEN_NUMBER_INTEGER || b == TOKEN_NUMBER_FLOATING)) {
+    if (IS_NUMBER_TYPE(a) && IS_NUMBER_TYPE(b)) {
       return true;
     }
   }
@@ -292,7 +306,7 @@ static void statement();
 static void integer(bool canAssign) {
   int value = atoi(parser.previous.start);
   emitConstant(OP_CONSTANT_INT, FROM_INTEGER(value));
-  pushType(TOKEN_NUMBER_INTEGER);
+  pushType(VALUE_INTEGER);
 }
 
 /**
@@ -304,7 +318,7 @@ static void integer(bool canAssign) {
 static void double_(bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
   emitConstant(OP_CONSTANT_DOUBLE, FROM_DOUBLE(value));
-  pushType(TOKEN_NUMBER_FLOATING);
+  pushType(VALUE_DOUBLE);
 }
 
 /**
@@ -316,11 +330,11 @@ static void double_(bool canAssign) {
 static void literal(bool canAssign) {
   if (parser.previous.type == TOKEN_NULL) {
     emitByte(OP_NULL);
-    pushType(TOKEN_NULL);
+    pushType(VALUE_NULL);
     return;
   }
   emitConstant(OP_CONSTANT_BOOL, FROM_BOOL(parser.previous.type == TOKEN_TRUE));
-  pushType(TOKEN_BOOL);
+  pushType(VALUE_BOOL);
 }
 
 /**
@@ -344,7 +358,7 @@ static void string(bool canAssign) {
   emitConstant(OP_CONSTANT_STRING,
                FROM_OBJECT(copyString(parser.previous.start + 1,
                                       parser.previous.length - 2)));
-  pushType(TOKEN_STRING);
+  pushType(VALUE_OBJECT);
 }
 
 /**
@@ -363,22 +377,22 @@ static void grouping(bool canAssign) {
  * @param canAssign bool whether or not the constant can be assigned to (never)
  */
 static void unary(bool canAssign) {
-  TokenType previous = parser.previous.type;
+  ValueType previous = parser.previous.type;
 
   parsePrecedence(PREC_UNARY);
 
-  TokenType current = popType();
+  ValueType current = popType();
 
   switch (previous) {
     case TOKEN_MINUS:
       switch (current) {
-        case TOKEN_NUMBER_INTEGER:
+        case VALUE_INTEGER:
           emitByte(OP_NEGATE_INT);
-          pushType(TOKEN_NUMBER_INTEGER);
+          pushType(VALUE_INTEGER);
           break;
-        case TOKEN_NUMBER_FLOATING:
+        case VALUE_DOUBLE:
           emitByte(OP_NEGATE_DOUBLE);
-          pushType(TOKEN_NUMBER_FLOATING);
+          pushType(VALUE_DOUBLE);
           break;
         default:
           parseError("Cannot negate non-numeric value.");
@@ -386,16 +400,16 @@ static void unary(bool canAssign) {
       }
       break;
     case TOKEN_BANG:
-      pushType(TOKEN_BOOL);
+      pushType(VALUE_BOOL);
       printf("%d\n", peekType());
       switch (current) {
-        case TOKEN_NUMBER_INTEGER:
+        case VALUE_INTEGER:
           emitByte(OP_NOT_NUMBER);
           break;
-        case TOKEN_NUMBER_FLOATING:
+        case VALUE_DOUBLE:
           emitByte(OP_NOT_NUMBER);
           break;
-        case TOKEN_BOOL:
+        case VALUE_BOOL:
           emitByte(OP_NOT_BOOL);
           break;
         default:
@@ -405,13 +419,57 @@ static void unary(bool canAssign) {
       break;
     case TOKEN_REFERENCE:
       emitByte(OP_REFERENCE);
-      pushType(TOKEN_REFERENCE);
+      pushType(VALUE_POINTER);
       break;
     default:
       parseError("Unary operator expected");
       break;
   }
 }
+
+#define BINARY_OPERATOR_CASE_NUM_RESULT(operator, instruction)     \
+  case (operator): {                                               \
+    if (before == VALUE_INTEGER && after == VALUE_INTEGER) {       \
+      emitByte(OP_##instruction##_INT);                            \
+      pushType(VALUE_INTEGER);                                     \
+    } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {  \
+      emitByte(OP_##instruction##_DOUBLE);                         \
+      pushType(VALUE_DOUBLE);                                      \
+    } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) { \
+      emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
+      emitByte(OP_##instruction##_DOUBLE);                         \
+      pushType(VALUE_DOUBLE);                                      \
+    } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) { \
+      emitByte(OP_SWAP);                                           \
+      emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
+      emitByte(OP_##instruction##_DOUBLE);                         \
+      pushType(VALUE_DOUBLE);                                      \
+    } else {                                                       \
+      parseError("Binary operator invalid for given values.");     \
+    }                                                              \
+    break;                                                         \
+  }
+
+#define BINARY_OPERATOR_CASE_BOOL_RESULT(operator, instruction)    \
+  case (operator): {                                               \
+    if (before == VALUE_INTEGER && after == VALUE_INTEGER) {       \
+      emitByte(OP_##instruction##_INT);                            \
+    } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {  \
+      emitByte(OP_##instruction##_DOUBLE);                         \
+    } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) { \
+      emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
+      emitByte(OP_##instruction##_DOUBLE);                         \
+    } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) { \
+      emitByte(OP_SWAP);                                           \
+      emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
+      emitByte(OP_##instruction##_DOUBLE);                         \
+    } else {                                                       \
+      parseError("Binary operator invalid for given values.");     \
+      return;                                                      \
+    }                                                              \
+    pushType(VALUE_BOOL);                                          \
+    break;                                                         \
+  }
 
 /**
  * @brief Handles binary operators, such as addition/subtraction, equality, etc.
@@ -424,66 +482,22 @@ static void binary(bool canAssign) {
 
   parsePrecedence((Precedence)(rule->precedence + 1));
 
-  TokenType before = popType();
-  TokenType after = popType();
+  ValueType before = popType();
+  ValueType after = popType();
 
   switch (operator) {
-    case TOKEN_PLUS: {
-      if (typesEqual(before, after, false) && before == TOKEN_NUMBER_INTEGER) {
-        emitByte(OP_ADD_INT);
-        pushType(TOKEN_NUMBER_INTEGER);
-      } else if (typesEqual(before, after, false) &&
-                 before == TOKEN_NUMBER_FLOATING) {
-        emitByte(OP_ADD_DOUBLE);
-        pushType(TOKEN_NUMBER_FLOATING);
-      } else {
-        parseError("Cannot add non-numeric values.");
-      }
-      break;
-    }
-    case TOKEN_MINUS: {
-      if (typesEqual(before, after, false) && before == TOKEN_NUMBER_INTEGER) {
-        emitByte(OP_SUB_INT);
-        pushType(TOKEN_NUMBER_INTEGER);
-      } else if (typesEqual(before, after, false) &&
-                 before == TOKEN_NUMBER_FLOATING) {
-        emitByte(OP_SUB_DOUBLE);
-        pushType(TOKEN_NUMBER_FLOATING);
-      } else {
-        parseError("Cannot subtract non-numeric values.");
-      }
-      break;
-    }
-    case TOKEN_STAR: {
-      if (typesEqual(before, after, false) && before == TOKEN_NUMBER_INTEGER) {
-        emitByte(OP_MUL_INT);
-        pushType(TOKEN_NUMBER_INTEGER);
-      } else if (typesEqual(before, after, false) &&
-                 before == TOKEN_NUMBER_FLOATING) {
-        emitByte(OP_MUL_DOUBLE);
-        pushType(TOKEN_NUMBER_FLOATING);
-      } else {
-        parseError("Cannot multiply non-numeric values.");
-      }
-      break;
-    }
-    case TOKEN_SLASH: {
-      if (typesEqual(before, after, false) && before == TOKEN_NUMBER_INTEGER) {
-        emitByte(OP_DIV_INT);
-        pushType(TOKEN_NUMBER_INTEGER);
-      } else if (typesEqual(before, after, false) &&
-                 before == TOKEN_NUMBER_FLOATING) {
-        emitByte(OP_DIV_DOUBLE);
-        pushType(TOKEN_NUMBER_FLOATING);
-      } else {
-        parseError("Cannot divide non-numeric values.");
-      }
-      break;
-    }
+    BINARY_OPERATOR_CASE_NUM_RESULT(TOKEN_PLUS, ADD);
+    BINARY_OPERATOR_CASE_NUM_RESULT(TOKEN_MINUS, SUB);
+    BINARY_OPERATOR_CASE_NUM_RESULT(TOKEN_STAR, MUL);
+    BINARY_OPERATOR_CASE_NUM_RESULT(TOKEN_SLASH, DIV);
+    BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_GREATER, GREATER);
+    BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_GREATER_EQUAL, GREATER_EQUAL);
+    BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_LESS, LESS);
+    BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_LESS_EQUAL, LESS_EQUAL);
     case TOKEN_EQUAL_EQUAL: {
       if (typesEqual(before, after, true)) {
         emitByte(OP_EQUALITY);
-        pushType(TOKEN_BOOL);
+        pushType(VALUE_BOOL);
       } else {
         parseError("Cannot compare values of different type.");
       }
@@ -492,13 +506,75 @@ static void binary(bool canAssign) {
     case TOKEN_BANG_EQUAL: {
       if (typesEqual(before, after, true)) {
         emitBytes(OP_EQUALITY, OP_NOT_BOOL);
-        pushType(TOKEN_BOOL);
+        pushType(VALUE_BOOL);
       } else {
         parseError("Cannot compare values of different type.");
       }
       break;
     }
   }
+}
+
+/**
+ * @brief Adds an identifiers name to the list of constants.
+ *
+ * @param name Token* name of the identifier
+ * @return uint8_t index of the constant in the constant list
+ */
+static uint8_t identifierConstant(Token* name) {
+  return addConstant(compiler->current,
+                     FROM_OBJECT(copyString(name->start, name->length)));
+}
+
+/**
+ * @brief Generates the proper opcodes for getting or setting a variable.
+ *
+ * @param name Token* the name of the variable
+ * @param canAssign bool whether or not the variable can be assigned to
+ */
+static void namedVariable(Token* name, bool canAssign) {
+  uint8_t arg = identifierConstant(name);
+
+  if (canAssign && match(TOKEN_EQUAL)) {
+    expression();
+    tableSet(&parser.globalTypes,
+             (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
+             (Value){.type = peekType(0)});
+    emitBytes(OP_GLOBAL_SET, arg);
+  } else {
+    emitBytes(OP_GLOBAL_GET, arg);
+    Value value;
+    if (!tableGet(&parser.globalTypes,
+                  (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
+                  &value)) {
+      parseError("Could not get type of variable.");
+      return;
+    }
+    pushType(value.type);
+  }
+}
+
+/**
+ * @brief Descent case for variables, calls helper namedVariable.
+ *
+ * @param canAssign bool whether or not the variable can be assigned to
+ */
+static void variable(bool canAssign) {
+  namedVariable(&parser.previous, canAssign);
+}
+
+/**
+ * @brief Generates and returns the index of the constant pointing to a string
+ * with the given identifier name.
+ *
+ * @param message char* the error message if no identifier is provided
+ * @return uint8_t the index of the constant pointing to the string with the
+ * identifier name
+ */
+static uint8_t parseVariable(const char* message) {
+  consume(TOKEN_IDENTIFIER, message);
+
+  return identifierConstant(&parser.previous);
 }
 
 ParseRule rules[] = {
@@ -518,7 +594,7 @@ ParseRule rules[] = {
     [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
-    [TOKEN_IDENTIFIER] = {NULL, NULL, PREC_NONE},
+    [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER_INTEGER] = {integer, NULL, PREC_NONE},
     [TOKEN_NUMBER_FLOATING] = {double_, NULL, PREC_NONE},
@@ -537,6 +613,9 @@ ParseRule rules[] = {
     [TOKEN_NULL] = {literal, NULL, PREC_NONE},
     [TOKEN_OR] = {NULL, NULL, PREC_OR},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
+    [TOKEN_INT] = {NULL, NULL, PREC_NONE},
+    [TOKEN_DOUBLE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_BOOL] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
     [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
@@ -580,7 +659,7 @@ static void parsePrecedence(Precedence prec) {
 
 #ifdef DEBUG_TRACE_EXEC
   printf("Type Stack: ");
-  for (TokenType* slot = parser.typeStack.data; slot < parser.typeStackTop;
+  for (ValueType* slot = parser.typeStack.data; slot < parser.typeStackTop;
        slot++) {
     printf("[");
     printf("%d", *slot);
@@ -615,6 +694,78 @@ static void statement() {
   }
 }
 
+static void intDeclaration() {
+  uint8_t name = parseVariable("Expected variable name.");
+
+  if (match(TOKEN_EQUAL)) {
+    expression();
+    if (popType() != VALUE_INTEGER) {
+      parseError("Integer initialized to non-integer value.");
+    }
+    tableSet(&parser.globalTypes,
+             (ObjString*)TO_OBJECT(compiler->current->constants.data[name]),
+             (Value){.type = VALUE_INTEGER});
+  } else {
+    emitByte(OP_NULL);
+  }
+
+  consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
+  emitBytes(OP_GLOBAL_SET, name);
+}
+
+static void doubleDeclaration() {
+  uint8_t name = parseVariable("Expected variable name.");
+
+  if (match(TOKEN_EQUAL)) {
+    expression();
+    if (popType() != VALUE_DOUBLE) {
+      parseError("Double initialized to non-double value.");
+    }
+    tableSet(&parser.globalTypes,
+             (ObjString*)TO_OBJECT(compiler->current->constants.data[name]),
+             (Value){.type = VALUE_DOUBLE});
+  } else {
+    emitByte(OP_NULL);
+  }
+
+  consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
+  emitBytes(OP_GLOBAL_SET, name);
+}
+
+static void boolDeclaration() {
+  uint8_t name = parseVariable("Expected variable name.");
+
+  if (match(TOKEN_EQUAL)) {
+    expression();
+    if (popType() != VALUE_BOOL) {
+      parseError("Boolean initialized to non-boolean value.");
+    }
+    tableSet(&parser.globalTypes,
+             (ObjString*)TO_OBJECT(compiler->current->constants.data[name]),
+             (Value){.type = VALUE_BOOL});
+  } else {
+    emitByte(OP_NULL);
+  }
+
+  consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
+  emitBytes(OP_GLOBAL_SET, name);
+}
+
+/**
+ * @brief Descent case for parsing declarations, e.g. var, function, etc.
+ */
+static void declaration() {
+  if (match(TOKEN_INT)) {
+    intDeclaration();
+  } else if (match(TOKEN_DOUBLE)) {
+    doubleDeclaration();
+  } else if (match(TOKEN_BOOL)) {
+    boolDeclaration();
+  } else {
+    statement();
+  }
+}
+
 /**
  * @brief Compiles the source into opcodes for the VM to process.
  *
@@ -627,7 +778,8 @@ bool compile(const char* source, Chunk* chunk) {
   Compiler comp;
   initCompiler(&comp, chunk);
   compiler = &comp;
-  INIT_DYNAMIC_ARRAY(TokenType, parser.typeStack);
+  INIT_DYNAMIC_ARRAY(ValueType, parser.typeStack);
+  initTable(&parser.globalTypes);
 
   parser.hadError = false;
   parser.panicMode = false;
@@ -635,12 +787,13 @@ bool compile(const char* source, Chunk* chunk) {
   advance();
 
   while (parser.current.type != TOKEN_EOF) {
-    statement();
+    declaration();
   }
 
   endCompiler();
 
-  FREE_DYNAMIC_ARRAY(TokenType, parser.typeStack);
+  FREE_DYNAMIC_ARRAY(ValueType, parser.typeStack);
+  freeTable(&parser.globalTypes);
 
 #ifdef DEBUG_PRINT_OPCODES
   if (!parser.hadError) {

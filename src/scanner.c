@@ -202,6 +202,8 @@ static TokenType identifierType() {
   switch (scanner.start[0]) {
     case 'a':
       return checkKeyword(1, 2, "nd", TOKEN_AND);
+    case 'b':
+      return checkKeyword(1, 3, "ool", TOKEN_BOOL);
     case 'd':
       return checkKeyword(1, 5, "ouble", TOKEN_DOUBLE);
     case 'e':

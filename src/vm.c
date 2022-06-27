@@ -6,6 +6,7 @@
  * @since 6/24/2022
  **/
 
+#include <stdarg.h>
 #include <stdio.h>
 
 #include "compiler.h"
@@ -22,6 +23,18 @@ static void resetStack() {
   vm.stackTop = vm.stack.data;
 }
 
+static void runtimeError(const char* format, ...) {
+  va_list args;
+  va_start(args, format);
+  vfprintf(stderr, format, args);
+  va_end(args);
+  fputs("\n", stderr);
+
+  uint8_t instruction = *vm.ip;
+  fprintf(stderr, "[line %d] in script.\n", vm.chunk->lines[instruction]);
+  resetStack();
+}
+
 /**
  * @brief Initializes the VM by zeroing out memory.
  */
@@ -34,6 +47,12 @@ void initVM() {
   resetStack();
 }
 
+static void addGlobal(ObjString* name, Value value) {
+  if (!tableSet(&vm.globals, name, value)) {
+    runtimeError("Global variable '%s' already defined.", name->chars);
+  }
+}
+
 /**
  * @brief Runs the chunk stored in the VM.
  *
@@ -42,6 +61,7 @@ void initVM() {
 static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
 #define READ_CONSTANT() (vm.chunk->constants.data[READ_BYTE()])
+#define READ_STRING() ((ObjString*)TO_OBJECT(READ_CONSTANT()))
 #define BINARY_OP(ctype, type, op) \
   do {                             \
     ctype b = TO_##type(pop());    \
@@ -49,16 +69,47 @@ static InterpretResult run() {
     push(FROM_##type(a op b));     \
   } while (false)
 
+#define ARITHMETIC_OPS_NUM(op, symbol)       \
+  {                                      \
+    case OP_##op##_INT: {                \
+      BINARY_OP(int, INTEGER, symbol);   \
+      break;                             \
+    }                                    \
+    case OP_##op##_DOUBLE: {             \
+      BINARY_OP(double, DOUBLE, symbol); \
+      break;                             \
+    }                                    \
+  }
+#define ARITHMETIC_OPS_BOOL(op, symbol)       \
+  {                                      \
+    case OP_##op##_INT: {                \
+      BINARY_OP(int, BOOL, symbol);   \
+      break;                             \
+    }                                    \
+    case OP_##op##_DOUBLE: {             \
+      BINARY_OP(double, BOOL, symbol); \
+      break;                             \
+    }                                    \
+  }                                      \
+
   while (true) {
     // I like to see the stack after the operation happens
+    bool hitReturn = false;
     uint8_t traveled = 1;
     uint8_t instruction;
     switch ((instruction = READ_BYTE())) {
       case OP_RETURN: {
+#ifdef DEBUG_PRINT_OPCODES
+        disassembleInstruction(vm.chunk, vm.ip - traveled - vm.chunk->code);
+#endif
         return INTERPRET_OK;
       }
       case OP_NULL: {
         push(NULL_VAL);
+        break;
+      }
+      case OP_SWAP: {
+        swap();
         break;
       }
       // UNARY OPERATIONS
@@ -81,49 +132,30 @@ static InterpretResult run() {
       }
       case OP_REFERENCE: {
         Value value = pop();
-        Value pointer = FROM_POINTER((struct Value*) &value);
+        Value pointer = FROM_POINTER((struct Value*)&value);
         push(pointer);
         break;
       }
       case OP_DEREFERENCE: {
         Value value = pop();
-        Value deref = *(Value*) value.data.pointer;
+        Value deref = *(Value*)value.data.pointer;
         push(deref);
         break;
       }
-      // BINARY OPERATIONS
-      case OP_ADD_INT: {
-        BINARY_OP(int, INTEGER, +);
+      case OP_ARITHMETIC_CAST_INT_DOUBLE: {
+        Value int_ = pop();
+        push(FROM_DOUBLE((double)TO_INTEGER(int_)));
         break;
       }
-      case OP_ADD_DOUBLE: {
-        BINARY_OP(double, DOUBLE, +);
-        break;
-      }
-      case OP_SUB_INT: {
-        BINARY_OP(int, INTEGER, -);
-        break;
-      }
-      case OP_SUB_DOUBLE: {
-        BINARY_OP(double, DOUBLE, -);
-        break;
-      }
-      case OP_MUL_INT: {
-        BINARY_OP(int, INTEGER, *);
-        break;
-      }
-      case OP_MUL_DOUBLE: {
-        BINARY_OP(double, DOUBLE, *);
-        break;
-      }
-      case OP_DIV_INT: {
-        BINARY_OP(int, INTEGER, /);
-        break;
-      }
-      case OP_DIV_DOUBLE: {
-        BINARY_OP(double, DOUBLE, /);
-        break;
-      }
+        // BINARY OPERATIONS
+        ARITHMETIC_OPS_NUM(ADD, +)
+        ARITHMETIC_OPS_NUM(SUB, -)
+        ARITHMETIC_OPS_NUM(MUL, *)
+        ARITHMETIC_OPS_NUM(DIV, /)
+        ARITHMETIC_OPS_BOOL(GREATER, >)
+        ARITHMETIC_OPS_BOOL(LESS, <)
+        ARITHMETIC_OPS_BOOL(GREATER_EQUAL, >=)
+        ARITHMETIC_OPS_BOOL(LESS_EQUAL, <=)
       case OP_EQUALITY: {
         Value b = pop();
         Value a = pop();
@@ -138,6 +170,25 @@ static InterpretResult run() {
       case OP_CONSTANT_DOUBLE: {
         Value constant = READ_CONSTANT();
         push(constant);
+        traveled++;
+        break;
+      }
+      // Variables
+      case OP_GLOBAL_GET: {
+        ObjString* name = READ_STRING();
+        Value value;
+        if (!tableGet(&vm.globals, name, &value)) {
+          runtimeError("Undefined variable '%s'.", name->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        push(value);
+        traveled++;
+        break;
+      }
+      case OP_GLOBAL_SET: {
+        ObjString* name = READ_STRING();
+        Value value = pop();
+        addGlobal(name, value);
         traveled++;
         break;
       }
@@ -162,7 +213,9 @@ static InterpretResult run() {
 
 #undef READ_BYTE
 #undef READ_CONSTANT
+#undef READ_STRING
 #undef BINARY_OP
+#undef ARITHMETIC_OPS
 }
 
 /**
@@ -219,6 +272,16 @@ Value pop() {
  */
 Value peek(int distance) {
   return vm.stack.data[vm.stackTop - vm.stack.data - distance - 1];
+}
+
+/**
+ * @brief Swaps the two top values on the stack.
+ */
+void swap() {
+  Value a = pop();
+  Value b = pop();
+  push(a);
+  push(b);
 }
 
 /**

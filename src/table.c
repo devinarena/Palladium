@@ -8,6 +8,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 
 #include "memory.h"
 #include "object.h"
@@ -130,7 +131,7 @@ bool tableGet(Table* table, ObjString* key, Value* value) {
  * @param table Table* the table to set the value in.
  * @param key ObjString* the key to set the value for.
  * @param value Value the value to set.
- * @return bool true if the key was found, false otherwise.
+ * @return bool true if the key is not found, false otherwise.
  */
 bool tableSet(Table* table, ObjString* key, Value value) {
   if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
