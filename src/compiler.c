@@ -267,10 +267,9 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
  * @param byte uint8_t the jump opcode to emit
  */
 static int emitJump(uint8_t byte) {
-  int ret = compiler->current->count;
   emitByte(byte);
   emitBytes(0xFF, 0xFF);
-  return ret;
+  return compiler->current->count - 2;
 }
 
 /**
@@ -280,13 +279,13 @@ static int emitJump(uint8_t byte) {
  * @param offset
  */
 static void patchJump(int offset) {
-  int jump = compiler->current->count - offset - 3;
+  int jump = compiler->current->count - offset - 2;
   if (jump > UINT16_MAX) {
     parseError("Too much code to jump over.");
     return;
   }
-  compiler->current->code[offset + 1] = (jump >> 8) & 0xFF;
-  compiler->current->code[offset + 2] = jump & 0xFF;
+  compiler->current->code[offset] = (jump >> 8) & 0xFF;
+  compiler->current->code[offset + 1] = jump & 0xFF;
 }
 
 /**
@@ -501,6 +500,7 @@ static void unary(bool canAssign) {
       emitByte(OP_SWAP);                                           \
       emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
       emitByte(OP_##instruction##_DOUBLE);                         \
+      emitByte(OP_SWAP);                                           \
       pushType(VALUE_DOUBLE);                                      \
     } else {                                                       \
       parseError("Binary operator invalid for given values.");     \
@@ -520,6 +520,7 @@ static void unary(bool canAssign) {
     } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) { \
       emitByte(OP_SWAP);                                           \
       emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
+      emitByte(OP_SWAP);                                           \
       emitByte(OP_##instruction##_DOUBLE);                         \
     } else {                                                       \
       parseError("Binary operator invalid for given values.");     \
@@ -707,12 +708,16 @@ static void parsePrecedence(Precedence prec) {
 
   bool canAssign = prec <= PREC_ASSIGNMENT;
 
-  prefix(false);
+  prefix(canAssign);
 
   while (prec <= getRule(parser.current.type)->precedence) {
     advance();
     ParseFn infix = getRule(parser.previous.type)->infix;
     infix(canAssign);
+  }
+
+  if (!canAssign && match(TOKEN_EQUAL)) {
+    parseError("Invalid assignment target.");
   }
 
 #ifdef DEBUG_TRACE_EXEC
@@ -782,19 +787,37 @@ static void ifStatement() {
 }
 
 /**
+ * @brief Descent case for expression statements (expressions terminated with a
+ * ';')
+ */
+static void expressionStatement() {
+  expression();
+  popType();
+  consume(TOKEN_SEMICOLON, "Expect ';' following expression.");
+}
+
+/**
+ * @brief Descent case for while statements (a condition and loop body)
+ * 
+ */
+static void whileStatement() {
+  
+}
+
+/**
  * @brief Descent case for parsing statements, e.g. print, if, while, etc.
  */
 static void statement() {
   if (match(TOKEN_PRINT)) {
     printStatement();
+  } else if (match(TOKEN_IF)) {
+    ifStatement();
   } else if (match(TOKEN_LEFT_BRACE)) {
     pushScope();
     block();
     popScope();
-  } else if (match(TOKEN_IF)) {
-    ifStatement();
   } else {
-    parseError("Expected statement.");
+    expressionStatement();
   }
 }
 
@@ -814,7 +837,7 @@ static void intDeclaration() {
   }
 
   consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
-  emitBytes(OP_GLOBAL_SET, name);
+  emitBytes(OP_GLOBAL_DEFINE, name);
 }
 
 static void doubleDeclaration() {

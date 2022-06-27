@@ -47,8 +47,26 @@ void initVM() {
   resetStack();
 }
 
+/**
+ * @brief Set the global in the VM's global table without caring for redefinition.
+ * 
+ * @param name ObjString* the name of the global
+ * @param value Value the value to set it to
+ * @return bool true if the variable existed in the table previously, false otherwise
+ */
+static bool setGlobal(ObjString* name, Value value) {
+  return !tableSet(&vm.globals, name, value);
+}
+
+/**
+ * @brief Adds a global to the VM's global table. Reports a runtime error if the
+ * global is already defined.
+ *
+ * @param name ObjString* the name of the global
+ * @param value Value the value to set it to
+ */
 static void addGlobal(ObjString* name, Value value) {
-  if (!tableSet(&vm.globals, name, value)) {
+  if (setGlobal(name, value)) {
     runtimeError("Global variable '%s' already defined.", name->chars);
   }
 }
@@ -63,34 +81,34 @@ static InterpretResult run() {
 #define READ_SHORT() (vm.ip += 2, (vm.ip[-2] << 8) | vm.ip[-1])
 #define READ_CONSTANT() (vm.chunk->constants.data[READ_BYTE()])
 #define READ_STRING() ((ObjString*)TO_OBJECT(READ_CONSTANT()))
-#define BINARY_OP(ctype, type, op) \
-  do {                             \
-    ctype b = TO_##type(pop());    \
-    ctype a = TO_##type(pop());    \
-    push(FROM_##type(a op b));     \
+#define BINARY_OP(ctype, type, result, op) \
+  do {                                     \
+    ctype b = TO_##type(pop());            \
+    ctype a = TO_##type(pop());            \
+    push(FROM_##result(a op b));           \
   } while (false)
 
-#define ARITHMETIC_OPS_NUM(op, symbol)   \
-  {                                      \
-    case OP_##op##_INT: {                \
-      BINARY_OP(int, INTEGER, symbol);   \
-      break;                             \
-    }                                    \
-    case OP_##op##_DOUBLE: {             \
-      BINARY_OP(double, DOUBLE, symbol); \
-      break;                             \
-    }                                    \
+#define ARITHMETIC_OPS_NUM(op, symbol)           \
+  {                                              \
+    case OP_##op##_INT: {                        \
+      BINARY_OP(int, INTEGER, INTEGER, symbol);  \
+      break;                                     \
+    }                                            \
+    case OP_##op##_DOUBLE: {                     \
+      BINARY_OP(double, DOUBLE, DOUBLE, symbol); \
+      break;                                     \
+    }                                            \
   }
-#define ARITHMETIC_OPS_BOOL(op, symbol) \
-  {                                     \
-    case OP_##op##_INT: {               \
-      BINARY_OP(int, BOOL, symbol);     \
-      break;                            \
-    }                                   \
-    case OP_##op##_DOUBLE: {            \
-      BINARY_OP(double, BOOL, symbol);  \
-      break;                            \
-    }                                   \
+#define ARITHMETIC_OPS_BOOL(op, symbol)        \
+  {                                            \
+    case OP_##op##_INT: {                      \
+      BINARY_OP(int, INTEGER, BOOL, symbol);   \
+      break;                                   \
+    }                                          \
+    case OP_##op##_DOUBLE: {                   \
+      BINARY_OP(double, DOUBLE, BOOL, symbol); \
+      break;                                   \
+    }                                          \
   }
 
   while (true) {
@@ -212,6 +230,13 @@ static InterpretResult run() {
         break;
       }
       case OP_GLOBAL_SET: {
+        ObjString* name = READ_STRING();
+        Value value = pop();
+        setGlobal(name, value);
+        traveled++;
+        break;
+      }
+      case OP_GLOBAL_DEFINE: {
         ObjString* name = READ_STRING();
         Value value = pop();
         addGlobal(name, value);
