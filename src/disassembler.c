@@ -50,8 +50,7 @@ static int simpleInstruction(const char* name, int offset) {
  */
 static int shortInstruction(const char* name, Chunk* chunk, int offset) {
   uint16_t data = (chunk->code[offset + 1] << 8) | chunk->code[offset + 2];
-  printf("%-16s %4d '", name, data);
-  printf("'\n");
+  printf("%-16s %4d\n", name, data);
   return offset + 3;
 }
 
@@ -98,6 +97,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_PRINT", offset);
     case OP_SWAP:
       return simpleInstruction("OP_SWAP", offset);
+    case OP_POP:
+      return simpleInstruction("OP_POP", offset);
     // unary
     case OP_NOT_NUMBER:
       return simpleInstruction("OP_NOT_NUMBER", offset);
@@ -112,7 +113,11 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_DEREFERENCE:
       return simpleInstruction("OP_DEREFERENCE", offset);
     case OP_ARITHMETIC_CAST_INT_DOUBLE:
-      return simpleInstruction("OP_ARITHMETIC_CAST", offset);
+      return simpleInstruction("OP_ARITHMETIC_CAST_INT_DOUBLE", offset);
+    case OP_JUMP_IF_FALSE:
+      return shortInstruction("OP_JUMP_IF_FALSE", chunk, offset);
+    case OP_JUMP:
+      return shortInstruction("OP_JUMP", chunk, offset);
       // binary
     case OP_ADD_INT:
       return simpleInstruction("OP_ADD_INT", offset);

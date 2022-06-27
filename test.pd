@@ -1,4 +1,9 @@
-{
-    int a = 1;
-    print a <= 0;
+int a = 6;
+
+if (a >= 5) {
+    print "a is greater than or equal to 5";
+} else if (a == 4) {
+    print "a is equal to 4";
+} else {
+    print "a is less than 5";
 }

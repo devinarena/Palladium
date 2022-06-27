@@ -60,6 +60,7 @@ static void addGlobal(ObjString* name, Value value) {
  */
 static InterpretResult run() {
 #define READ_BYTE() (*vm.ip++)
+#define READ_SHORT() (vm.ip += 2, (vm.ip[-2] << 8) | vm.ip[-1])
 #define READ_CONSTANT() (vm.chunk->constants.data[READ_BYTE()])
 #define READ_STRING() ((ObjString*)TO_OBJECT(READ_CONSTANT()))
 #define BINARY_OP(ctype, type, op) \
@@ -69,7 +70,7 @@ static InterpretResult run() {
     push(FROM_##type(a op b));     \
   } while (false)
 
-#define ARITHMETIC_OPS_NUM(op, symbol)       \
+#define ARITHMETIC_OPS_NUM(op, symbol)   \
   {                                      \
     case OP_##op##_INT: {                \
       BINARY_OP(int, INTEGER, symbol);   \
@@ -80,17 +81,17 @@ static InterpretResult run() {
       break;                             \
     }                                    \
   }
-#define ARITHMETIC_OPS_BOOL(op, symbol)       \
-  {                                      \
-    case OP_##op##_INT: {                \
-      BINARY_OP(int, BOOL, symbol);   \
-      break;                             \
-    }                                    \
-    case OP_##op##_DOUBLE: {             \
-      BINARY_OP(double, BOOL, symbol); \
-      break;                             \
-    }                                    \
-  }                                      \
+#define ARITHMETIC_OPS_BOOL(op, symbol) \
+  {                                     \
+    case OP_##op##_INT: {               \
+      BINARY_OP(int, BOOL, symbol);     \
+      break;                            \
+    }                                   \
+    case OP_##op##_DOUBLE: {            \
+      BINARY_OP(double, BOOL, symbol);  \
+      break;                            \
+    }                                   \
+  }
 
   while (true) {
     // I like to see the stack after the operation happens
@@ -110,6 +111,10 @@ static InterpretResult run() {
       }
       case OP_SWAP: {
         swap();
+        break;
+      }
+      case OP_POP: {
+        pop();
         break;
       }
       // UNARY OPERATIONS
@@ -146,6 +151,27 @@ static InterpretResult run() {
         Value int_ = pop();
         push(FROM_DOUBLE((double)TO_INTEGER(int_)));
         break;
+      }
+      case OP_JUMP: {
+#ifdef DEBUG_TRACE_EXEC
+        disassembleInstruction(vm.chunk,
+                               (int)(vm.ip - traveled - vm.chunk->code));
+#endif
+        uint16_t offset = READ_SHORT();
+        vm.ip += offset;
+        continue;
+      }
+      case OP_JUMP_IF_FALSE: {
+#ifdef DEBUG_TRACE_EXEC
+        disassembleInstruction(vm.chunk,
+                               (int)(vm.ip - traveled - vm.chunk->code));
+#endif
+        uint16_t offset = READ_SHORT();
+        Value condition = peek(0);
+        if (!TO_BOOL(condition)) {
+          vm.ip += offset;
+        }
+        continue;
       }
         // BINARY OPERATIONS
         ARITHMETIC_OPS_NUM(ADD, +)

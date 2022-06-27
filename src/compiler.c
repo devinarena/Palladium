@@ -262,6 +262,34 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
 }
 
 /**
+ * @brief Helper for emitting a jump (jump opcode).
+ *
+ * @param byte uint8_t the jump opcode to emit
+ */
+static int emitJump(uint8_t byte) {
+  int ret = compiler->current->count;
+  emitByte(byte);
+  emitBytes(0xFF, 0xFF);
+  return ret;
+}
+
+/**
+ * @brief Patches a jump by setting the bytes at the specified offset to the
+ * correct jump location (current instruction count).
+ *
+ * @param offset
+ */
+static void patchJump(int offset) {
+  int jump = compiler->current->count - offset - 3;
+  if (jump > UINT16_MAX) {
+    parseError("Too much code to jump over.");
+    return;
+  }
+  compiler->current->code[offset + 1] = (jump >> 8) & 0xFF;
+  compiler->current->code[offset + 2] = jump & 0xFF;
+}
+
+/**
  * @brief Helper for emitting a return opcode.
  */
 static void emitReturn() {
@@ -305,6 +333,9 @@ static void pushScope() {
   compiler->scopeDepth++;
 }
 
+/**
+ * @brief Decrements scope depth.
+ */
 static void popScope() {
   compiler->scopeDepth--;
 }
@@ -723,6 +754,34 @@ static void block() {
 }
 
 /**
+ * @brief Descent case for if statement, parses the condition and then the if
+ * and else blocks.
+ */
+static void ifStatement() {
+  consume(TOKEN_LEFT_PAREN, "Expected '(' after if.");
+  expression();
+  if (popType() != VALUE_BOOL) {
+    parseError("Expected boolean condition.");
+  }
+  consume(TOKEN_RIGHT_PAREN, "Expected ')' after if condition.");
+
+  int thenJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  statement();
+
+  int elseJump = emitJump(OP_JUMP);
+
+  patchJump(thenJump);
+  emitByte(OP_POP);
+
+  if (match(TOKEN_ELSE)) {
+    statement();
+  }
+
+  patchJump(elseJump);
+}
+
+/**
  * @brief Descent case for parsing statements, e.g. print, if, while, etc.
  */
 static void statement() {
@@ -732,6 +791,8 @@ static void statement() {
     pushScope();
     block();
     popScope();
+  } else if (match(TOKEN_IF)) {
+    ifStatement();
   } else {
     parseError("Expected statement.");
   }

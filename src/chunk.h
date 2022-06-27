@@ -35,6 +35,7 @@ typedef enum {
   OP_RETURN,
   OP_NULL,
   OP_SWAP,
+  OP_POP,
   // Unary
   OP_NOT_NUMBER,
   OP_NOT_BOOL,
@@ -43,6 +44,8 @@ typedef enum {
   OP_REFERENCE,
   OP_DEREFERENCE,
   OP_ARITHMETIC_CAST_INT_DOUBLE,
+  OP_JUMP_IF_FALSE,
+  OP_JUMP,
   // Binary
   OP_ADD_INT,
   OP_ADD_DOUBLE,
