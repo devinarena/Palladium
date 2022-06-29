@@ -36,6 +36,8 @@ typedef enum {
   OP_NULL,
   OP_SWAP,
   OP_POP,
+  OP_JUMP,
+  OP_LOOP,
   // Unary
   OP_NOT_NUMBER,
   OP_NOT_BOOL,
@@ -45,7 +47,6 @@ typedef enum {
   OP_DEREFERENCE,
   OP_ARITHMETIC_CAST_INT_DOUBLE,
   OP_JUMP_IF_FALSE,
-  OP_JUMP,
   // Binary
   OP_ADD_INT,
   OP_ADD_DOUBLE,
@@ -74,6 +75,8 @@ typedef enum {
   OP_GLOBAL_GET,
   OP_GLOBAL_SET,
   OP_GLOBAL_DEFINE,
+  OP_LOCAL_SET,
+  OP_LOCAL_GET,
   OP_PRINT
 } OpCode;
 

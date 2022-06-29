@@ -28,8 +28,15 @@ typedef struct {
 } Parser;
 
 typedef struct {
+  Token name;
+  int depth;
+  uint8_t valueType;
+} Local;
+
+typedef struct {
   Chunk* current;
   int scopeDepth;
+  DYNAMIC_ARRAY(Local) locals;
 } Compiler;
 
 typedef enum {
@@ -272,6 +279,12 @@ static int emitJump(uint8_t byte) {
   return compiler->current->count - 2;
 }
 
+static void emitLoop(int instruction) {
+  int offset = compiler->current->count - instruction;
+  emitByte(OP_LOOP);
+  emitBytes((offset >> 8) & 0xFF, offset & 0xFF);
+}
+
 /**
  * @brief Patches a jump by setting the bytes at the specified offset to the
  * correct jump location (current instruction count).
@@ -325,6 +338,32 @@ bool typesEqual(ValueType a, ValueType b, bool useNum) {
   return a == b;
 }
 
+static int resolveLocal(Token* name) {
+  for (int i = compiler->locals.count - 1; i >= 0; i--) {
+    Local local = compiler->locals.data[i];
+    if (local.name.start == name->start && local.name.length == name->length) {
+      return local.depth;
+    }
+  }
+  return -1;
+}
+
+static void addLocal(Token name, ValueType type) {
+  if (compiler->scopeDepth == 0) {
+    parseError("Cannot declare local variables at the top level.");
+    return;
+  }
+  if (resolveLocal(&name) == compiler->scopeDepth) {
+    parseError("Cannot declare two variables with the same name.");
+    return;
+  }
+  Local local;
+  local.name = name;
+  local.valueType = type;
+  local.depth = -1;
+  INSERT_DYNAMIC_ARRAY(Local, compiler->locals, local);
+}
+
 /**
  * @brief Increments scope depth.
  */
@@ -337,6 +376,15 @@ static void pushScope() {
  */
 static void popScope() {
   compiler->scopeDepth--;
+
+  // remove all locals from the current scope
+  for (int i = compiler->locals.count - 1; i >= 0; i--) {
+    Local local = compiler->locals.data[i];
+    if (local.depth >= compiler->scopeDepth) {
+      compiler->locals.count--;
+    } else
+      break;
+  }
 }
 
 /**
@@ -458,7 +506,6 @@ static void unary(bool canAssign) {
       break;
     case TOKEN_BANG:
       pushType(VALUE_BOOL);
-      printf("%d\n", peekType());
       switch (current) {
         case VALUE_INTEGER:
           emitByte(OP_NOT_NUMBER);
@@ -592,24 +639,34 @@ static uint8_t identifierConstant(Token* name) {
  * @param canAssign bool whether or not the variable can be assigned to
  */
 static void namedVariable(Token* name, bool canAssign) {
-  uint8_t arg = identifierConstant(name);
-
-  if (canAssign && match(TOKEN_EQUAL)) {
-    expression();
-    tableSet(&parser.globalTypes,
-             (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
-             (Value){.type = peekType(0)});
-    emitBytes(OP_GLOBAL_SET, arg);
-  } else {
-    emitBytes(OP_GLOBAL_GET, arg);
-    Value value;
-    if (!tableGet(&parser.globalTypes,
-                  (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
-                  &value)) {
-      parseError("Could not get type of variable.");
-      return;
+  int arg = resolveLocal(name);
+  if (arg != -1) {
+    if (canAssign && match(TOKEN_EQUAL)) {
+      expression();
+      emitBytes(OP_LOCAL_SET, (uint8_t)arg);
+    } else {
+      emitBytes(OP_LOCAL_GET, (uint8_t)arg);
+      pushType(compiler->locals.data[arg].valueType);
     }
-    pushType(value.type);
+  } else {
+    if (canAssign && match(TOKEN_EQUAL)) {
+      expression();
+      tableSet(&parser.globalTypes,
+               (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
+               (Value){.type = popType()});
+      emitBytes(OP_GLOBAL_SET, arg);
+    } else {
+      emitBytes(OP_GLOBAL_GET, arg);
+      Value value;
+      if (!tableGet(
+              &parser.globalTypes,
+              (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
+              &value)) {
+        parseError("Could not get type of variable.");
+        return;
+      }
+      pushType(value.type);
+    }
   }
 }
 
@@ -732,6 +789,9 @@ static void parsePrecedence(Precedence prec) {
 #endif
 }
 
+/**
+ * @brief Descent case for an expression, parses with assignment precedence.
+ */
 static void expression() {
   parsePrecedence(PREC_ASSIGNMENT);
 }
@@ -798,10 +858,23 @@ static void expressionStatement() {
 
 /**
  * @brief Descent case for while statements (a condition and loop body)
- * 
+ *
  */
 static void whileStatement() {
-  
+  int loopStart = compiler->current->count - 3;
+  consume(TOKEN_LEFT_PAREN, "Expected '(' after while.");
+  expression();
+  if (popType() != VALUE_BOOL) {
+    parseError("Expected boolean condition.");
+  }
+  consume(TOKEN_RIGHT_PAREN, "Expected ')' after while condition.");
+
+  int exitJump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  statement();
+  emitLoop(loopStart);
+  patchJump(exitJump);
+  emitByte(OP_POP);
 }
 
 /**
@@ -812,6 +885,8 @@ static void statement() {
     printStatement();
   } else if (match(TOKEN_IF)) {
     ifStatement();
+  } else if (match(TOKEN_WHILE)) {
+    whileStatement();
   } else if (match(TOKEN_LEFT_BRACE)) {
     pushScope();
     block();
@@ -821,25 +896,43 @@ static void statement() {
   }
 }
 
+/**
+ * @brief Descent case for integer declaration, int followed by an identifier
+ * and initializer.
+ */
 static void intDeclaration() {
   uint8_t name = parseVariable("Expected variable name.");
+  uint8_t op = OP_GLOBAL_DEFINE;
 
   if (match(TOKEN_EQUAL)) {
     expression();
     if (popType() != VALUE_INTEGER) {
       parseError("Integer initialized to non-integer value.");
     }
-    tableSet(&parser.globalTypes,
-             (ObjString*)TO_OBJECT(compiler->current->constants.data[name]),
-             (Value){.type = VALUE_INTEGER});
+    if (compiler->scopeDepth == 0) {
+      tableSet(&parser.globalTypes,
+               (ObjString*)TO_OBJECT(compiler->current->constants.data[name]),
+               (Value){.type = VALUE_INTEGER});
+    } else {
+      addLocal(compiler->locals.data[name].name, VALUE_INTEGER);
+      op = OP_LOCAL_SET;
+    }
   } else {
     emitByte(OP_NULL);
   }
 
   consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
-  emitBytes(OP_GLOBAL_DEFINE, name);
+  emitBytes(op, name);
+
+  if (op == OP_LOCAL_SET) {
+    compiler->locals.data[name].depth = compiler->scopeDepth;
+  }
 }
 
+/**
+ * @brief Descent case for double declaration, double followed by an identifier
+ * and initializer.
+ */
 static void doubleDeclaration() {
   uint8_t name = parseVariable("Expected variable name.");
 
@@ -859,6 +952,10 @@ static void doubleDeclaration() {
   emitBytes(OP_GLOBAL_SET, name);
 }
 
+/**
+ * @brief Descent case for boolean declaration, bool followed by an identifier
+ * and initializer.
+ */
 static void boolDeclaration() {
   uint8_t name = parseVariable("Expected variable name.");
 

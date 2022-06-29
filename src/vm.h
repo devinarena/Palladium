@@ -17,6 +17,12 @@
 typedef struct {
   Chunk* chunk;
   uint8_t* ip;
+  Value* slot;
+} CallFrame;
+
+typedef struct {
+  CallFrame* callStack;
+  int callStackSize;
   DYNAMIC_ARRAY(Value) stack;
   Table strings;
   Table globals;

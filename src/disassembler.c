@@ -99,6 +99,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_SWAP", offset);
     case OP_POP:
       return simpleInstruction("OP_POP", offset);
+    case OP_JUMP:
+      return shortInstruction("OP_JUMP", chunk, offset);
+    case OP_LOOP:
+      return shortInstruction("OP_LOOP", chunk, offset);
     // unary
     case OP_NOT_NUMBER:
       return simpleInstruction("OP_NOT_NUMBER", offset);
@@ -116,8 +120,6 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_ARITHMETIC_CAST_INT_DOUBLE", offset);
     case OP_JUMP_IF_FALSE:
       return shortInstruction("OP_JUMP_IF_FALSE", chunk, offset);
-    case OP_JUMP:
-      return shortInstruction("OP_JUMP", chunk, offset);
       // binary
     case OP_ADD_INT:
       return simpleInstruction("OP_ADD_INT", offset);
@@ -170,6 +172,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_GLOBAL_SET", chunk, offset);
     case OP_GLOBAL_DEFINE:
       return constantInstruction("OP_GLOBAL_DEFINE", chunk, offset);
+    case OP_LOCAL_GET:
+      return constantInstruction("OP_LOCAL_GET", chunk, offset);
+    case OP_LOCAL_SET:
+      return constantInstruction("OP_LOCAL_SET", chunk, offset);
     default:
       printf("Unknown opcode encountered: %d", instruction);
       exit(1);

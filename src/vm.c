@@ -21,6 +21,7 @@ VM vm;
  */
 static void resetStack() {
   vm.stackTop = vm.stack.data;
+  vm.callStackSize = 0;
 }
 
 static void runtimeError(const char* format, ...) {
@@ -30,8 +31,8 @@ static void runtimeError(const char* format, ...) {
   va_end(args);
   fputs("\n", stderr);
 
-  uint8_t instruction = *vm.ip;
-  fprintf(stderr, "[line %d] in script.\n", vm.chunk->lines[instruction]);
+  uint8_t instruction = *vm.callStack->ip;
+  fprintf(stderr, "[line %d] in script.\n", vm.callStack->chunk->lines[instruction]);
   resetStack();
 }
 
@@ -40,19 +41,21 @@ static void runtimeError(const char* format, ...) {
  */
 void initVM() {
   INIT_DYNAMIC_ARRAY(Value, vm.stack);
-  vm.chunk = NULL;
   vm.heap = NULL;
+  vm.callStack = 0;
   initTable(&vm.strings);
   initTable(&vm.globals);
   resetStack();
 }
 
 /**
- * @brief Set the global in the VM's global table without caring for redefinition.
- * 
+ * @brief Set the global in the VM's global table without caring for
+ * redefinition.
+ *
  * @param name ObjString* the name of the global
  * @param value Value the value to set it to
- * @return bool true if the variable existed in the table previously, false otherwise
+ * @return bool true if the variable existed in the table previously, false
+ * otherwise
  */
 static bool setGlobal(ObjString* name, Value value) {
   return !tableSet(&vm.globals, name, value);
@@ -77,9 +80,10 @@ static void addGlobal(ObjString* name, Value value) {
  * @return InterpretResult The result of the execution.
  */
 static InterpretResult run() {
-#define READ_BYTE() (*vm.ip++)
-#define READ_SHORT() (vm.ip += 2, (vm.ip[-2] << 8) | vm.ip[-1])
-#define READ_CONSTANT() (vm.chunk->constants.data[READ_BYTE()])
+  CallFrame frame = vm.callStack[vm.callStackSize - 1];
+#define READ_BYTE() (*frame.ip++)
+#define READ_SHORT() (frame.ip += 2, (frame.ip[-2] << 8) | frame.ip[-1])
+#define READ_CONSTANT() (frame.chunk->constants.data[READ_BYTE()])
 #define READ_STRING() ((ObjString*)TO_OBJECT(READ_CONSTANT()))
 #define BINARY_OP(ctype, type, result, op) \
   do {                                     \
@@ -112,14 +116,13 @@ static InterpretResult run() {
   }
 
   while (true) {
-    // I like to see the stack after the operation happens
     bool hitReturn = false;
     uint8_t traveled = 1;
     uint8_t instruction;
     switch ((instruction = READ_BYTE())) {
       case OP_RETURN: {
 #ifdef DEBUG_PRINT_OPCODES
-        disassembleInstruction(vm.chunk, vm.ip - traveled - vm.chunk->code);
+        disassembleInstruction(frame.chunk, frame.ip - traveled - frame.chunk->code);
 #endif
         return INTERPRET_OK;
       }
@@ -133,6 +136,27 @@ static InterpretResult run() {
       }
       case OP_POP: {
         pop();
+        break;
+      }
+      case OP_JUMP: {
+#ifdef DEBUG_TRACE_EXEC
+        disassembleInstruction(frame.chunk,
+                               (int)(frame.ip - traveled - frame.chunk->code));
+#endif
+        uint16_t offset = READ_SHORT();
+        frame.ip += offset;
+        continue;
+      }
+      case OP_LOOP: {
+#ifdef DEBUG_TRACE_EXEC
+        disassembleInstruction(frame.chunk,
+                               (int)(frame.ip - traveled - frame.chunk->code));
+#endif
+        uint16_t offset = READ_SHORT();
+        if (TO_BOOL(peek(0))) {
+          frame.ip -= offset;
+          continue;
+        }
         break;
       }
       // UNARY OPERATIONS
@@ -170,24 +194,15 @@ static InterpretResult run() {
         push(FROM_DOUBLE((double)TO_INTEGER(int_)));
         break;
       }
-      case OP_JUMP: {
-#ifdef DEBUG_TRACE_EXEC
-        disassembleInstruction(vm.chunk,
-                               (int)(vm.ip - traveled - vm.chunk->code));
-#endif
-        uint16_t offset = READ_SHORT();
-        vm.ip += offset;
-        continue;
-      }
       case OP_JUMP_IF_FALSE: {
 #ifdef DEBUG_TRACE_EXEC
-        disassembleInstruction(vm.chunk,
-                               (int)(vm.ip - traveled - vm.chunk->code));
+        disassembleInstruction(frame.chunk,
+                               (int)(frame.ip - traveled - frame.chunk->code));
 #endif
         uint16_t offset = READ_SHORT();
         Value condition = peek(0);
         if (!TO_BOOL(condition)) {
-          vm.ip += offset;
+          frame.ip += offset;
         }
         continue;
       }
@@ -243,6 +258,20 @@ static InterpretResult run() {
         traveled++;
         break;
       }
+      case OP_LOCAL_GET: {
+        uint8_t slot = READ_BYTE();
+        Value value = frame.slot[slot];
+        push(value);
+        traveled++;
+        break;
+      }
+      case OP_LOCAL_SET: {
+        uint8_t slot = READ_BYTE();
+        Value value = pop();
+        frame.slot[slot] = value;
+        traveled++;
+        break;
+      }
       case OP_PRINT: {
         Value value = pop();
         printValue(value);
@@ -250,8 +279,9 @@ static InterpretResult run() {
         break;
       }
     }
+    // I like to see the stack after the operation happens
 #ifdef DEBUG_TRACE_EXEC
-    disassembleInstruction(vm.chunk, (int)(vm.ip - traveled - vm.chunk->code));
+    disassembleInstruction(frame.chunk, (int)(frame.ip - traveled - frame.chunk->code));
     printf("        ");
     for (Value* slot = vm.stack.data; slot < vm.stackTop; slot++) {
       printf("[");
@@ -283,8 +313,12 @@ InterpretResult interpret(const char* source) {
   if (!compile(source, &chunk)) {
     return INTERPRET_COMPILE_ERROR;
   }
-  vm.chunk = &chunk;
-  vm.ip = vm.chunk->code;
+  CallFrame callFrame;
+  callFrame.chunk = &chunk;
+  callFrame.ip = chunk.code;
+  callFrame.slot = NULL;
+  vm.callStack = &callFrame;
+  vm.callStackSize += 1;
 
   InterpretResult result = run();
 
