@@ -278,7 +278,7 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
 static int emitJump(uint8_t byte) {
   emitByte(byte);
   emitBytes(0xFF, 0xFF);
-  return compiler->current->count - 2;
+  return compiler->current->count - 3;
 }
 
 /**
@@ -299,13 +299,13 @@ static void emitLoop(int instruction) {
  * @param offset
  */
 static void patchJump(int offset) {
-  int jump = compiler->current->count - offset - 2;
+  int jump = compiler->current->count - offset - 3;
   if (jump > UINT16_MAX) {
     parseError("Too much code to jump over.");
     return;
   }
-  compiler->current->code[offset] = (jump >> 8) & 0xFF;
-  compiler->current->code[offset + 1] = jump & 0xFF;
+  compiler->current->code[offset + 1] = (jump >> 8) & 0xFF;
+  compiler->current->code[offset + 2] = jump & 0xFF;
 }
 
 /**
@@ -356,6 +356,27 @@ static uint8_t identifierConstant(Token* name) {
                      FROM_OBJECT(copyString(name->start, name->length)));
 }
 
+/**
+ * @brief Generates and returns the index of the constant pointing to a string
+ * with the given identifier name.
+ *
+ * @param message char* the error message if no identifier is provided
+ * @return uint8_t the index of the constant pointing to the string with the
+ * identifier name
+ */
+static uint8_t parseVariable(const char* message) {
+  consume(TOKEN_IDENTIFIER, message);
+
+  return identifierConstant(&parser.previous);
+}
+
+/**
+ * @brief Resolves a local by searching the current scope from the end (to get
+ * most recently declared).
+ *
+ * @param name Token* name of the local to resolve
+ * @return int index of the local in the local list
+ */
 static int resolveLocal(Token* name) {
   for (int i = compiler->locals.count - 1; i >= 0; i--) {
     Local local = compiler->locals.data[i];
@@ -370,6 +391,12 @@ static int resolveLocal(Token* name) {
   return -1;
 }
 
+/**
+ * @brief Adds a local to the current compilers locals list.
+ *
+ * @param name Token name of the local
+ * @param type ValueType type of the local
+ */
 static void addLocal(Token name, ValueType type) {
   if (compiler->scopeDepth == 0) {
     parseError("Cannot declare local variables at the top level.");
@@ -480,6 +507,7 @@ static void literal(bool canAssign) {
 static void char_(bool canAssign) {
   char c = *(parser.previous.start + 1);
   emitConstant(OP_CONSTANT_CHARACTER, FROM_CHARACTER(c));
+  pushType(VALUE_CHARACTER);
 }
 
 /**
@@ -713,18 +741,36 @@ static void variable(bool canAssign) {
   namedVariable(&parser.previous, canAssign);
 }
 
-/**
- * @brief Generates and returns the index of the constant pointing to a string
- * with the given identifier name.
- *
- * @param message char* the error message if no identifier is provided
- * @return uint8_t the index of the constant pointing to the string with the
- * identifier name
- */
-static uint8_t parseVariable(const char* message) {
-  consume(TOKEN_IDENTIFIER, message);
+static void and (bool canAssign) {
+  ValueType a = popType();
+  if (a != VALUE_BOOL) {
+    parseError("And operator must be used with boolean operands.");
+  }
+  int jump = emitJump(OP_JUMP_IF_FALSE);
+  emitByte(OP_POP);
+  parsePrecedence(PREC_AND);
+  ValueType b = popType();
+  if (b != VALUE_BOOL) {
+    parseError("And operator must be used with boolean operands.");
+  }
+  patchJump(jump);
+  pushType(VALUE_BOOL);
+}
 
-  return identifierConstant(&parser.previous);
+static void or (bool canAssign) {
+  ValueType a = popType();
+  if (a != VALUE_BOOL) {
+    parseError("Or operator must be used with boolean operands.");
+  }
+  int jump = emitJump(OP_JUMP_IF_TRUE);
+  emitByte(OP_POP);
+  parsePrecedence(PREC_OR);
+  ValueType b = popType();
+  if (b != VALUE_BOOL) {
+    parseError("Or operator must be used with boolean operands.");
+  }
+  patchJump(jump);
+  pushType(VALUE_BOOL);
 }
 
 ParseRule rules[] = {
@@ -756,18 +802,18 @@ ParseRule rules[] = {
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {NULL, binary, PREC_FACTOR},
-    [TOKEN_AND] = {NULL, NULL, PREC_AND},
-    [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
-    [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
+    [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_AND] = {NULL, and, PREC_AND},
+    [TOKEN_OR] = {NULL, or, PREC_OR},
     [TOKEN_NULL] = {literal, NULL, PREC_NONE},
-    [TOKEN_OR] = {NULL, NULL, PREC_OR},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_INT] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOUBLE] = {NULL, NULL, PREC_NONE},
     [TOKEN_BOOL] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_FOR] = {NULL, NULL, PREC_NONE},
     [TOKEN_ERROR] = {NULL, NULL, PREC_NONE},
     [TOKEN_EOF] = {NULL, NULL, PREC_NONE},
 };
@@ -911,6 +957,48 @@ static void whileStatement() {
   emitByte(OP_POP);
 }
 
+static void forStatement() {
+  consume(TOKEN_LEFT_PAREN, "Expected '(' after for.");
+  // if (match(TOKEN_SEMICOLON)) {
+  // } else if (match(TOKEN_VAR)) {
+  //   // initializer is a variable declaration
+  //   declaration();
+  // } else {
+  //   // initializer is an expression
+  //   expressionStatement();
+  // }
+  if (!match(TOKEN_SEMICOLON)) {
+    declaration();
+  }
+  // have to jump to skip the post condition first time around.
+  int postJump = emitJump(OP_JUMP);
+  int loopStart = compiler->current->count - 3;
+  if (!match(TOKEN_SEMICOLON)) {
+    expression();
+    popType();
+    consume(TOKEN_SEMICOLON, "Expected ';' after loop condition.");
+  }
+  if (!match(TOKEN_RIGHT_PAREN)) {
+    int exitJump = emitJump(OP_JUMP_IF_FALSE);
+    emitByte(OP_POP);
+    expression();
+    popType();
+    consume(TOKEN_RIGHT_PAREN, "Expected ')' after loop condition.");
+    patchJump(postJump);
+    if (!match(TOKEN_RIGHT_BRACE)) {
+      statement();
+    }
+    emitLoop(loopStart);
+    patchJump(exitJump);
+  } else {
+    // no loop condition
+    if (!match(TOKEN_RIGHT_BRACE)) {
+      statement();
+    }
+    emitLoop(loopStart);
+  }
+}
+
 /**
  * @brief Descent case for parsing statements, e.g. print, if, while, etc.
  */
@@ -921,6 +1009,8 @@ static void statement() {
     ifStatement();
   } else if (match(TOKEN_WHILE)) {
     whileStatement();
+  } else if (match(TOKEN_FOR)) {
+    forStatement();
   } else if (match(TOKEN_LEFT_BRACE)) {
     pushScope();
     block();
@@ -938,7 +1028,7 @@ static void statement() {
     if (match(TOKEN_EQUAL)) {                                                  \
       expression();                                                            \
       if (popType() != value) {                                                \
-        parseError("Integer initialized to non-integer value.");               \
+        parseError("Initializer does not match declared type.");               \
       }                                                                        \
     } else {                                                                   \
       emitByte(OP_NULL);                                                       \
@@ -979,6 +1069,12 @@ DECLARATION(Double, VALUE_DOUBLE);
 DECLARATION(Boolean, VALUE_BOOL);
 
 /**
+ * @brief Descent case for character declaration, char followed by an identifier
+ * and initializer.
+ */
+DECLARATION(Character, VALUE_CHARACTER);
+
+/**
  * @brief Descent case for parsing declarations, e.g. var, function, etc.
  */
 static void declaration() {
@@ -988,6 +1084,8 @@ static void declaration() {
     declarationDouble();
   } else if (match(TOKEN_BOOL)) {
     declarationBoolean();
+  } else if (match(TOKEN_CHAR)) {
+    declarationCharacter();
   } else {
     statement();
   }

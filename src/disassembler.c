@@ -120,6 +120,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_ARITHMETIC_CAST_INT_DOUBLE", offset);
     case OP_JUMP_IF_FALSE:
       return shortInstruction("OP_JUMP_IF_FALSE", chunk, offset);
+    case OP_JUMP_IF_TRUE:
+      return shortInstruction("OP_JUMP_IF_TRUE", chunk, offset);
       // binary
     case OP_ADD_INT:
       return simpleInstruction("OP_ADD_INT", offset);

@@ -32,7 +32,8 @@ static void runtimeError(const char* format, ...) {
   fputs("\n", stderr);
 
   uint8_t instruction = vm.callStack->ip - vm.callStack->chunk->code;
-  fprintf(stderr, "[line %d] in script.\n", vm.callStack->chunk->lines[instruction]);
+  fprintf(stderr, "[line %d] in script.\n",
+          vm.callStack->chunk->lines[instruction]);
   resetStack();
 }
 
@@ -121,8 +122,9 @@ static InterpretResult run() {
     uint8_t instruction;
     switch ((instruction = READ_BYTE())) {
       case OP_RETURN: {
-#ifdef DEBUG_PRINT_OPCODES
-        disassembleInstruction(frame.chunk, frame.ip - traveled - frame.chunk->code);
+#ifdef DEBUG_TRACE_EXEC
+        disassembleInstruction(frame.chunk,
+                               frame.ip - traveled - frame.chunk->code);
 #endif
         return INTERPRET_OK;
       }
@@ -206,6 +208,18 @@ static InterpretResult run() {
         }
         continue;
       }
+      case OP_JUMP_IF_TRUE: {
+#ifdef DEBUG_TRACE_EXEC
+        disassembleInstruction(frame.chunk,
+                               (int)(frame.ip - traveled - frame.chunk->code));
+#endif
+        uint16_t offset = READ_SHORT();
+        Value condition = peek(0);
+        if (TO_BOOL(condition)) {
+          frame.ip += offset;
+        }
+        continue;
+      }
         // BINARY OPERATIONS
         ARITHMETIC_OPS_NUM(ADD, +)
         ARITHMETIC_OPS_NUM(SUB, -)
@@ -277,9 +291,10 @@ static InterpretResult run() {
         break;
       }
     }
-    // I like to see the stack after the operation happens
+      // I like to see the stack after the operation happens
 #ifdef DEBUG_TRACE_EXEC
-    disassembleInstruction(frame.chunk, (int)(frame.ip - traveled - frame.chunk->code));
+    disassembleInstruction(frame.chunk,
+                           (int)(frame.ip - traveled - frame.chunk->code));
     printf("        ");
     for (Value* slot = vm.stack.data; slot < vm.stackTop; slot++) {
       printf("[");

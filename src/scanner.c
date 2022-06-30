@@ -131,7 +131,7 @@ static Token makeToken(TokenType type) {
 static Token errorToken(const char* message) {
   Token token;
   token.type = TOKEN_ERROR;
-  token.start = scanner.start;
+  token.start = message;
   token.length = (int)strlen(message);
   token.line = scanner.line;
   return token;
@@ -200,10 +200,10 @@ static TokenType checkKeyword(int start,
  */
 static TokenType identifierType() {
   switch (scanner.start[0]) {
-    case 'a':
-      return checkKeyword(1, 2, "nd", TOKEN_AND);
     case 'b':
       return checkKeyword(1, 3, "ool", TOKEN_BOOL);
+      case 'c':
+      return checkKeyword(1, 3, "har", TOKEN_CHAR);
     case 'd':
       return checkKeyword(1, 5, "ouble", TOKEN_DOUBLE);
     case 'e':
@@ -234,8 +234,6 @@ static TokenType identifierType() {
       break;
     case 'n':
       return checkKeyword(1, 3, "ull", TOKEN_NULL);
-    case 'o':
-      return checkKeyword(1, 1, "r", TOKEN_OR);
     case 'p':
       return checkKeyword(1, 4, "rint", TOKEN_PRINT);
     case 'r':
@@ -353,7 +351,13 @@ Token scanToken() {
     case '*':
       return makeToken(TOKEN_STAR);
     case '&':
+      if (match('&'))
+        return makeToken(TOKEN_AND);
       return makeToken(TOKEN_REFERENCE);
+    case '|':
+      if (match('|'))
+        return makeToken(TOKEN_OR);
+      break;
     case '!':
       return makeToken(match('=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=':

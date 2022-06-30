@@ -1,6 +1,3 @@
-bool i = true;
-bool i = false;
+char c = 'a';
 
-{
-    print i;
-}
+print c;
