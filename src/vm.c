@@ -31,7 +31,7 @@ static void runtimeError(const char* format, ...) {
   va_end(args);
   fputs("\n", stderr);
 
-  uint8_t instruction = *vm.callStack->ip;
+  uint8_t instruction = vm.callStack->ip - vm.callStack->chunk->code;
   fprintf(stderr, "[line %d] in script.\n", vm.callStack->chunk->lines[instruction]);
   resetStack();
 }
@@ -260,15 +260,13 @@ static InterpretResult run() {
       }
       case OP_LOCAL_GET: {
         uint8_t slot = READ_BYTE();
-        Value value = frame.slot[slot];
-        push(value);
+        push(frame.slot[slot]);
         traveled++;
         break;
       }
       case OP_LOCAL_SET: {
         uint8_t slot = READ_BYTE();
-        Value value = pop();
-        frame.slot[slot] = value;
+        frame.slot[slot] = pop();
         traveled++;
         break;
       }
@@ -316,7 +314,7 @@ InterpretResult interpret(const char* source) {
   CallFrame callFrame;
   callFrame.chunk = &chunk;
   callFrame.ip = chunk.code;
-  callFrame.slot = NULL;
+  callFrame.slot = vm.stackTop;
   vm.callStack = &callFrame;
   vm.callStackSize += 1;
 

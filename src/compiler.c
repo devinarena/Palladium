@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "compiler.h"
 #include "dynamic_array.h"
@@ -72,6 +73,7 @@ Compiler* compiler;
 static void initCompiler(Compiler* compiler, Chunk* chunk) {
   compiler->current = chunk;
   compiler->scopeDepth = 0;
+  INIT_DYNAMIC_ARRAY(Local, compiler->locals);
 }
 
 /**
@@ -105,7 +107,7 @@ static void errorAtToken(Token* token, const char* message) {
  * @param message const char* the error message to print.
  */
 static void parseError(const char* message) {
-  errorAtToken(&parser.current, message);
+  errorAtToken(&parser.previous, message);
   parser.panicMode = true;
 }
 
@@ -279,6 +281,11 @@ static int emitJump(uint8_t byte) {
   return compiler->current->count - 2;
 }
 
+/**
+ * @brief Emits a loop to and the offset to loop back to.
+ *
+ * @param instruction int the instruction to loop back to.
+ */
 static void emitLoop(int instruction) {
   int offset = compiler->current->count - instruction;
   emitByte(OP_LOOP);
@@ -338,11 +345,26 @@ bool typesEqual(ValueType a, ValueType b, bool useNum) {
   return a == b;
 }
 
+/**
+ * @brief Adds an identifiers name to the list of constants.
+ *
+ * @param name Token* name of the identifier
+ * @return uint8_t index of the constant in the constant list
+ */
+static uint8_t identifierConstant(Token* name) {
+  return addConstant(compiler->current,
+                     FROM_OBJECT(copyString(name->start, name->length)));
+}
+
 static int resolveLocal(Token* name) {
   for (int i = compiler->locals.count - 1; i >= 0; i--) {
     Local local = compiler->locals.data[i];
-    if (local.name.start == name->start && local.name.length == name->length) {
-      return local.depth;
+    if (local.name.length == name->length &&
+        memcmp(local.name.start, name->start, name->length) == 0) {
+      if (local.depth == -1) {
+        parseError("Cannot read local variable in its own initializer.");
+      }
+      return i;
     }
   }
   return -1;
@@ -353,9 +375,16 @@ static void addLocal(Token name, ValueType type) {
     parseError("Cannot declare local variables at the top level.");
     return;
   }
-  if (resolveLocal(&name) == compiler->scopeDepth) {
-    parseError("Cannot declare two variables with the same name.");
-    return;
+  for (int i = compiler->locals.count - 1; i >= 0; i--) {
+    Local local = compiler->locals.data[i];
+    if (local.depth != -1 && local.depth < compiler->scopeDepth) {
+      break;
+    }
+    if (local.name.length == name.length &&
+        memcmp(local.name.start, name.start, name.length) == 0) {
+      parseError("Cannot declare two variables with the same name.");
+      return;
+    }
   }
   Local local;
   local.name = name;
@@ -622,17 +651,6 @@ static void binary(bool canAssign) {
 }
 
 /**
- * @brief Adds an identifiers name to the list of constants.
- *
- * @param name Token* name of the identifier
- * @return uint8_t index of the constant in the constant list
- */
-static uint8_t identifierConstant(Token* name) {
-  return addConstant(compiler->current,
-                     FROM_OBJECT(copyString(name->start, name->length)));
-}
-
-/**
  * @brief Generates the proper opcodes for getting or setting a variable.
  *
  * @param name Token* the name of the variable
@@ -641,19 +659,35 @@ static uint8_t identifierConstant(Token* name) {
 static void namedVariable(Token* name, bool canAssign) {
   int arg = resolveLocal(name);
   if (arg != -1) {
+    Local local = compiler->locals.data[arg];
     if (canAssign && match(TOKEN_EQUAL)) {
       expression();
+      ValueType type = popType();
+      if (type != local.valueType) {
+        parseError("Cannot assign value of different type.");
+      }
+      addLocal(*name, type);
       emitBytes(OP_LOCAL_SET, (uint8_t)arg);
+      local.depth = compiler->scopeDepth;
     } else {
       emitBytes(OP_LOCAL_GET, (uint8_t)arg);
-      pushType(compiler->locals.data[arg].valueType);
+      pushType(local.valueType);
     }
   } else {
+    arg = identifierConstant(name);
     if (canAssign && match(TOKEN_EQUAL)) {
       expression();
-      tableSet(&parser.globalTypes,
-               (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
-               (Value){.type = popType()});
+      ValueType type = popType();
+      Value value;
+      if (!tableGet(
+              &parser.globalTypes,
+              (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
+              &value)) {
+        parseError("Cannot assign to undeclared variable.");
+      }
+      if (type != value.type) {
+        parseError("Cannot assign value of different type.");
+      }
       emitBytes(OP_GLOBAL_SET, arg);
     } else {
       emitBytes(OP_GLOBAL_GET, arg);
@@ -662,7 +696,7 @@ static void namedVariable(Token* name, bool canAssign) {
               &parser.globalTypes,
               (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
               &value)) {
-        parseError("Could not get type of variable.");
+        parseError("Referenced variable is undefined.");
         return;
       }
       pushType(value.type);
@@ -896,95 +930,64 @@ static void statement() {
   }
 }
 
+#define DECLARATION(T, value)                                                  \
+  static void declaration##T() {                                               \
+    uint8_t index = parseVariable("Expected variable name.");                  \
+    uint8_t op = OP_GLOBAL_DEFINE;                                             \
+    Token name = parser.previous;                                              \
+    if (match(TOKEN_EQUAL)) {                                                  \
+      expression();                                                            \
+      if (popType() != value) {                                                \
+        parseError("Integer initialized to non-integer value.");               \
+      }                                                                        \
+    } else {                                                                   \
+      emitByte(OP_NULL);                                                       \
+    }                                                                          \
+    if (compiler->scopeDepth == 0) {                                           \
+      if (!tableSet(                                                           \
+              &parser.globalTypes,                                             \
+              (ObjString*)TO_OBJECT(compiler->current->constants.data[index]), \
+              (Value){.type = value}))                                         \
+        parseError("Global variable already defined.");                        \
+    } else {                                                                   \
+      addLocal(name, value);                                                   \
+      op = OP_LOCAL_SET;                                                       \
+    }                                                                          \
+    consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");      \
+    emitBytes(op, index);                                                      \
+    if (op == OP_LOCAL_SET) {                                                  \
+      compiler->locals.data->depth = compiler->scopeDepth;                     \
+    }                                                                          \
+  }
+
 /**
  * @brief Descent case for integer declaration, int followed by an identifier
  * and initializer.
  */
-static void intDeclaration() {
-  uint8_t name = parseVariable("Expected variable name.");
-  uint8_t op = OP_GLOBAL_DEFINE;
-
-  if (match(TOKEN_EQUAL)) {
-    expression();
-    if (popType() != VALUE_INTEGER) {
-      parseError("Integer initialized to non-integer value.");
-    }
-    if (compiler->scopeDepth == 0) {
-      tableSet(&parser.globalTypes,
-               (ObjString*)TO_OBJECT(compiler->current->constants.data[name]),
-               (Value){.type = VALUE_INTEGER});
-    } else {
-      addLocal(compiler->locals.data[name].name, VALUE_INTEGER);
-      op = OP_LOCAL_SET;
-    }
-  } else {
-    emitByte(OP_NULL);
-  }
-
-  consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
-  emitBytes(op, name);
-
-  if (op == OP_LOCAL_SET) {
-    compiler->locals.data[name].depth = compiler->scopeDepth;
-  }
-}
+DECLARATION(Integer, VALUE_INTEGER)
 
 /**
  * @brief Descent case for double declaration, double followed by an identifier
  * and initializer.
  */
-static void doubleDeclaration() {
-  uint8_t name = parseVariable("Expected variable name.");
-
-  if (match(TOKEN_EQUAL)) {
-    expression();
-    if (popType() != VALUE_DOUBLE) {
-      parseError("Double initialized to non-double value.");
-    }
-    tableSet(&parser.globalTypes,
-             (ObjString*)TO_OBJECT(compiler->current->constants.data[name]),
-             (Value){.type = VALUE_DOUBLE});
-  } else {
-    emitByte(OP_NULL);
-  }
-
-  consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
-  emitBytes(OP_GLOBAL_SET, name);
-}
+DECLARATION(Double, VALUE_DOUBLE);
 
 /**
  * @brief Descent case for boolean declaration, bool followed by an identifier
  * and initializer.
  */
-static void boolDeclaration() {
-  uint8_t name = parseVariable("Expected variable name.");
-
-  if (match(TOKEN_EQUAL)) {
-    expression();
-    if (popType() != VALUE_BOOL) {
-      parseError("Boolean initialized to non-boolean value.");
-    }
-    tableSet(&parser.globalTypes,
-             (ObjString*)TO_OBJECT(compiler->current->constants.data[name]),
-             (Value){.type = VALUE_BOOL});
-  } else {
-    emitByte(OP_NULL);
-  }
-
-  consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
-  emitBytes(OP_GLOBAL_SET, name);
-}
+DECLARATION(Boolean, VALUE_BOOL);
 
 /**
  * @brief Descent case for parsing declarations, e.g. var, function, etc.
  */
 static void declaration() {
   if (match(TOKEN_INT)) {
-    intDeclaration();
+    declarationInteger();
   } else if (match(TOKEN_DOUBLE)) {
-    doubleDeclaration();
+    declarationDouble();
   } else if (match(TOKEN_BOOL)) {
-    boolDeclaration();
+    declarationBoolean();
   } else {
     statement();
   }
