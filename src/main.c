@@ -68,6 +68,8 @@ static void runFile(const char* path) {
   char* source = readFile(path);
 
   interpret(source);
+
+  free(source); 
 }
 
 int main(int argc, const char* argv[]) {

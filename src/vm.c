@@ -20,7 +20,7 @@ VM vm;
  * stack.
  */
 static void resetStack() {
-  vm.stackTop = vm.stack.data;
+  vm.stackTop = 0;
   vm.callStackSize = 0;
 }
 
@@ -155,11 +155,8 @@ static InterpretResult run() {
                                (int)(frame.ip - traveled - frame.chunk->code));
 #endif
         uint16_t offset = READ_SHORT();
-        if (TO_BOOL(peek(0))) {
-          frame.ip -= offset;
-          continue;
-        }
-        break;
+        frame.ip -= offset;
+        continue;
       }
       // UNARY OPERATIONS
       case OP_NEGATE_INT: {
@@ -274,13 +271,14 @@ static InterpretResult run() {
       }
       case OP_LOCAL_GET: {
         uint8_t slot = READ_BYTE();
-        push(frame.slot[slot]);
+        Value value = frame.slot[slot];
+        push(value);
         traveled++;
         break;
       }
       case OP_LOCAL_SET: {
         uint8_t slot = READ_BYTE();
-        frame.slot[slot] = pop();
+        frame.slot[slot] = peek(0);
         traveled++;
         break;
       }
@@ -296,9 +294,9 @@ static InterpretResult run() {
     disassembleInstruction(frame.chunk,
                            (int)(frame.ip - traveled - frame.chunk->code));
     printf("        ");
-    for (Value* slot = vm.stack.data; slot < vm.stackTop; slot++) {
+    for (int slot = 0; slot < vm.stackTop; slot++) {
       printf("[");
-      printValue(*slot);
+      printValue(vm.stack.data[slot]);
       printf("]");
     }
     printf("\n");
@@ -329,7 +327,7 @@ InterpretResult interpret(const char* source) {
   CallFrame callFrame;
   callFrame.chunk = &chunk;
   callFrame.ip = chunk.code;
-  callFrame.slot = vm.stackTop;
+  callFrame.slot = vm.stack.data;
   vm.callStack = &callFrame;
   vm.callStackSize += 1;
 
@@ -347,9 +345,8 @@ InterpretResult interpret(const char* source) {
  * @param value Value the value to push.
  */
 void push(Value value) {
-  uint8_t dist = (vm.stackTop - vm.stack.data);
-  INSERT_DYNAMIC_ARRAY_AT(Value, vm.stack, dist, value);
-  vm.stackTop = vm.stack.data + dist + 1;
+  INSERT_DYNAMIC_ARRAY_AT(Value, vm.stack, vm.stackTop, value);
+  vm.stackTop++;
 }
 
 /**
@@ -359,7 +356,7 @@ void push(Value value) {
  */
 Value pop() {
   vm.stackTop--;
-  return *vm.stackTop;
+  return vm.stack.data[vm.stackTop];
 }
 
 /**
@@ -369,7 +366,7 @@ Value pop() {
  * @return Value The value at the given distance from the top of the stack.
  */
 Value peek(int distance) {
-  return vm.stack.data[vm.stackTop - vm.stack.data - distance - 1];
+  return vm.stack.data[vm.stackTop - 1 - distance];
 }
 
 /**
@@ -387,6 +384,7 @@ void swap() {
  */
 void freeVM() {
   FREE_DYNAMIC_ARRAY(Value, vm.stack);
+
   freeTable(&vm.globals);
   freeTable(&vm.strings);
   Object* current = vm.heap;

@@ -26,7 +26,7 @@ typedef struct {
   DYNAMIC_ARRAY(Value) stack;
   Table strings;
   Table globals;
-  Value* stackTop;
+  int stackTop;
   Object* heap;
 } VM;
 

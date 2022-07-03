@@ -31,7 +31,7 @@ typedef struct {
 typedef struct {
   Token name;
   int depth;
-  uint8_t valueType;
+  ValueType valueType;
 } Local;
 
 typedef struct {
@@ -448,6 +448,7 @@ static void popScope() {
  */
 static void endCompiler() {
   emitReturn();
+  FREE_DYNAMIC_ARRAY(Local, compiler->locals);
 }
 
 // RECURSIVE DESCENT
@@ -694,10 +695,10 @@ static void namedVariable(Token* name, bool canAssign) {
       if (type != local.valueType) {
         parseError("Cannot assign value of different type.");
       }
-      addLocal(*name, type);
       emitBytes(OP_LOCAL_SET, (uint8_t)arg);
       local.depth = compiler->scopeDepth;
     } else {
+      printf("%d\n", arg);
       emitBytes(OP_LOCAL_GET, (uint8_t)arg);
       pushType(local.valueType);
     }
@@ -861,9 +862,8 @@ static void parsePrecedence(Precedence prec) {
   printf("Type Stack: ");
   for (ValueType* slot = parser.typeStack.data; slot < parser.typeStackTop;
        slot++) {
-    printf("[");
-    printf("%d", *slot);
-    printf("]");
+    ValueType t = *slot;
+    printf("[%d]", t);
   }
   printf("\n");
 #endif
@@ -958,15 +958,10 @@ static void whileStatement() {
 }
 
 static void forStatement() {
+  pushScope();
+
   consume(TOKEN_LEFT_PAREN, "Expected '(' after for.");
-  // if (match(TOKEN_SEMICOLON)) {
-  // } else if (match(TOKEN_VAR)) {
-  //   // initializer is a variable declaration
-  //   declaration();
-  // } else {
-  //   // initializer is an expression
-  //   expressionStatement();
-  // }
+  
   if (!match(TOKEN_SEMICOLON)) {
     declaration();
   }
@@ -985,9 +980,9 @@ static void forStatement() {
     popType();
     consume(TOKEN_RIGHT_PAREN, "Expected ')' after loop condition.");
     patchJump(postJump);
-    if (!match(TOKEN_RIGHT_BRACE)) {
+    if (!match(TOKEN_RIGHT_BRACE))
       statement();
-    }
+    
     emitLoop(loopStart);
     patchJump(exitJump);
   } else {
@@ -997,6 +992,8 @@ static void forStatement() {
     }
     emitLoop(loopStart);
   }
+
+  popScope();
 }
 
 /**
