@@ -604,8 +604,8 @@ static void unary(bool canAssign) {
     } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) { \
       emitByte(OP_SWAP);                                           \
       emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
-      emitByte(OP_##instruction##_DOUBLE);                         \
       emitByte(OP_SWAP);                                           \
+      emitByte(OP_##instruction##_DOUBLE);                         \
       pushType(VALUE_DOUBLE);                                      \
     } else {                                                       \
       parseError("Binary operator invalid for given values.");     \
@@ -696,6 +696,7 @@ static void namedVariable(Token* name, bool canAssign) {
         parseError("Cannot assign value of different type.");
       }
       emitBytes(OP_LOCAL_SET, (uint8_t)arg);
+      emitByte(OP_POP);
       local.depth = compiler->scopeDepth;
     } else {
       printf("%d\n", arg);
@@ -957,11 +958,13 @@ static void whileStatement() {
   emitByte(OP_POP);
 }
 
+/**
+ * @brief Descent case for for statements (a condition, an expression, loop
+ * body, and a post-loop expression).
+ */
 static void forStatement() {
-  pushScope();
-
   consume(TOKEN_LEFT_PAREN, "Expected '(' after for.");
-  
+
   if (!match(TOKEN_SEMICOLON)) {
     declaration();
   }
@@ -982,7 +985,7 @@ static void forStatement() {
     patchJump(postJump);
     if (!match(TOKEN_RIGHT_BRACE))
       statement();
-    
+
     emitLoop(loopStart);
     patchJump(exitJump);
   } else {
@@ -992,8 +995,6 @@ static void forStatement() {
     }
     emitLoop(loopStart);
   }
-
-  popScope();
 }
 
 /**
