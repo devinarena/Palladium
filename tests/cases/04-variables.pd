@@ -1,0 +1,19 @@
+bool w = true;
+int x = 1;
+double y = 1.0;
+char z = 'a';
+
+print w; // true
+print x; // 1
+print y; // 1.0
+print z; // 'a'
+
+w = false;
+x = x + 5;
+y = y / 10;
+z = 'b';
+
+print w; // false
+print x; // 6
+print y; // 0.1
+print z; // 'b'

@@ -1,0 +1,49 @@
+// true
+print true == true;
+print false == false;
+print 1 > 0;
+print 1 >= 1;
+print 1 <= 1;
+print 1 < 2;
+print 1 != 0;
+print 1 == 1;
+print 5.0 > 4.0;
+print 5.0 >= 4.0;
+print 5.0 >= 5.0;
+print 5.0 <= 5.0;
+print 5.0 != 4.0;
+print 5.0 == 5.0;
+print "hello" != "world";
+print "hello" != "hello";
+print 'c' == 'c';
+print 'c' != 'd';
+// false
+print 'c' != 'c';
+print "hello" == "hello";
+print 1 < 0;
+print 1 > 2;
+print 1 != 1;
+print 5.0 < 4.0;
+print 5.0 <= 4.0;
+print 5.0 != 5.0;
+print "hello" == "world";
+
+print 1 + 2; // 3
+print 1 - 2; // -1
+print 1 * 2; // 2
+print 1 / 2; // 0
+
+print 1 + 2.0; // 3.0
+print 1 - 2.0; // -1.0
+print 1 * 2.0; // 2.0
+print 1 / 2.0; // 0.5
+
+print 1.0 + 2; // 3.0
+print 1.0 - 2; // -1.0
+print 1.0 * 2; // 2.0
+print 1.0 / 2; // 0.5
+
+print 1.0 + 2.0; // 3.0
+print 1.0 - 2.0; // -1.0
+print 1.0 * 2.0; // 2.0
+print 1.0 / 2.0; // 0.5

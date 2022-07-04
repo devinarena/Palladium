@@ -699,7 +699,6 @@ static void namedVariable(Token* name, bool canAssign) {
       emitByte(OP_POP);
       local.depth = compiler->scopeDepth;
     } else {
-      printf("%d\n", arg);
       emitBytes(OP_LOCAL_GET, (uint8_t)arg);
       pushType(local.valueType);
     }
@@ -785,7 +784,7 @@ ParseRule rules[] = {
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
     [TOKEN_REFERENCE] = {unary, NULL, PREC_NONE},
     [TOKEN_BANG] = {unary, NULL, PREC_NONE},
-    [TOKEN_BANG_EQUAL] = {NULL, NULL, PREC_EQUALITY},
+    [TOKEN_BANG_EQUAL] = {NULL, binary, PREC_EQUALITY},
     [TOKEN_EQUAL] = {NULL, NULL, PREC_NONE},
     [TOKEN_EQUAL_EQUAL] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_GREATER] = {NULL, binary, PREC_COMPARISON},
@@ -963,38 +962,50 @@ static void whileStatement() {
  * body, and a post-loop expression).
  */
 static void forStatement() {
+  pushScope();
   consume(TOKEN_LEFT_PAREN, "Expected '(' after for.");
 
   if (!match(TOKEN_SEMICOLON)) {
     declaration();
   }
-  // have to jump to skip the post condition first time around.
-  int postJump = emitJump(OP_JUMP);
+
+
+  // need two loops, loop back to the post expression after
+  // then from the post expression loop back to the condition
   int loopStart = compiler->current->count - 3;
+  int exitJump = -1;
+
   if (!match(TOKEN_SEMICOLON)) {
     expression();
     popType();
     consume(TOKEN_SEMICOLON, "Expected ';' after loop condition.");
-  }
-  if (!match(TOKEN_RIGHT_PAREN)) {
-    int exitJump = emitJump(OP_JUMP_IF_FALSE);
+    exitJump = emitJump(OP_JUMP_IF_FALSE);
     emitByte(OP_POP);
+  }
+
+  if (!match(TOKEN_RIGHT_PAREN)) {
+    // jump over the post expression (will jump back later)
+    int bodyJump = emitJump(OP_JUMP);
+    int incrementStart = compiler->current->count - 3;
     expression();
     popType();
-    consume(TOKEN_RIGHT_PAREN, "Expected ')' after loop condition.");
-    patchJump(postJump);
-    if (!match(TOKEN_RIGHT_BRACE))
-      statement();
-
+    consume(TOKEN_RIGHT_PAREN, "Expected ')' after for loop.");
+    // loop back to the condition
     emitLoop(loopStart);
-    patchJump(exitJump);
-  } else {
-    // no loop condition
-    if (!match(TOKEN_RIGHT_BRACE)) {
-      statement();
-    }
-    emitLoop(loopStart);
+    loopStart = incrementStart;
+    patchJump(bodyJump);
   }
+
+  statement();
+  // loop back to the post expression
+  emitLoop(loopStart);
+
+  if (exitJump != -1) {
+    patchJump(exitJump);
+    emitByte(OP_POP);
+  }
+
+  popScope();
 }
 
 /**
