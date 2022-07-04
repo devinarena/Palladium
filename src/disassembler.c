@@ -127,10 +127,14 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_ADD_INT", offset);
     case OP_ADD_DOUBLE:
       return simpleInstruction("OP_ADD_DOUBLE", offset);
+    case OP_ADD_POINTER:
+      return simpleInstruction("OP_ADD_POINTER", offset);
     case OP_SUB_INT:
       return simpleInstruction("OP_SUB_INT", offset);
     case OP_SUB_DOUBLE:
       return simpleInstruction("OP_SUB_DOUBLE", offset);
+    case OP_SUB_POINTER:
+      return simpleInstruction("OP_SUB_POINTER", offset);
     case OP_MUL_INT:
       return simpleInstruction("OP_MUL_INT", offset);
     case OP_MUL_DOUBLE:

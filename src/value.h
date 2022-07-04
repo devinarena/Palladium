@@ -26,7 +26,7 @@
 #define TO_INTEGER(value) (value.data.integer)
 #define TO_DOUBLE(value) (value.data.double_)
 #define TO_CHARACTER(value) (value.data.character)
-#define TO_POINTER(value) (value.data.pointer)
+#define TO_POINTER(value) (Value*)(value.data.pointer)
 #define TO_OBJECT(value) (value.data.object)
 
 #define NULL_VAL ((Value){VALUE_NULL, {.integer = 0}})
@@ -34,7 +34,7 @@
 #define FROM_DOUBLE(value) ((Value){VALUE_DOUBLE, {.double_ = value}})
 #define FROM_BOOL(value) ((Value){VALUE_BOOL, {.boolean = value}})
 #define FROM_CHARACTER(value) ((Value){VALUE_CHARACTER, {.character = value}})
-#define FROM_POINTER(value) ((Value){VALUE_POINTER, {.pointer = value}})
+#define FROM_POINTER(value) ((Value){VALUE_POINTER, {.pointer = (struct Value*)value}})
 #define FROM_OBJECT(obj) ((Value){VALUE_OBJECT, {.object = (Object*)obj}})
 
 // note: types must go in order of cast priority ascending

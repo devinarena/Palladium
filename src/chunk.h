@@ -51,8 +51,10 @@ typedef enum {
   // Binary
   OP_ADD_INT,
   OP_ADD_DOUBLE,
+  OP_ADD_POINTER,
   OP_SUB_INT,
   OP_SUB_DOUBLE,
+  OP_SUB_POINTER,
   OP_MUL_INT,
   OP_MUL_DOUBLE,
   OP_DIV_INT,
