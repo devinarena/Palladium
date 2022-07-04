@@ -61,6 +61,7 @@ typedef struct {
     struct Value* pointer;
     Object* object;
   } data;
+  ValueType pointerType;
 } Value;
 
 void printValue(Value value);

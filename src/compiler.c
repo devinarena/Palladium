@@ -436,7 +436,8 @@ static void popScope() {
   // remove all locals from the current scope
   for (int i = compiler->locals.count - 1; i >= 0; i--) {
     Local local = compiler->locals.data[i];
-    if (local.depth >= compiler->scopeDepth) {
+    if (local.depth > compiler->scopeDepth) {
+      emitByte(OP_POP);
       compiler->locals.count--;
     } else
       break;
@@ -969,7 +970,6 @@ static void forStatement() {
     declaration();
   }
 
-
   // need two loops, loop back to the post expression after
   // then from the post expression loop back to the condition
   int loopStart = compiler->current->count - 3;
@@ -1055,7 +1055,8 @@ static void statement() {
     consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");      \
     emitBytes(op, index);                                                      \
     if (op == OP_LOCAL_SET) {                                                  \
-      compiler->locals.data->depth = compiler->scopeDepth;                     \
+      compiler->locals.data[compiler->locals.count - 1].depth =                \
+          compiler->scopeDepth;                                                \
     }                                                                          \
   }
 
