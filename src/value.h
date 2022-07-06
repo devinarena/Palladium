@@ -30,6 +30,7 @@
 #define TO_OBJECT(value) (value.data.object)
 
 #define NULL_VAL ((Value){VALUE_NULL, {.integer = 0}})
+#define NULL_POINTER ((Value){VALUE_POINTER, {.pointer = NULL}})
 #define FROM_INTEGER(value) ((Value){VALUE_INTEGER, {.integer = value}})
 #define FROM_DOUBLE(value) ((Value){VALUE_DOUBLE, {.double_ = value}})
 #define FROM_BOOL(value) ((Value){VALUE_BOOL, {.boolean = value}})
@@ -49,7 +50,7 @@ typedef enum {
 } ValueType;
 
 typedef struct Object Object;
-typedef struct ObjString ObjString;
+typedef struct PdString PdString;
 
 typedef struct {
   ValueType type;
@@ -58,6 +59,7 @@ typedef struct {
     int integer;
     double double_;
     char character;
+    // should look into this, these always point to the same thing. some optimizations could probably be made.
     struct Value* pointer;
     Object* object;
   } data;

@@ -18,6 +18,11 @@
 #include "disassembler.h"
 #endif
 
+typedef enum {
+  TYPE_SCRIPT,
+  TYPE_FUNCTION,
+} FunctionType;
+
 typedef struct {
   Token current;
   Token previous;
@@ -35,7 +40,9 @@ typedef struct {
 } Local;
 
 typedef struct {
-  Chunk* current;
+  PdFunction* current;
+  struct Compiler* enclosing;
+  FunctionType type;
   int scopeDepth;
   DYNAMIC_ARRAY(Local) locals;
 } Compiler;
@@ -70,10 +77,11 @@ Compiler* compiler;
  *
  * @param compiler Compiler* a pointer to the compiler to initialize.
  */
-static void initCompiler(Compiler* compiler, Chunk* chunk) {
-  compiler->current = chunk;
-  compiler->scopeDepth = 0;
-  INIT_DYNAMIC_ARRAY(Local, compiler->locals);
+static void initCompiler(Compiler* comp, FunctionType type) {
+  comp->enclosing = (struct Compiler*)compiler;
+  comp->type = type;
+  comp->scopeDepth = 0;
+  INIT_DYNAMIC_ARRAY(Local, comp->locals);
 }
 
 /**
@@ -256,7 +264,7 @@ static void swapTypes() {
  * @param byte byte the opcode to write
  */
 static void emitByte(uint8_t byte) {
-  writeToChunk(compiler->current, byte, parser.previous.line);
+  writeToChunk(&compiler->current->chunk, byte, parser.previous.line);
 }
 
 /**
@@ -278,7 +286,7 @@ static void emitBytes(uint8_t byte1, uint8_t byte2) {
 static int emitJump(uint8_t byte) {
   emitByte(byte);
   emitBytes(0xFF, 0xFF);
-  return compiler->current->count - 3;
+  return compiler->current->chunk.count - 3;
 }
 
 /**
@@ -287,7 +295,7 @@ static int emitJump(uint8_t byte) {
  * @param instruction int the instruction to loop back to.
  */
 static void emitLoop(int instruction) {
-  int offset = compiler->current->count - instruction;
+  int offset = compiler->current->chunk.count - instruction;
   emitByte(OP_LOOP);
   emitBytes((offset >> 8) & 0xFF, offset & 0xFF);
 }
@@ -299,13 +307,13 @@ static void emitLoop(int instruction) {
  * @param offset
  */
 static void patchJump(int offset) {
-  int jump = compiler->current->count - offset - 3;
+  int jump = compiler->current->chunk.count - offset - 3;
   if (jump > UINT16_MAX) {
     parseError("Too much code to jump over.");
     return;
   }
-  compiler->current->code[offset + 1] = (jump >> 8) & 0xFF;
-  compiler->current->code[offset + 2] = jump & 0xFF;
+  compiler->current->chunk.code[offset + 1] = (jump >> 8) & 0xFF;
+  compiler->current->chunk.code[offset + 2] = jump & 0xFF;
 }
 
 /**
@@ -322,7 +330,7 @@ static void emitReturn() {
  * @param constant the constant to emit
  */
 static void emitConstant(int opcode, Value constant) {
-  uint8_t index = (uint8_t)addConstant(compiler->current, constant);
+  uint8_t index = (uint8_t)addConstant(&compiler->current->chunk, constant);
   emitBytes(opcode, index);
 }
 
@@ -352,7 +360,7 @@ bool typesEqual(ValueType a, ValueType b, bool useNum) {
  * @return uint8_t index of the constant in the constant list
  */
 static uint8_t identifierConstant(Token* name) {
-  return addConstant(compiler->current,
+  return addConstant(&compiler->current->chunk,
                      FROM_OBJECT(copyString(name->start, name->length)));
 }
 
@@ -447,9 +455,21 @@ static void popScope() {
 /**
  * @brief Handles shutting down the compiler. Emits a return opcode.
  */
-static void endCompiler() {
+static PdFunction* endCompiler() {
   emitReturn();
   FREE_DYNAMIC_ARRAY(Local, compiler->locals);
+
+  PdFunction* fun = compiler->current;
+
+#ifdef DEBUG_PRINT_OPCODES
+  if (!parser.hadError) {
+    disassembleChunk(&fun->chunk,
+                     compiler->type == TYPE_SCRIPT ? "script" : "function");
+  }
+#endif
+
+  compiler = (Compiler*)compiler->enclosing;
+  return fun;
 }
 
 // RECURSIVE DESCENT
@@ -586,6 +606,9 @@ static void unary(bool canAssign) {
       pushType(VALUE_POINTER);
       break;
     case TOKEN_STAR:
+      if (current != VALUE_POINTER) {
+        parseError("Cannot dereference non-pointer value.");
+      }
       emitByte(OP_DEREFERENCE);
       break;
     default:
@@ -641,7 +664,7 @@ static void unary(bool canAssign) {
     } else if (before == VALUE_POINTER && after == VALUE_INTEGER) {     \
       emitByte(OP_##instruction##_POINTER);                             \
     } else if (before == VALUE_INTEGER && after == VALUE_POINTER) {     \
-      emitBytes(OP_SWAP, OP_##instruction##_POINTER);                                        \
+      emitBytes(OP_SWAP, OP_##instruction##_POINTER);                   \
     } else {                                                            \
       parseError("Binary operator invalid for given values.");          \
     }                                                                   \
@@ -743,10 +766,10 @@ static void namedVariable(Token* name, bool canAssign) {
       expression();
       ValueType type = popType();
       Value value;
-      if (!tableGet(
-              &parser.globalTypes,
-              (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
-              &value)) {
+      if (!tableGet(&parser.globalTypes,
+                    (PdString*)TO_OBJECT(
+                        compiler->current->chunk.constants.data[arg]),
+                    &value)) {
         parseError("Cannot assign to undeclared variable.");
       }
       if (type != value.type) {
@@ -756,10 +779,10 @@ static void namedVariable(Token* name, bool canAssign) {
     } else {
       emitBytes(OP_GLOBAL_GET, arg);
       Value value;
-      if (!tableGet(
-              &parser.globalTypes,
-              (ObjString*)TO_OBJECT(compiler->current->constants.data[arg]),
-              &value)) {
+      if (!tableGet(&parser.globalTypes,
+                    (PdString*)TO_OBJECT(
+                        compiler->current->chunk.constants.data[arg]),
+                    &value)) {
         parseError("Referenced variable is undefined.");
         return;
       }
@@ -777,6 +800,12 @@ static void variable(bool canAssign) {
   namedVariable(&parser.previous, canAssign);
 }
 
+/**
+ * @brief Descent case for and operation, produces opcodes for an and operation
+ * of the top two stack values with short-circuit.
+ * @param canAssign bool whether or not the expression can be assigned to
+ * (false)
+ */
 static void and (bool canAssign) {
   ValueType a = popType();
   if (a != VALUE_BOOL) {
@@ -793,6 +822,13 @@ static void and (bool canAssign) {
   pushType(VALUE_BOOL);
 }
 
+/**
+ * @brief Descent case for or operation, produces opcodes for an or operation of
+ * the top two stack values with short-circuit.
+ *
+ * @param canAssign bool whether or not the expression can be assigned to
+ * (false)
+ */
 static void or (bool canAssign) {
   ValueType a = popType();
   if (a != VALUE_BOOL) {
@@ -809,8 +845,13 @@ static void or (bool canAssign) {
   pushType(VALUE_BOOL);
 }
 
+static void call(bool canAssign) {
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+  emitByte(OP_CALL);
+}
+
 ParseRule rules[] = {
-    [TOKEN_LEFT_PAREN] = {grouping, NULL, PREC_CALL},
+    [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
@@ -934,6 +975,40 @@ static void block() {
 }
 
 /**
+ * @brief Descent case for functions. Creates a new compiler for the function,
+ * a new function object, and parses the body. VM handles functions by defining
+ * globals as pointers a value struct with a value of the function pointer.
+ *
+ * @param returnType ValueType the return type of the function
+ * @param type FunctionType The type of the function
+ */
+static void function(ValueType returnType, FunctionType type) {
+  uint8_t index = parseVariable("Expected function name.");
+
+  pushScope();
+
+  Compiler newCompiler;
+  initCompiler(&newCompiler, type);
+  newCompiler.current = newFunction(
+      returnType, TO_STRING(compiler->current->chunk.constants.data[index]));
+  compiler = &newCompiler;
+
+  consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after function arguments.");
+
+  consume(TOKEN_LEFT_BRACE, "Expect '{' after function body.");
+  block();
+
+  PdFunction* fn = endCompiler();
+  uint8_t reference = addConstant(&compiler->current->chunk, FROM_OBJECT(fn));
+  emitBytes(OP_CONSTANT_POINTER, reference);
+  emitBytes(OP_GLOBAL_DEFINE, index);
+  tableSet(&parser.globalTypes, fn->name, (Value){.type = fn->returnType});
+
+  popScope();
+}
+
+/**
  * @brief Descent case for if statement, parses the condition and then the if
  * and else blocks.
  */
@@ -976,7 +1051,7 @@ static void expressionStatement() {
  *
  */
 static void whileStatement() {
-  int loopStart = compiler->current->count - 3;
+  int loopStart = compiler->current->chunk.count - 3;
   consume(TOKEN_LEFT_PAREN, "Expected '(' after while.");
   expression();
   if (popType() != VALUE_BOOL) {
@@ -1006,7 +1081,7 @@ static void forStatement() {
 
   // need two loops, loop back to the post expression after
   // then from the post expression loop back to the condition
-  int loopStart = compiler->current->count - 3;
+  int loopStart = compiler->current->chunk.count - 3;
   int exitJump = -1;
 
   if (!match(TOKEN_SEMICOLON)) {
@@ -1020,7 +1095,7 @@ static void forStatement() {
   if (!match(TOKEN_RIGHT_PAREN)) {
     // jump over the post expression (will jump back later)
     int bodyJump = emitJump(OP_JUMP);
-    int incrementStart = compiler->current->count - 3;
+    int incrementStart = compiler->current->chunk.count - 3;
     expression();
     popType();
     consume(TOKEN_RIGHT_PAREN, "Expected ')' after for loop.");
@@ -1063,35 +1138,35 @@ static void statement() {
   }
 }
 
-#define DECLARATION(T, value)                                                  \
-  static void declaration##T() {                                               \
-    uint8_t index = parseVariable("Expected variable name.");                  \
-    uint8_t op = OP_GLOBAL_DEFINE;                                             \
-    Token name = parser.previous;                                              \
-    if (match(TOKEN_EQUAL)) {                                                  \
-      expression();                                                            \
-      if (popType() != value) {                                                \
-        parseError("Initializer does not match declared type.");               \
-      }                                                                        \
-    } else {                                                                   \
-      emitByte(OP_NULL);                                                       \
-    }                                                                          \
-    if (compiler->scopeDepth == 0) {                                           \
-      if (!tableSet(                                                           \
-              &parser.globalTypes,                                             \
-              (ObjString*)TO_OBJECT(compiler->current->constants.data[index]), \
-              (Value){.type = value}))                                         \
-        parseError("Global variable already defined.");                        \
-    } else {                                                                   \
-      addLocal(name, value);                                                   \
-      op = OP_LOCAL_SET;                                                       \
-    }                                                                          \
-    consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");      \
-    emitBytes(op, index);                                                      \
-    if (op == OP_LOCAL_SET) {                                                  \
-      compiler->locals.data[compiler->locals.count - 1].depth =                \
-          compiler->scopeDepth;                                                \
-    }                                                                          \
+#define DECLARATION(T, value)                                             \
+  static void declaration##T() {                                          \
+    uint8_t index = parseVariable("Expected variable name.");             \
+    uint8_t op = OP_GLOBAL_DEFINE;                                        \
+    Token name = parser.previous;                                         \
+    if (match(TOKEN_EQUAL)) {                                             \
+      expression();                                                       \
+      if (popType() != value) {                                           \
+        parseError("Initializer does not match declared type.");          \
+      }                                                                   \
+    } else {                                                              \
+      emitByte(OP_NULL);                                                  \
+    }                                                                     \
+    if (compiler->scopeDepth == 0) {                                      \
+      if (!tableSet(&parser.globalTypes,                                  \
+                    (PdString*)TO_OBJECT(                                 \
+                        compiler->current->chunk.constants.data[index]),  \
+                    (Value){.type = value}))                              \
+        parseError("Global variable already defined.");                   \
+    } else {                                                              \
+      addLocal(name, value);                                              \
+      op = OP_LOCAL_SET;                                                  \
+    }                                                                     \
+    consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration."); \
+    emitBytes(op, index);                                                 \
+    if (op == OP_LOCAL_SET) {                                             \
+      compiler->locals.data[compiler->locals.count - 1].depth =           \
+          compiler->scopeDepth;                                           \
+    }                                                                     \
   }
 
 /**
@@ -1119,6 +1194,50 @@ DECLARATION(Boolean, VALUE_BOOL);
 DECLARATION(Character, VALUE_CHARACTER);
 
 /**
+ * @brief Descent case for void declarations. Void declarations cannot be set
+ * unless they are a pointer.
+ */
+static void declarationVoid() {
+  if (match(TOKEN_STAR)) {
+    uint8_t index = parseVariable("Expected variable name.");
+    uint8_t op = OP_GLOBAL_DEFINE;
+    Token name = parser.previous;
+    if (match(TOKEN_EQUAL)) {
+      if (match(TOKEN_NULL)) {
+        emitByte(OP_NULL_POINTER);
+        popType();
+      } else {
+        expression();
+        if (popType() != VALUE_POINTER) {
+          parseError("Initializer does not match declared type.");
+        }
+        popType();
+      }
+    } else {
+      emitByte(OP_NULL_POINTER);
+    }
+    if (compiler->scopeDepth == 0) {
+      if (!tableSet(&parser.globalTypes,
+                    (PdString*)TO_OBJECT(
+                        compiler->current->chunk.constants.data[index]),
+                    (Value){.type = VALUE_POINTER}))
+        parseError("Global variable already defined.");
+    } else {
+      addLocal(name, VALUE_POINTER);
+      op = OP_LOCAL_SET;
+    }
+    consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
+    emitBytes(op, index);
+    if (op == OP_LOCAL_SET) {
+      compiler->locals.data[compiler->locals.count - 1].depth =
+          compiler->scopeDepth;
+    }
+  } else {
+    function(VALUE_NULL, TYPE_FUNCTION);
+  }
+}
+
+/**
  * @brief Descent case for parsing declarations, e.g. var, function, etc.
  */
 static void declaration() {
@@ -1130,8 +1249,14 @@ static void declaration() {
     declarationBoolean();
   } else if (match(TOKEN_CHAR)) {
     declarationCharacter();
+  } else if (match(TOKEN_VOID)) {
+    declarationVoid();
   } else {
     statement();
+  }
+
+  if (parser.panicMode) {
+    synchronize();
   }
 }
 
@@ -1142,11 +1267,16 @@ static void declaration() {
  * @param chunk Chunk* the chunk to compile opcodes into.
  * @return bool true if the compilation was successful, false otherwise.
  */
-bool compile(const char* source, Chunk* chunk) {
+PdFunction* compile(const char* source) {
   initScanner(source);
+
   Compiler comp;
-  initCompiler(&comp, chunk);
+  initCompiler(&comp, TYPE_SCRIPT);
+  Chunk chunk;
+  initChunk(&chunk);
+  comp.current = newFunction(VALUE_NULL, copyString("script", 6));
   compiler = &comp;
+
   INIT_DYNAMIC_ARRAY(ValueType, parser.typeStack);
   initTable(&parser.globalTypes);
 
@@ -1155,20 +1285,14 @@ bool compile(const char* source, Chunk* chunk) {
 
   advance();
 
-  while (parser.current.type != TOKEN_EOF) {
+  while (!match(TOKEN_EOF)) {
     declaration();
   }
 
-  endCompiler();
+  PdFunction* func = endCompiler();
 
   FREE_DYNAMIC_ARRAY(ValueType, parser.typeStack);
   freeTable(&parser.globalTypes);
 
-#ifdef DEBUG_PRINT_OPCODES
-  if (!parser.hadError) {
-    disassembleChunk(chunk, "code");
-  }
-#endif
-
-  return !parser.hadError;
+  return !parser.hadError ? func : NULL;
 }

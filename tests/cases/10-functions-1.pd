@@ -1,9 +1,8 @@
+
 void test() {
     for (int i = 0; i < 10; i = i + 1) {
         print i;
     }
 }
 
-void* pTest = &test;
-print pTest;
-print (*pTest);
+test();

@@ -8,6 +8,7 @@
 
 #include <stdarg.h>
 #include <stdio.h>
+#include <stdlib.h>
 
 #include "compiler.h"
 #include "disassembler.h"
@@ -43,7 +44,6 @@ static void runtimeError(const char* format, ...) {
 void initVM() {
   INIT_DYNAMIC_ARRAY(Value, vm.stack);
   vm.heap = NULL;
-  vm.callStack = 0;
   initTable(&vm.strings);
   initTable(&vm.globals);
   resetStack();
@@ -53,12 +53,12 @@ void initVM() {
  * @brief Set the global in the VM's global table without caring for
  * redefinition.
  *
- * @param name ObjString* the name of the global
+ * @param name PdString* the name of the global
  * @param value Value the value to set it to
  * @return bool true if the variable existed in the table previously, false
  * otherwise
  */
-static bool setGlobal(ObjString* name, Value value) {
+static bool setGlobal(PdString* name, Value value) {
   return !tableSet(&vm.globals, name, value);
 }
 
@@ -66,13 +66,34 @@ static bool setGlobal(ObjString* name, Value value) {
  * @brief Adds a global to the VM's global table. Reports a runtime error if the
  * global is already defined.
  *
- * @param name ObjString* the name of the global
+ * @param name PdString* the name of the global
  * @param value Value the value to set it to
  */
-static void addGlobal(ObjString* name, Value value) {
+static void addGlobal(PdString* name, Value value) {
   if (setGlobal(name, value)) {
     runtimeError("Global variable '%s' already defined.", name->chars);
   }
+}
+
+/**
+ * @brief Calls a PdFunction by placing a CallFrame on top of the callstack
+ * containing the opcodes for that function.
+ *
+ * @param function PdFunction* the function to call
+ */
+static void call(PdFunction* function) {
+  if (vm.callStackSize == 255) {
+    runtimeError("Stack overflow.");
+  }
+  CallFrame frame;
+  frame.chunk = &function->chunk;
+  frame.ip = function->chunk.code;
+  frame.slot = vm.stack.data + vm.stackTop;
+  vm.callStack[vm.callStackSize] = frame;
+  vm.callStackSize++;
+#ifdef DEBUG_TRACE_EXEC
+  printf("========= %s =========\n", function->name->chars);
+#endif
 }
 
 /**
@@ -81,11 +102,11 @@ static void addGlobal(ObjString* name, Value value) {
  * @return InterpretResult The result of the execution.
  */
 static InterpretResult run() {
-  CallFrame frame = vm.callStack[vm.callStackSize - 1];
-#define READ_BYTE() (*frame.ip++)
-#define READ_SHORT() (frame.ip += 2, (frame.ip[-2] << 8) | frame.ip[-1])
-#define READ_CONSTANT() (frame.chunk->constants.data[READ_BYTE()])
-#define READ_STRING() ((ObjString*)TO_OBJECT(READ_CONSTANT()))
+  CallFrame* frame = &vm.callStack[vm.callStackSize - 1];
+#define READ_BYTE() (*frame->ip++)
+#define READ_SHORT() (frame->ip += 2, (frame->ip[-2] << 8) | frame->ip[-1])
+#define READ_CONSTANT() (frame->chunk->constants.data[READ_BYTE()])
+#define READ_STRING() ((PdString*)TO_OBJECT(READ_CONSTANT()))
 #define BINARY_OP(ctype, type, result, op) \
   do {                                     \
     ctype b = TO_##type(pop());            \
@@ -123,13 +144,29 @@ static InterpretResult run() {
     switch ((instruction = READ_BYTE())) {
       case OP_RETURN: {
 #ifdef DEBUG_TRACE_EXEC
-        disassembleInstruction(frame.chunk,
-                               frame.ip - traveled - frame.chunk->code);
+        disassembleInstruction(
+            frame->chunk, (int)(frame->ip - traveled - frame->chunk->code));
+        printf("==================================\n");
 #endif
-        return INTERPRET_OK;
+        Value result = NULL_VAL;
+        if (vm.stackTop > 0) {
+          result = pop();
+        }
+        vm.callStackSize--;
+        if (vm.callStackSize == 0) {
+          return INTERPRET_OK;
+        }
+        vm.stackTop = frame->slot - vm.stack.data;
+        push(result);
+        frame = &vm.callStack[vm.callStackSize - 1];
+        continue;
       }
       case OP_NULL: {
         push(NULL_VAL);
+        break;
+      }
+      case OP_NULL_POINTER: {
+        push(NULL_POINTER);
         break;
       }
       case OP_SWAP: {
@@ -142,20 +179,20 @@ static InterpretResult run() {
       }
       case OP_JUMP: {
 #ifdef DEBUG_TRACE_EXEC
-        disassembleInstruction(frame.chunk,
-                               (int)(frame.ip - traveled - frame.chunk->code));
+        disassembleInstruction(
+            frame->chunk, (int)(frame->ip - traveled - frame->chunk->code));
 #endif
         uint16_t offset = READ_SHORT();
-        frame.ip += offset;
+        frame->ip += offset;
         continue;
       }
       case OP_LOOP: {
 #ifdef DEBUG_TRACE_EXEC
-        disassembleInstruction(frame.chunk,
-                               (int)(frame.ip - traveled - frame.chunk->code));
+        disassembleInstruction(
+            frame->chunk, (int)(frame->ip - traveled - frame->chunk->code));
 #endif
         uint16_t offset = READ_SHORT();
-        frame.ip -= offset;
+        frame->ip -= offset;
         continue;
       }
       // UNARY OPERATIONS
@@ -184,6 +221,10 @@ static InterpretResult run() {
       }
       case OP_DEREFERENCE: {
         Value value = pop();
+        if (value.data.pointer == NULL) {
+          runtimeError("Dereferencing NULL pointer.");
+          exit(1);
+        }
         Value deref = *(Value*)value.data.pointer;
         push(deref);
         break;
@@ -195,25 +236,25 @@ static InterpretResult run() {
       }
       case OP_JUMP_IF_FALSE: {
 #ifdef DEBUG_TRACE_EXEC
-        disassembleInstruction(frame.chunk,
-                               (int)(frame.ip - traveled - frame.chunk->code));
+        disassembleInstruction(
+            frame->chunk, (int)(frame->ip - traveled - frame->chunk->code));
 #endif
         uint16_t offset = READ_SHORT();
         Value condition = peek(0);
         if (!TO_BOOL(condition)) {
-          frame.ip += offset;
+          frame->ip += offset;
         }
         continue;
       }
       case OP_JUMP_IF_TRUE: {
 #ifdef DEBUG_TRACE_EXEC
-        disassembleInstruction(frame.chunk,
-                               (int)(frame.ip - traveled - frame.chunk->code));
+        disassembleInstruction(
+            frame->chunk, (int)(frame->ip - traveled - frame->chunk->code));
 #endif
         uint16_t offset = READ_SHORT();
         Value condition = peek(0);
         if (TO_BOOL(condition)) {
-          frame.ip += offset;
+          frame->ip += offset;
         }
         continue;
       }
@@ -251,6 +292,7 @@ static InterpretResult run() {
       case OP_CONSTANT_BOOL:
       case OP_CONSTANT_CHARACTER:
       case OP_CONSTANT_STRING:
+      case OP_CONSTANT_POINTER:
       case OP_CONSTANT_DOUBLE: {
         Value constant = READ_CONSTANT();
         push(constant);
@@ -259,7 +301,7 @@ static InterpretResult run() {
       }
       // Variables
       case OP_GLOBAL_GET: {
-        ObjString* name = READ_STRING();
+        PdString* name = READ_STRING();
         Value value;
         if (!tableGet(&vm.globals, name, &value)) {
           runtimeError("Undefined variable '%s'.", name->chars);
@@ -270,14 +312,14 @@ static InterpretResult run() {
         break;
       }
       case OP_GLOBAL_SET: {
-        ObjString* name = READ_STRING();
+        PdString* name = READ_STRING();
         Value value = pop();
         setGlobal(name, value);
         traveled++;
         break;
       }
       case OP_GLOBAL_DEFINE: {
-        ObjString* name = READ_STRING();
+        PdString* name = READ_STRING();
         Value value = pop();
         addGlobal(name, value);
         traveled++;
@@ -285,14 +327,14 @@ static InterpretResult run() {
       }
       case OP_LOCAL_GET: {
         uint8_t slot = READ_BYTE();
-        Value value = frame.slot[slot];
+        Value value = frame->slot[slot];
         push(value);
         traveled++;
         break;
       }
       case OP_LOCAL_SET: {
         uint8_t slot = READ_BYTE();
-        frame.slot[slot] = peek(0);
+        frame->slot[slot] = peek(0);
         traveled++;
         break;
       }
@@ -302,11 +344,27 @@ static InterpretResult run() {
         printf("\n");
         break;
       }
+      // Function calls
+      case OP_CALL: {
+#ifdef DEBUG_TRACE_EXEC
+        disassembleInstruction(
+            frame->chunk, (int)(frame->ip - traveled - frame->chunk->code));
+#endif
+        Value fun = pop();
+        if (!IS_OBJECT(fun) || TO_OBJECT(fun)->type != ObjectFunction) {
+          runtimeError("Cannot call non-function.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        PdFunction* function = TO_FUNCTION(fun);
+        call(function);
+        frame = &vm.callStack[vm.callStackSize - 1];
+        continue;
+      }
     }
       // I like to see the stack after the operation happens
 #ifdef DEBUG_TRACE_EXEC
-    disassembleInstruction(frame.chunk,
-                           (int)(frame.ip - traveled - frame.chunk->code));
+    disassembleInstruction(frame->chunk,
+                           (int)(frame->ip - traveled - frame->chunk->code));
     printf("        ");
     for (int slot = 0; slot < vm.stackTop; slot++) {
       printf("[");
@@ -331,26 +389,21 @@ static InterpretResult run() {
  * @return InterpretResult the result of the interpretation.
  */
 InterpretResult interpret(const char* source) {
-  Chunk chunk;
-  initChunk(&chunk);
   initVM();
 
-  if (!compile(source, &chunk)) {
+  PdFunction* fun = compile(source);
+
+  if (!fun) {
     return INTERPRET_COMPILE_ERROR;
   }
-  CallFrame callFrame;
-  callFrame.chunk = &chunk;
-  callFrame.ip = chunk.code;
-  callFrame.slot = vm.stack.data;
-  vm.callStack = &callFrame;
-  vm.callStackSize += 1;
 
-  InterpretResult result = run();
+  call(fun);
 
-  freeChunk(&chunk);
+  InterpretResult res = run();
+
   freeVM();
 
-  return result;
+  return res;
 }
 
 /**

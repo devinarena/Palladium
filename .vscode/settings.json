@@ -12,6 +12,9 @@
         "object.h": "c",
         "commons.h": "c",
         "memory.h": "c",
-        "disassembler.h": "c"
+        "disassembler.h": "c",
+        "compiler.h": "c",
+        "scanner.h": "c",
+        "chunk.h": "c"
     }
 }

@@ -13,6 +13,6 @@
 #include "chunk.h"
 #include "object.h"
 
-bool compile(const char* source, Chunk* chunk);
+PdFunction* compile(const char* source);
 
 #endif

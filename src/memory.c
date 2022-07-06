@@ -10,6 +10,7 @@
 #include <stdio.h>
 
 #include "memory.h"
+#include "chunk.h"
 
 /**
  * @brief Reallocates memory for the specified pointer. Can be used to grow or
@@ -42,9 +43,15 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 void freeObject(Object* object) {
   switch(object->type) {
     case ObjectString: {
-      ObjString* str = (ObjString*)object;
+      PdString* str = (PdString*)object;
       FREE_ARRAY(char, str->chars, str->length + 1);
       FREE(ObjectString, object);
+      break;
+    }
+    case ObjectFunction: {
+      PdFunction* func = (PdFunction*)object;
+      freeChunk(&func->chunk);
+      FREE(ObjectFunction, object);
       break;
     }
   }

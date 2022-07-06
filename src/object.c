@@ -43,10 +43,10 @@ static Object* allocateObject(size_t size, ObjectType type) {
  * @param chars The characters of the string to allocate.
  * @param length The length of the string to allocate.
  * @param hash The hash of the string to allocate.
- * @return ObjString* The pointer to the allocated string.
+ * @return PdString* The pointer to the allocated string.
  */
-static ObjString* allocateString(char* chars, int length, uint32_t hash) {
-  ObjString* string = ALLOCATE_OBJ(ObjString, ObjectString);
+static PdString* allocateString(char* chars, int length, uint32_t hash) {
+  PdString* string = ALLOCATE_OBJ(PdString, ObjectString);
   string->length = length;
   string->chars = chars;
   string->hash = hash;
@@ -75,15 +75,15 @@ static uint32_t hashString(const char* key, int length) {
 }
 
 /**
- * @brief Allocates a new string for the ObjString* given a c string.
+ * @brief Allocates a new string for the PdString* given a c string.
  *
  * @param chars The c string to allocate.
  * @param length The length of the c string to allocate.
- * @return ObjString* The pointer to the allocated string.
+ * @return PdString* The pointer to the allocated string.
  */
-ObjString* newString(char* chars, int length) {
+PdString* newString(char* chars, int length) {
   uint32_t hash = hashString(chars, length);
-  ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+  PdString* interned = tableFindString(&vm.strings, chars, length, hash);
 
   if (interned != NULL) {
     FREE_ARRAY(char, chars, length + 1);
@@ -98,11 +98,11 @@ ObjString* newString(char* chars, int length) {
  *
  * @param chars The c string to copy.
  * @param length The length of the c string to copy.
- * @return ObjString* The pointer to the copied string.
+ * @return PdString* The pointer to the copied string.
  */
-ObjString* copyString(const char* chars, int length) {
+PdString* copyString(const char* chars, int length) {
   uint32_t hash = hashString(chars, length);
-  ObjString* interned = tableFindString(&vm.strings, chars, length, hash);
+  PdString* interned = tableFindString(&vm.strings, chars, length, hash);
   if (interned != NULL)
     return interned;
 
@@ -110,6 +110,14 @@ ObjString* copyString(const char* chars, int length) {
   memcpy(heapChars, chars, length);
   heapChars[length] = '\0';
   return allocateString(heapChars, length, hash);
+}
+
+PdFunction* newFunction(ValueType returnType, PdString* name) {
+  PdFunction* function = ALLOCATE_OBJ(PdFunction, ObjectFunction);
+  initChunk(&function->chunk);
+  function->returnType = returnType;
+  function->name = name;
+  return function;
 }
 
 /**
@@ -122,6 +130,27 @@ void printObject(Value value) {
     case ObjectString:
       printf("%s", TO_CSTRING(value));
       break;
+    case ObjectFunction: {
+      PdFunction* fun = TO_FUNCTION(value);
+      switch(fun->returnType) {
+        case VALUE_BOOL:
+          printf("<bool %s>", TO_FUNCTION(value)->name->chars);
+          break;
+        case VALUE_CHARACTER:
+          printf("<char %s>", TO_FUNCTION(value)->name->chars);
+          break;
+        case VALUE_INTEGER:
+          printf("<int %s>", TO_FUNCTION(value)->name->chars);
+          break;
+        case VALUE_DOUBLE:
+          printf("<double %s>", TO_FUNCTION(value)->name->chars);
+          break;
+        case VALUE_NULL:
+          printf("<void %s>", TO_FUNCTION(value)->name->chars);
+          break;
+      }
+      break;
+    }
     default:
       printf("%p", TO_OBJECT(value));
       break;

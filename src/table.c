@@ -45,10 +45,10 @@ void freeTable(Table* table) {
  *
  * @param entries Entry* the array of entries to search.
  * @param capacity int the capacity of the array.
- * @param key ObjString* the key to search for.
+ * @param key PdString* the key to search for.
  * @return Entry* the entry that was found.
  */
-static Entry* findEntry(Entry* entries, int capacity, ObjString* key) {
+static Entry* findEntry(Entry* entries, int capacity, PdString* key) {
   uint32_t index = key->hash & (capacity - 1);
   Entry* tombstone = NULL;
 
@@ -107,11 +107,11 @@ static void adjustCapacity(Table* table, int capacity) {
  * value to the value pointer. If the key is not found, it returns false.
  *
  * @param table Table* the table to search.
- * @param key ObjString* the key to search for.
+ * @param key PdString* the key to search for.
  * @param value Value* the value to assign to.
  * @return bool true if the key was found, false otherwise.
  */
-bool tableGet(Table* table, ObjString* key, Value* value) {
+bool tableGet(Table* table, PdString* key, Value* value) {
   if (table->count == 0)
     return false;
 
@@ -129,11 +129,11 @@ bool tableGet(Table* table, ObjString* key, Value* value) {
  * load.
  *
  * @param table Table* the table to set the value in.
- * @param key ObjString* the key to set the value for.
+ * @param key PdString* the key to set the value for.
  * @param value Value the value to set.
  * @return bool true if the key is not found, false otherwise.
  */
-bool tableSet(Table* table, ObjString* key, Value value) {
+bool tableSet(Table* table, PdString* key, Value value) {
   if (table->count + 1 > table->capacity * TABLE_MAX_LOAD) {
     int capacity = GROW_CAPACITY(table->capacity);
     adjustCapacity(table, capacity);
@@ -153,10 +153,10 @@ bool tableSet(Table* table, ObjString* key, Value value) {
  * @brief Deletes an entry from the table by setting it to be a tombstone.
  *
  * @param table Table* the table to delete the entry from.
- * @param key ObjString* the key to delete.
+ * @param key PdString* the key to delete.
  * @return bool true if the key was found, false otherwise.
  */
-bool tableDelete(Table* table, ObjString* key) {
+bool tableDelete(Table* table, PdString* key) {
   if (table->count == 0)
     return false;
 
@@ -193,9 +193,9 @@ void tableAddAll(Table* from, Table* to) {
  * @param chars char* the characters to search for.
  * @param length int the length of the string.
  * @param hash uint32_t the hash of the string.
- * @return ObjString* the string that was found or NULL.
+ * @return PdString* the string that was found or NULL.
  */
-ObjString* tableFindString(Table* table,
+PdString* tableFindString(Table* table,
                            const char* chars,
                            int length,
                            uint32_t hash) {

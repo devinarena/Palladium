@@ -34,6 +34,7 @@ int addConstant(Chunk* chunk, Value value);
 typedef enum {
   OP_RETURN,
   OP_NULL,
+  OP_NULL_POINTER,
   OP_SWAP,
   OP_POP,
   OP_JUMP,
@@ -74,13 +75,16 @@ typedef enum {
   OP_CONSTANT_BOOL,
   OP_CONSTANT_CHARACTER,
   OP_CONSTANT_STRING,
+  OP_CONSTANT_POINTER,
   // Variables
   OP_GLOBAL_GET,
   OP_GLOBAL_SET,
   OP_GLOBAL_DEFINE,
   OP_LOCAL_SET,
   OP_LOCAL_GET,
-  OP_PRINT
+  OP_PRINT,
+  // Functions
+  OP_CALL
 } OpCode;
 
 #endif

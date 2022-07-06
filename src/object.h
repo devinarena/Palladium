@@ -11,15 +11,19 @@
 
 #include "commons.h"
 #include "value.h"
+#include "chunk.h"
 
 #define OBJ_TYPE(value) (((Object*)value.data.object)->type)
 
 #define TO_OBJECT(value) (value.data.object)
 
-#define TO_CSTRING(value) (((ObjString*)value.data.object)->chars)
+#define TO_STRING(value) ((PdString*)value.data.object)
+#define TO_CSTRING(value) ((TO_STRING(value)->chars))
+#define TO_FUNCTION(value) ((PdFunction*)value.data.object)
 
 typedef enum {
   ObjectString,
+  ObjectFunction
 } ObjectType;
 
 struct Object {
@@ -27,15 +31,23 @@ struct Object {
   struct Object* next;  // heap
 };
 
-struct ObjString {
+struct PdString {
   Object object;
   uint32_t length;
   char* chars;
   uint32_t hash;
 };
 
-ObjString* newString(char* chars, int length);
-ObjString* copyString(const char* chars, int length);
+typedef struct {
+  Object object;
+  Chunk chunk;
+  ValueType returnType;
+  PdString* name;
+} PdFunction;
+
+PdString* newString(char* chars, int length);
+PdString* copyString(const char* chars, int length);
+PdFunction* newFunction(ValueType returnType, PdString* name);
 void printObject(Value value);
 
 #endif

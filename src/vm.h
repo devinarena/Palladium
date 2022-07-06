@@ -21,7 +21,7 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
-  CallFrame* callStack;
+  CallFrame callStack[255];
   int callStackSize;
   DYNAMIC_ARRAY(Value) stack;
   Table strings;

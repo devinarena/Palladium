@@ -1,0 +1,4 @@
+void* test = null;
+print test;
+test = &10;
+print *test;
