@@ -81,14 +81,14 @@ static void addGlobal(PdString* name, Value value) {
  *
  * @param function PdFunction* the function to call
  */
-static void call(PdFunction* function) {
+static void call(PdFunction* function, uint8_t argCount) {
   if (vm.callStackSize == 255) {
     runtimeError("Stack overflow.");
   }
   CallFrame frame;
   frame.chunk = &function->chunk;
   frame.ip = function->chunk.code;
-  frame.slot = vm.stack.data + vm.stackTop;
+  frame.slot = vm.stack.data + vm.stackTop - argCount;
   vm.callStack[vm.callStackSize] = frame;
   vm.callStackSize++;
 #ifdef DEBUG_TRACE_EXEC
@@ -350,13 +350,14 @@ static InterpretResult run() {
         disassembleInstruction(
             frame->chunk, (int)(frame->ip - traveled - frame->chunk->code));
 #endif
+        uint8_t argCount = READ_BYTE();
         Value fun = pop();
         if (!IS_OBJECT(fun) || TO_OBJECT(fun)->type != ObjectFunction) {
           runtimeError("Cannot call non-function.");
           return INTERPRET_RUNTIME_ERROR;
         }
         PdFunction* function = TO_FUNCTION(fun);
-        call(function);
+        call(function, argCount);
         frame = &vm.callStack[vm.callStackSize - 1];
         continue;
       }
@@ -397,7 +398,7 @@ InterpretResult interpret(const char* source) {
     return INTERPRET_COMPILE_ERROR;
   }
 
-  call(fun);
+  call(fun, 0);
 
   InterpretResult res = run();
 

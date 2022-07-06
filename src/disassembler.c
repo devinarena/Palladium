@@ -40,6 +40,20 @@ static int simpleInstruction(const char* name, int offset) {
 }
 
 /**
+ * @brief Helper for displaying a byte instruction, an instruction followed by a single byte.
+ * 
+ * @param name const char* the name of the instruction
+ * @param chunk Chunk* the chunk to disassemble
+ * @param offset int the offset of the instruction
+ * @return int the offset of the next instruction
+ */
+static int byteInstruction(const char* name, Chunk* chunk, int offset) {
+  uint8_t data = chunk->code[offset + 1];
+  printf("%-16s %4d\n", name, data);
+  return offset + 3;
+}
+
+/**
  * @brief Helper for displaying a short instruction and moving the offset to
  * the next instruction.
  *
@@ -188,7 +202,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_LOCAL_SET", chunk, offset);
     // Function calls
     case OP_CALL:
-      return simpleInstruction("OP_CALL", offset);
+      return byteInstruction("OP_CALL", chunk, offset);
     default:
       printf("Unknown opcode encountered: %d", instruction);
       exit(1);

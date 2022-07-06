@@ -845,9 +845,24 @@ static void or (bool canAssign) {
   pushType(VALUE_BOOL);
 }
 
+/**
+ * @brief Descent case for object calls (); mainly for functions.
+ *
+ * @param canAssign bool whether or not the expression can be assigned to
+ */
 static void call(bool canAssign) {
+  uint8_t argCount = 0;
+  if (!check(TOKEN_RIGHT_PAREN)) {
+    do {
+      expression();
+      argCount++;
+      if (argCount > 255) {
+        parseError("Cannot have more than 255 arguments.");
+      }
+    } while (match(TOKEN_COMMA));
+  }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
-  emitByte(OP_CALL);
+  emitBytes(OP_CALL, argCount);
 }
 
 ParseRule rules[] = {
@@ -991,11 +1006,25 @@ static void function(ValueType returnType, FunctionType type) {
   initCompiler(&newCompiler, type);
   newCompiler.current = newFunction(
       returnType, TO_STRING(compiler->current->chunk.constants.data[index]));
+  newCompiler.scopeDepth = compiler->scopeDepth;
   compiler = &newCompiler;
 
   consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
-  consume(TOKEN_RIGHT_PAREN, "Expect ')' after function arguments.");
-
+  uint8_t argCount = 0;
+  if (!check(TOKEN_RIGHT_PAREN)) {
+    do {
+      if (argCount >= 255) {
+        parseError("Cannot have more than 255 arguments.");
+      }
+      consume(TOKEN_INT, "Expected value type after of argument.");
+      Token name = parser.current;
+      parseVariable("Expected variable name.");
+      addLocal(name, VALUE_INTEGER);
+      compiler->locals.data->depth = compiler->scopeDepth;
+      argCount++;
+    } while (match(TOKEN_COMMA));
+  }
+  consume(TOKEN_RIGHT_PAREN, "Expected ')' after arguments.");
   consume(TOKEN_LEFT_BRACE, "Expect '{' after function body.");
   block();
 
