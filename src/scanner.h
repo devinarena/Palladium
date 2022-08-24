@@ -9,6 +9,7 @@
 #define PALLADIUM_SCANNER_H
 
 #include "commons.h"
+#include "value.h"
 
 // Tokens found in the source string.
 typedef enum {
@@ -73,6 +74,7 @@ typedef struct {
 } Token;
 
 void initScanner(const char* source);
+ValueType getValueTypeOfKeyword(TokenType type);
 Token scanToken();
 
 #endif

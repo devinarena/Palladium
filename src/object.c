@@ -117,6 +117,8 @@ PdFunction* newFunction(ValueType returnType, PdString* name) {
   initChunk(&function->chunk);
   function->returnType = returnType;
   function->name = name;
+  function->arity = 0;
+  INIT_DYNAMIC_ARRAY(ValueType, function->locals);
   return function;
 }
 

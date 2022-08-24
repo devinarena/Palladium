@@ -78,4 +78,11 @@ void freeObject(Object* obj);
     }                                                      \
   } while (false)
 
+#define POP_DYNAMIC_ARRAY(type, array)         \
+  do {                                         \
+    if ((array).count > 0) {                   \
+      ((array).data + (--array.count)) = NULL; \
+    }                                          \
+  } while (false)
+
 #endif

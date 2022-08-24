@@ -202,7 +202,7 @@ static TokenType identifierType() {
   switch (scanner.start[0]) {
     case 'b':
       return checkKeyword(1, 3, "ool", TOKEN_BOOL);
-      case 'c':
+    case 'c':
       return checkKeyword(1, 3, "har", TOKEN_CHAR);
     case 'd':
       return checkKeyword(1, 5, "ouble", TOKEN_DOUBLE);
@@ -379,4 +379,25 @@ Token scanToken() {
   }
 
   return errorToken("Unexpected character.");
+}
+
+/**
+ * @brief Lookup table for keywords to get their required valueType.
+ */
+ValueType keywordTypes[] = {
+    [TOKEN_INT] = VALUE_INTEGER,
+    [TOKEN_DOUBLE] = VALUE_DOUBLE,
+    [TOKEN_BOOL] = VALUE_BOOL,
+    [TOKEN_CHARACTER] = VALUE_CHARACTER,
+    [TOKEN_IDENTIFIER] = VALUE_OBJECT
+};
+
+/**
+ * @brief Helper to lookup the valueType of a keyword.
+ * 
+ * @param type TokenType of the keyword
+ * @return ValueType the valueType of the keyword
+ */
+ValueType getValueTypeOfKeyword(TokenType type) {
+  return keywordTypes[type];
 }

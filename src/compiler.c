@@ -26,11 +26,12 @@ typedef enum {
 typedef struct {
   Token current;
   Token previous;
+  Token last;
   bool hadError;
   bool panicMode;
   DYNAMIC_ARRAY(ValueType) typeStack;
   ValueType* typeStackTop;
-  Table globalTypes;
+  Table globals;
 } Parser;
 
 typedef struct {
@@ -122,9 +123,9 @@ static void parseError(const char* message) {
 /**
  * @brief Advances the parser to the next token. If an error occurs, the parser
  * will stop parsing and emit a parse error.
- *
  */
 static void advance() {
+  parser.last = parser.previous;
   parser.previous = parser.current;
 
   while (true) {
@@ -218,7 +219,7 @@ static void synchronize() {
  *
  * @param type ValueType the type to push.
  */
-static void pushType(ValueType type) {
+static void pushType(uint32_t type) {
   uint8_t dist = (parser.typeStackTop - parser.typeStack.data);
   INSERT_DYNAMIC_ARRAY_AT(ValueType, parser.typeStack, dist, type);
   parser.typeStackTop = parser.typeStack.data + dist + 1;
@@ -229,7 +230,7 @@ static void pushType(ValueType type) {
  *
  * @return ValueType the type popped.
  */
-static ValueType popType() {
+static uint32_t popType() {
   if (parser.typeStackTop == parser.typeStack.data)
     return VALUE_NULL;
   parser.typeStackTop--;
@@ -241,7 +242,7 @@ static ValueType popType() {
  *
  * @return ValueType the type at the top of the stack.
  */
-static ValueType peekType() {
+static uint32_t peekType() {
   if (parser.typeStackTop == parser.typeStack.data)
     return VALUE_NULL;
   return *(parser.typeStackTop - 1);
@@ -766,7 +767,7 @@ static void namedVariable(Token* name, bool canAssign) {
       expression();
       ValueType type = popType();
       Value value;
-      if (!tableGet(&parser.globalTypes,
+      if (!tableGet(&parser.globals,
                     (PdString*)TO_OBJECT(
                         compiler->current->chunk.constants.data[arg]),
                     &value)) {
@@ -779,7 +780,7 @@ static void namedVariable(Token* name, bool canAssign) {
     } else {
       emitBytes(OP_GLOBAL_GET, arg);
       Value value;
-      if (!tableGet(&parser.globalTypes,
+      if (!tableGet(&parser.globals,
                     (PdString*)TO_OBJECT(
                         compiler->current->chunk.constants.data[arg]),
                     &value)) {
@@ -852,14 +853,33 @@ static void or (bool canAssign) {
  */
 static void call(bool canAssign) {
   uint8_t argCount = 0;
+  // BIG NOTE: THIS FORCES FUNCTIONS TO REQUIRE FORWARD DECLARATIONS.
+  // SOMETHING THAT MUST BE LOOKED INTO.
+  // DEVIN CHECK: does this always work?
+  Value fun;
+  if (!tableGet(&parser.globals, name, &fun)) {
+    parseError("Cannot call undefined function.");
+    return;
+  }
+  if (fun.type != VALUE_OBJECT || TO_OBJECT(fun)->type != ObjectFunction) {
+    parseError("Cannot call non-function.");
+    return;
+  }
+  PdFunction* fn = TO_FUNCTION(fun);
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
       expression();
+      if (popType() != fn->locals.data[argCount]) {
+        parseError("Function argument type mismatch.");
+      }
       argCount++;
       if (argCount > 255) {
         parseError("Cannot have more than 255 arguments.");
       }
     } while (match(TOKEN_COMMA));
+  }
+  if (argCount != fn->arity) {
+    parseError("Argument count mismatch.");
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
   emitBytes(OP_CALL, argCount);
@@ -1016,12 +1036,20 @@ static void function(ValueType returnType, FunctionType type) {
       if (argCount >= 255) {
         parseError("Cannot have more than 255 arguments.");
       }
-      consume(TOKEN_INT, "Expected value type after of argument.");
+      advance();
+      Token typeToken = parser.previous;
+      if (typeToken.type != TOKEN_INT && typeToken.type != TOKEN_DOUBLE &&
+          typeToken.type != TOKEN_BOOL && typeToken.type != TOKEN_CHAR &&
+          typeToken.type != TOKEN_IDENTIFIER) {
+        parseError("Expected type for argument.");
+      }
+      compiler->current->arity++;
+      ValueType type = getValueTypeOfKeyword(typeToken.type);
       Token name = parser.current;
       parseVariable("Expected variable name.");
-      addLocal(name, VALUE_INTEGER);
-      compiler->locals.data->depth = compiler->scopeDepth;
-      argCount++;
+      addLocal(name, type);
+      compiler->locals.data[argCount++].depth = compiler->scopeDepth;
+      INSERT_DYNAMIC_ARRAY(ValueType, compiler->current->locals, type);
     } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expected ')' after arguments.");
@@ -1032,7 +1060,7 @@ static void function(ValueType returnType, FunctionType type) {
   uint8_t reference = addConstant(&compiler->current->chunk, FROM_OBJECT(fn));
   emitBytes(OP_CONSTANT_POINTER, reference);
   emitBytes(OP_GLOBAL_DEFINE, index);
-  tableSet(&parser.globalTypes, fn->name, (Value){.type = fn->returnType});
+  tableSet(&parser.globals, fn->name, FROM_OBJECT(fn));
 
   popScope();
 }
@@ -1181,7 +1209,7 @@ static void statement() {
       emitByte(OP_NULL);                                                  \
     }                                                                     \
     if (compiler->scopeDepth == 0) {                                      \
-      if (!tableSet(&parser.globalTypes,                                  \
+      if (!tableSet(&parser.globals,                                      \
                     (PdString*)TO_OBJECT(                                 \
                         compiler->current->chunk.constants.data[index]),  \
                     (Value){.type = value}))                              \
@@ -1246,7 +1274,7 @@ static void declarationVoid() {
       emitByte(OP_NULL_POINTER);
     }
     if (compiler->scopeDepth == 0) {
-      if (!tableSet(&parser.globalTypes,
+      if (!tableSet(&parser.globals,
                     (PdString*)TO_OBJECT(
                         compiler->current->chunk.constants.data[index]),
                     (Value){.type = VALUE_POINTER}))
@@ -1307,7 +1335,7 @@ PdFunction* compile(const char* source) {
   compiler = &comp;
 
   INIT_DYNAMIC_ARRAY(ValueType, parser.typeStack);
-  initTable(&parser.globalTypes);
+  initTable(&parser.globals);
 
   parser.hadError = false;
   parser.panicMode = false;
@@ -1321,7 +1349,7 @@ PdFunction* compile(const char* source) {
   PdFunction* func = endCompiler();
 
   FREE_DYNAMIC_ARRAY(ValueType, parser.typeStack);
-  freeTable(&parser.globalTypes);
+  freeTable(&parser.globals);
 
   return !parser.hadError ? func : NULL;
 }

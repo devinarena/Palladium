@@ -148,17 +148,22 @@ static InterpretResult run() {
             frame->chunk, (int)(frame->ip - traveled - frame->chunk->code));
         printf("==================================\n");
 #endif
-        Value result = NULL_VAL;
-        if (vm.stackTop > 0) {
-          result = pop();
-        }
         vm.callStackSize--;
         if (vm.callStackSize == 0) {
           return INTERPRET_OK;
         }
-        vm.stackTop = frame->slot - vm.stack.data;
-        push(result);
+        int old = (vm.stack.data + vm.stackTop) - frame->slot;
+        Value result;
+        result.type = VALUE_NULL;
+        if (vm.stackTop - old - 2 > 0) {
+          result = pop();
+        }
         frame = &vm.callStack[vm.callStackSize - 1];
+        for (int i = 0; i < old + 1; i++) {
+          pop();
+        }
+        if (result.type != VALUE_NULL)
+          push(result);
         continue;
       }
       case OP_NULL: {
@@ -351,7 +356,7 @@ static InterpretResult run() {
             frame->chunk, (int)(frame->ip - traveled - frame->chunk->code));
 #endif
         uint8_t argCount = READ_BYTE();
-        Value fun = pop();
+        Value fun = peek(argCount);
         if (!IS_OBJECT(fun) || TO_OBJECT(fun)->type != ObjectFunction) {
           runtimeError("Cannot call non-function.");
           return INTERPRET_RUNTIME_ERROR;
@@ -413,7 +418,7 @@ InterpretResult interpret(const char* source) {
  * @param value Value the value to push.
  */
 void push(Value value) {
-  INSERT_DYNAMIC_ARRAY_AT(Value, vm.stack, vm.stackTop, value);
+  INSERT_DYNAMIC_ARRAY(Value, vm.stack, value);
   vm.stackTop++;
 }
 
@@ -423,6 +428,7 @@ void push(Value value) {
  * @return Value the value popped off of the stack.
  */
 Value pop() {
+  vm.stack.data[vm.stack.count--] = NULL_VAL;
   vm.stackTop--;
   return vm.stack.data[vm.stackTop];
 }

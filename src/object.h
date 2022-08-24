@@ -41,6 +41,8 @@ struct PdString {
 typedef struct {
   Object object;
   Chunk chunk;
+  uint8_t arity;
+  DYNAMIC_ARRAY(ValueType) locals;
   ValueType returnType;
   PdString* name;
 } PdFunction;

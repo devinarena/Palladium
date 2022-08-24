@@ -1,0 +1,7 @@
+void test(int x) {
+    print x;
+}
+
+test(16);
+
+print test;

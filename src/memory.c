@@ -51,6 +51,7 @@ void freeObject(Object* object) {
     case ObjectFunction: {
       PdFunction* func = (PdFunction*)object;
       freeChunk(&func->chunk);
+      FREE_DYNAMIC_ARRAY(ValueType, func->locals);
       FREE(ObjectFunction, object);
       break;
     }
