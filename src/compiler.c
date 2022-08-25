@@ -611,6 +611,7 @@ static void unary(bool canAssign) {
         parseError("Cannot dereference non-pointer value.");
       }
       emitByte(OP_DEREFERENCE);
+      pushType(VALUE_OBJECT);
       break;
     default:
       parseError("Unary operator expected");
@@ -856,13 +857,21 @@ static void call(bool canAssign) {
   // BIG NOTE: THIS FORCES FUNCTIONS TO REQUIRE FORWARD DECLARATIONS.
   // SOMETHING THAT MUST BE LOOKED INTO.
   // DEVIN CHECK: does this always work?
+  if (peekType() == VALUE_POINTER) {
+    consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+    emitBytes(OP_CALL, argCount);
+    return;
+  }
+  if (peekType() != VALUE_OBJECT) {
+    parseError("Cannot call non-function.");
+    return;
+  }
+  PdString* name =
+      TO_STRING(compiler->current->chunk.constants
+                    .data[compiler->current->chunk.constants.count - 1]);
   Value fun;
   if (!tableGet(&parser.globals, name, &fun)) {
     parseError("Cannot call undefined function.");
-    return;
-  }
-  if (fun.type != VALUE_OBJECT || TO_OBJECT(fun)->type != ObjectFunction) {
-    parseError("Cannot call non-function.");
     return;
   }
   PdFunction* fn = TO_FUNCTION(fun);
