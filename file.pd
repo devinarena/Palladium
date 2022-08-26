@@ -1,13 +1,6 @@
 
-void test(int x, int y) {
-    int res = 1;
-    for (int i = 0; i < y; i = i + 1) {
-        res = res * x;
-    }
-    print res;
+void test(int x, int y, int z) {
+    print x + y + z;
 }
 
-test(2, 3);
-
-void* t = &test;
-*t;
+test(2, 3, 4);

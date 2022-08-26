@@ -861,32 +861,14 @@ static void call(bool canAssign) {
     parseError("Cannot call non-object as function.");
     return;
   }
-  printf("%s", parser.previous.start); 
-  if (parser.previous.type == TOKEN_IDENTIFIER) {
-    PdString* name =
-        TO_STRING(compiler->current->chunk.constants
-                      .data[compiler->current->chunk.constants.count - 1]);
-    Value fun;
-    if (!tableGet(&parser.globals, name, &fun)) {
-      parseError("Cannot call undefined function.");
-      return;
-    }
-    PdFunction* fn = TO_FUNCTION(fun);
-    if (!check(TOKEN_RIGHT_PAREN)) {
-      do {
-        expression();
-        if (popType() != fn->locals.data[argCount]) {
-          parseError("Function argument type mismatch.");
-        }
-        argCount++;
-        if (argCount > 255) {
-          parseError("Cannot have more than 255 arguments.");
-        }
-      } while (match(TOKEN_COMMA));
-    }
-    if (argCount != fn->arity) {
-      parseError("Argument count mismatch.");
-    }
+  if (!check(TOKEN_RIGHT_PAREN)) {
+    do {
+      expression();
+      argCount++;
+      if (argCount > 255) {
+        parseError("Cannot have more than 255 arguments.");
+      }
+    } while (match(TOKEN_COMMA));
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
   emitBytes(OP_CALL, argCount);

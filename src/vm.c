@@ -353,8 +353,19 @@ static InterpretResult run() {
           runtimeError("Cannot call non-function.");
           return INTERPRET_RUNTIME_ERROR;
         }
-        PdFunction* function = TO_FUNCTION(fun);
-        call(function, argCount);
+        PdFunction* fn = TO_FUNCTION(fun);
+        if (argCount != fn->arity) {
+          runtimeError("Expected %d arguments but got %d.", fn->arity,
+                       argCount);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        for (int i = vm.stackTop - argCount - 1; i < vm.stackTop - 1; i++) {
+          if (peek(i).type != fn->locals.data[i - vm.stackTop + argCount + 1]) {
+            runtimeError("Mismatched argument type for position %d.", (vm.stackTop - 1) - i - 1);
+            return INTERPRET_RUNTIME_ERROR;
+          }
+        }
+        call(fn, argCount);
         frame = &vm.callStack[vm.callStackSize - 1];
         continue;
       }
