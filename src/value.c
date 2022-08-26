@@ -9,8 +9,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include "value.h"
 #include "object.h"
+#include "value.h"
 
 /**
  * @brief Helper method for printing the specified value to standard output.
@@ -45,6 +45,27 @@ void printValue(Value value) {
       printf("Unknown value type\n");
       exit(1);
       break;
+  }
+}
+
+char* getValueTypeName(ValueType type) {
+  switch (type) {
+    case VALUE_NULL:
+      return "null";
+    case VALUE_INTEGER:
+      return "integer";
+    case VALUE_DOUBLE:
+      return "double";
+    case VALUE_BOOL:
+      return "boolean";
+    case VALUE_CHARACTER:
+      return "character";
+    case VALUE_POINTER:
+      return "pointer";
+    case VALUE_OBJECT:
+      return "object";
+    default:
+      return "unknown";
   }
 }
 

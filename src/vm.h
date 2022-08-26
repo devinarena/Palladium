@@ -18,6 +18,7 @@ typedef struct {
   Chunk* chunk;
   uint8_t* ip;
   Value* slot;
+  ValueType returnType;
 } CallFrame;
 
 typedef struct {

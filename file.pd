@@ -1,6 +1,6 @@
 
-void test(int x, int y, int z) {
-    print x + y + z;
+int x() {
+    ret 1;
 }
 
-test(2, 3, 4);
+print x();

@@ -602,6 +602,10 @@ static void unary(bool canAssign) {
       }
       break;
     case TOKEN_REFERENCE:
+      if (current == VALUE_NULL) {
+        parseError("Cannot create reference to null.");
+        return;
+      }
       emitByte(OP_REFERENCE);
       pushType(current);
       pushType(VALUE_POINTER);
@@ -864,6 +868,7 @@ static void call(bool canAssign) {
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
       expression();
+      popType();
       argCount++;
       if (argCount > 255) {
         parseError("Cannot have more than 255 arguments.");
@@ -957,16 +962,6 @@ static void parsePrecedence(Precedence prec) {
   if (!canAssign && match(TOKEN_EQUAL)) {
     parseError("Invalid assignment target.");
   }
-
-#ifdef DEBUG_TRACE_EXEC
-  printf("%d\n\tType Stack: ", parser.previous.type);
-  for (ValueType* slot = parser.typeStack.data; slot < parser.typeStackTop;
-       slot++) {
-    ValueType t = *slot;
-    printf("[%d]", t);
-  }
-  printf("\n");
-#endif
 }
 
 /**
@@ -1005,10 +1000,9 @@ static void block() {
  *
  * @param returnType ValueType the return type of the function
  * @param type FunctionType The type of the function
+ * @param index uint8_t the index of the identifer in the symbol table
  */
-static void function(ValueType returnType, FunctionType type) {
-  uint8_t index = parseVariable("Expected function name.");
-
+static void function(ValueType returnType, FunctionType type, uint8_t index) {
   pushScope();
 
   Compiler newCompiler;
@@ -1164,6 +1158,28 @@ static void forStatement() {
   popScope();
 }
 
+static void returnStatement() {
+  if (compiler->type == TYPE_SCRIPT) {
+    parseError("Cannot return from top-level code.");
+    return;
+  }
+  if (match(TOKEN_SEMICOLON)) {
+    if (compiler->current->returnType != VALUE_NULL) {
+      parseError("Non-void functions must return a value.");
+      return;
+    }
+    emitReturn();
+  } else {
+    expression();
+    if (compiler->current->returnType != popType()) {
+      parseError("Return type does not match expected.");
+      return;
+    }
+    emitReturn();
+  }
+  consume(TOKEN_SEMICOLON, "Expected ';' after return statement.");
+}
+
 /**
  * @brief Descent case for parsing statements, e.g. print, if, while, etc.
  */
@@ -1176,6 +1192,8 @@ static void statement() {
     whileStatement();
   } else if (match(TOKEN_FOR)) {
     forStatement();
+  } else if (match(TOKEN_RETURN)) {
+    returnStatement();
   } else if (match(TOKEN_LEFT_BRACE)) {
     pushScope();
     block();
@@ -1185,35 +1203,71 @@ static void statement() {
   }
 }
 
-#define DECLARATION(T, value)                                             \
-  static void declaration##T() {                                          \
-    uint8_t index = parseVariable("Expected variable name.");             \
-    uint8_t op = OP_GLOBAL_DEFINE;                                        \
-    Token name = parser.previous;                                         \
-    if (match(TOKEN_EQUAL)) {                                             \
-      expression();                                                       \
-      if (popType() != value) {                                           \
-        parseError("Initializer does not match declared type.");          \
-      }                                                                   \
-    } else {                                                              \
-      emitByte(OP_NULL);                                                  \
-    }                                                                     \
-    if (compiler->scopeDepth == 0) {                                      \
-      if (!tableSet(&parser.globals,                                      \
-                    (PdString*)TO_OBJECT(                                 \
-                        compiler->current->chunk.constants.data[index]),  \
-                    (Value){.type = value}))                              \
-        parseError("Global variable already defined.");                   \
-    } else {                                                              \
-      addLocal(name, value);                                              \
-      op = OP_LOCAL_SET;                                                  \
-    }                                                                     \
-    consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration."); \
-    emitBytes(op, index);                                                 \
-    if (op == OP_LOCAL_SET) {                                             \
-      compiler->locals.data[compiler->locals.count - 1].depth =           \
-          compiler->scopeDepth;                                           \
-    }                                                                     \
+#define DECLARATION(T, value)                                                  \
+  static void declaration##T() {                                               \
+    uint8_t op = OP_GLOBAL_DEFINE;                                             \
+    if (match(TOKEN_STAR)) {                                                   \
+      uint8_t index = parseVariable("Expected variable name.");                \
+      Token name = parser.previous;                                            \
+      if (match(TOKEN_EQUAL)) {                                                \
+        if (match(TOKEN_NULL)) {                                               \
+          emitByte(OP_NULL_POINTER);                                           \
+          popType();                                                           \
+        } else {                                                               \
+          expression();                                                        \
+          if (popType() != VALUE_POINTER) {                                    \
+            parseError("Initializer does not match declared type.");           \
+          }                                                                    \
+          popType();                                                           \
+        }                                                                      \
+      } else {                                                                 \
+        emitByte(OP_NULL_POINTER);                                             \
+      }                                                                        \
+      if (compiler->scopeDepth == 0) {                                         \
+        if (!tableSet(&parser.globals,                                         \
+                      (PdString*)TO_OBJECT(                                    \
+                          compiler->current->chunk.constants.data[index]),     \
+                      (Value){.type = VALUE_POINTER, .pointerType = (value)})) \
+          parseError("Global variable already defined.");                      \
+      } else {                                                                 \
+        addLocal(name, VALUE_POINTER);                                         \
+        op = OP_LOCAL_SET;                                                     \
+      }                                                                        \
+      consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");    \
+      emitBytes(op, index);                                                    \
+      if (op == OP_LOCAL_SET) {                                                \
+        compiler->locals.data[compiler->locals.count - 1].depth =              \
+            compiler->scopeDepth;                                              \
+      }                                                                        \
+    } else {                                                                   \
+      uint8_t index = parseVariable("Expected function name.");                \
+      Token name = parser.previous;                                            \
+      if (match(TOKEN_EQUAL)) {                                                \
+        expression();                                                          \
+        if (popType() != (value)) {                                            \
+          parseError("Initializer does not match declared type.");             \
+          return;                                                              \
+        }                                                                      \
+        if (compiler->scopeDepth == 0) {                                       \
+          if (!tableSet(&parser.globals,                                       \
+                        (PdString*)TO_OBJECT(                                  \
+                            compiler->current->chunk.constants.data[index]),   \
+                        (Value){.type = (value)}))                             \
+            parseError("Global variable already defined.");                    \
+        } else {                                                               \
+          addLocal(name, (value));                                             \
+          op = OP_LOCAL_SET;                                                   \
+        }                                                                      \
+        consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");  \
+        emitBytes(op, index);                                                  \
+        if (op == OP_LOCAL_SET) {                                              \
+          compiler->locals.data[compiler->locals.count - 1].depth =            \
+              compiler->scopeDepth;                                            \
+        }                                                                      \
+      } else {                                                                 \
+        function((value), TYPE_FUNCTION, index);                               \
+      }                                                                        \
+    }                                                                          \
   }
 
 /**
@@ -1245,8 +1299,8 @@ DECLARATION(Character, VALUE_CHARACTER);
  * unless they are a pointer.
  */
 static void declarationVoid() {
+  uint8_t index = parseVariable("Expected variable name.");
   if (match(TOKEN_STAR)) {
-    uint8_t index = parseVariable("Expected variable name.");
     uint8_t op = OP_GLOBAL_DEFINE;
     Token name = parser.previous;
     if (match(TOKEN_EQUAL)) {
@@ -1280,7 +1334,7 @@ static void declarationVoid() {
           compiler->scopeDepth;
     }
   } else {
-    function(VALUE_NULL, TYPE_FUNCTION);
+    function(VALUE_NULL, TYPE_FUNCTION, index);
   }
 }
 
@@ -1334,6 +1388,16 @@ PdFunction* compile(const char* source) {
 
   while (!match(TOKEN_EOF)) {
     declaration();
+
+#ifdef DEBUG_TRACE_EXEC
+    printf("\tType Stack: ", parser.previous.type);
+    for (ValueType* slot = parser.typeStack.data; slot < parser.typeStackTop;
+         slot++) {
+      ValueType t = *slot;
+      printf("[%d]", t);
+    }
+    printf("\n");
+#endif
   }
 
   PdFunction* func = endCompiler();

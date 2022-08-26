@@ -89,6 +89,7 @@ static void call(PdFunction* function, uint8_t argCount) {
   frame.chunk = &function->chunk;
   frame.ip = function->chunk.code;
   frame.slot = vm.stack.data + vm.stackTop - argCount;
+  frame.returnType = function->returnType;
   vm.callStack[vm.callStackSize] = frame;
   vm.callStackSize++;
 #ifdef DEBUG_TRACE_EXEC
@@ -155,12 +156,19 @@ static InterpretResult run() {
         int old = (vm.stack.data + vm.stackTop) - frame->slot;
         Value result;
         result.type = VALUE_NULL;
-        if (vm.stackTop - old - 2 > 0) {
+        if (frame->returnType != VALUE_NULL) {
           result = pop();
+          old--;
         }
-        frame = &vm.callStack[vm.callStackSize - 1];
+        frame = &vm.callStack[vm.callStackSize];
         for (int i = 0; i < old + 1; i++) {
           pop();
+        }
+        if (result.type != frame->returnType) {
+          runtimeError("Can't return %s from %s function.",
+                       getValueTypeName(result.type),
+                       getValueTypeName(frame->returnType));
+          return INTERPRET_RUNTIME_ERROR;
         }
         if (result.type != VALUE_NULL)
           push(result);
@@ -361,7 +369,8 @@ static InterpretResult run() {
         }
         for (int i = vm.stackTop - argCount - 1; i < vm.stackTop - 1; i++) {
           if (peek(i).type != fn->locals.data[i - vm.stackTop + argCount + 1]) {
-            runtimeError("Mismatched argument type for position %d.", (vm.stackTop - 1) - i - 1);
+            runtimeError("Mismatched argument type for position %d.",
+                         (vm.stackTop - 1) - i - 1);
             return INTERPRET_RUNTIME_ERROR;
           }
         }
