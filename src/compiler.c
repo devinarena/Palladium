@@ -857,38 +857,36 @@ static void call(bool canAssign) {
   // BIG NOTE: THIS FORCES FUNCTIONS TO REQUIRE FORWARD DECLARATIONS.
   // SOMETHING THAT MUST BE LOOKED INTO.
   // DEVIN CHECK: does this always work?
-  if (peekType() == VALUE_POINTER) {
-    consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
-    emitBytes(OP_CALL, argCount);
+  if (popType() != VALUE_OBJECT) {
+    parseError("Cannot call non-object as function.");
     return;
   }
-  if (peekType() != VALUE_OBJECT) {
-    parseError("Cannot call non-function.");
-    return;
-  }
-  PdString* name =
-      TO_STRING(compiler->current->chunk.constants
-                    .data[compiler->current->chunk.constants.count - 1]);
-  Value fun;
-  if (!tableGet(&parser.globals, name, &fun)) {
-    parseError("Cannot call undefined function.");
-    return;
-  }
-  PdFunction* fn = TO_FUNCTION(fun);
-  if (!check(TOKEN_RIGHT_PAREN)) {
-    do {
-      expression();
-      if (popType() != fn->locals.data[argCount]) {
-        parseError("Function argument type mismatch.");
-      }
-      argCount++;
-      if (argCount > 255) {
-        parseError("Cannot have more than 255 arguments.");
-      }
-    } while (match(TOKEN_COMMA));
-  }
-  if (argCount != fn->arity) {
-    parseError("Argument count mismatch.");
+  printf("%s", parser.previous.start); 
+  if (parser.previous.type == TOKEN_IDENTIFIER) {
+    PdString* name =
+        TO_STRING(compiler->current->chunk.constants
+                      .data[compiler->current->chunk.constants.count - 1]);
+    Value fun;
+    if (!tableGet(&parser.globals, name, &fun)) {
+      parseError("Cannot call undefined function.");
+      return;
+    }
+    PdFunction* fn = TO_FUNCTION(fun);
+    if (!check(TOKEN_RIGHT_PAREN)) {
+      do {
+        expression();
+        if (popType() != fn->locals.data[argCount]) {
+          parseError("Function argument type mismatch.");
+        }
+        argCount++;
+        if (argCount > 255) {
+          parseError("Cannot have more than 255 arguments.");
+        }
+      } while (match(TOKEN_COMMA));
+    }
+    if (argCount != fn->arity) {
+      parseError("Argument count mismatch.");
+    }
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
   emitBytes(OP_CALL, argCount);
@@ -979,7 +977,7 @@ static void parsePrecedence(Precedence prec) {
   }
 
 #ifdef DEBUG_TRACE_EXEC
-  printf("Type Stack: ");
+  printf("%d\n\tType Stack: ", parser.previous.type);
   for (ValueType* slot = parser.typeStack.data; slot < parser.typeStackTop;
        slot++) {
     ValueType t = *slot;
@@ -1066,10 +1064,11 @@ static void function(ValueType returnType, FunctionType type) {
   block();
 
   PdFunction* fn = endCompiler();
-  uint8_t reference = addConstant(&compiler->current->chunk, FROM_OBJECT(fn));
+  Value rValue = FROM_OBJECT(fn);
+  uint8_t reference = addConstant(&compiler->current->chunk, rValue);
   emitBytes(OP_CONSTANT_POINTER, reference);
   emitBytes(OP_GLOBAL_DEFINE, index);
-  tableSet(&parser.globals, fn->name, FROM_OBJECT(fn));
+  tableSet(&parser.globals, fn->name, rValue);
 
   popScope();
 }
@@ -1286,7 +1285,7 @@ static void declarationVoid() {
       if (!tableSet(&parser.globals,
                     (PdString*)TO_OBJECT(
                         compiler->current->chunk.constants.data[index]),
-                    (Value){.type = VALUE_POINTER}))
+                    (Value){.type = VALUE_POINTER, .pointerType = popType()}))
         parseError("Global variable already defined.");
     } else {
       addLocal(name, VALUE_POINTER);

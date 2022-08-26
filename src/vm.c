@@ -269,17 +269,9 @@ static InterpretResult run() {
         ARITHMETIC_OPS_NUM(MUL, *)
         ARITHMETIC_OPS_NUM(DIV, /)
       case OP_ADD_POINTER: {
-        Value b = pop();
-        Value a = pop();
-        push(FROM_POINTER(
-            (Value*)(TO_POINTER(a) + sizeof(Value) * TO_INTEGER(b))));
         break;
       }
       case OP_SUB_POINTER: {
-        Value b = pop();
-        Value a = pop();
-        push(FROM_POINTER(
-            (Value*)(TO_POINTER(a) - sizeof(Value) * TO_INTEGER(b))));
         break;
       }
         ARITHMETIC_OPS_BOOL(GREATER, >)
