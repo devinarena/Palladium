@@ -321,6 +321,7 @@ static void patchJump(int offset) {
  * @brief Helper for emitting a return opcode.
  */
 static void emitReturn() {
+  emitByte(OP_NULL);
   emitByte(OP_RETURN);
 }
 
@@ -1175,7 +1176,7 @@ static void returnStatement() {
       parseError("Return type does not match expected.");
       return;
     }
-    emitReturn();
+    emitByte(OP_RETURN);
   }
   consume(TOKEN_SEMICOLON, "Expected ';' after return statement.");
 }
@@ -1299,8 +1300,8 @@ DECLARATION(Character, VALUE_CHARACTER);
  * unless they are a pointer.
  */
 static void declarationVoid() {
-  uint8_t index = parseVariable("Expected variable name.");
   if (match(TOKEN_STAR)) {
+    uint8_t index = parseVariable("Expected variable name.");
     uint8_t op = OP_GLOBAL_DEFINE;
     Token name = parser.previous;
     if (match(TOKEN_EQUAL)) {
@@ -1334,6 +1335,7 @@ static void declarationVoid() {
           compiler->scopeDepth;
     }
   } else {
+    uint8_t index = parseVariable("Expected function name.");
     function(VALUE_NULL, TYPE_FUNCTION, index);
   }
 }

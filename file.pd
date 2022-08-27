@@ -1,6 +1,8 @@
 
-int x() {
-    ret 1;
+void square(int y) {
+    print y * y;
 }
 
-print x();
+void* sp = &square;
+
+(*sp)(5);

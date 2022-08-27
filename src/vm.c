@@ -146,7 +146,7 @@ static InterpretResult run() {
       case OP_RETURN: {
 #ifdef DEBUG_TRACE_EXEC
         disassembleInstruction(
-            frame->chunk, (int)(frame->ip - traveled - frame->chunk->code));
+            frame->chunk, (int)(frame->ip - frame->chunk->code - traveled));
         printf("==================================\n");
 #endif
         vm.callStackSize--;
@@ -155,23 +155,17 @@ static InterpretResult run() {
         }
         int old = (vm.stack.data + vm.stackTop) - frame->slot;
         Value result;
-        result.type = VALUE_NULL;
-        if (frame->returnType != VALUE_NULL) {
-          result = pop();
-          old--;
-        }
-        frame = &vm.callStack[vm.callStackSize];
-        for (int i = 0; i < old + 1; i++) {
-          pop();
-        }
+        result = pop();
         if (result.type != frame->returnType) {
           runtimeError("Can't return %s from %s function.",
                        getValueTypeName(result.type),
                        getValueTypeName(frame->returnType));
           return INTERPRET_RUNTIME_ERROR;
         }
-        if (result.type != VALUE_NULL)
-          push(result);
+        frame->slot = vm.stack.data + vm.stackTop - old;
+        vm.stackTop = frame->slot;
+        frame = &vm.callStack[vm.callStackSize - 1];
+        push(result);
         continue;
       }
       case OP_NULL: {

@@ -50,7 +50,7 @@ static int simpleInstruction(const char* name, int offset) {
 static int byteInstruction(const char* name, Chunk* chunk, int offset) {
   uint8_t data = chunk->code[offset + 1];
   printf("%-16s %4d\n", name, data);
-  return offset + 3;
+  return offset + 2;
 }
 
 /**
