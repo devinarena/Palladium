@@ -1,8 +1,1 @@
 
-void square(int y) {
-    print y * y;
-}
-
-void* sp = &square;
-
-(*sp)(5);

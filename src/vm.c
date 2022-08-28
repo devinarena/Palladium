@@ -162,9 +162,10 @@ static InterpretResult run() {
                        getValueTypeName(frame->returnType));
           return INTERPRET_RUNTIME_ERROR;
         }
-        frame->slot = vm.stack.data + vm.stackTop - old;
-        vm.stackTop = frame->slot;
         frame = &vm.callStack[vm.callStackSize - 1];
+        for (int i = 0; i < old; i++) {
+          pop();
+        }
         push(result);
         continue;
       }
