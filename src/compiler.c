@@ -1159,6 +1159,10 @@ static void forStatement() {
   popScope();
 }
 
+/**
+ * @brief Descent case for return statements, handles checking proper return
+ * values and handling different cases.
+ */
 static void returnStatement() {
   if (compiler->type == TYPE_SCRIPT) {
     parseError("Cannot return from top-level code.");
@@ -1296,6 +1300,12 @@ DECLARATION(Boolean, VALUE_BOOL);
 DECLARATION(Character, VALUE_CHARACTER);
 
 /**
+ * @brief Descent case for string declaration, string followed by an identifier
+ * and initializer.
+ */
+DECLARATION(String, VALUE_OBJECT);
+
+/**
  * @brief Descent case for void declarations. Void declarations cannot be set
  * unless they are a pointer.
  */
@@ -1352,6 +1362,8 @@ static void declaration() {
     declarationBoolean();
   } else if (match(TOKEN_CHAR)) {
     declarationCharacter();
+  } else if (match(TOKEN_STR)) {
+    declarationString();
   } else if (match(TOKEN_VOID)) {
     declarationVoid();
   } else {

@@ -1,1 +1,4 @@
 
+str string = "Hello World";
+
+print string;

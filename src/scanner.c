@@ -238,6 +238,8 @@ static TokenType identifierType() {
       return checkKeyword(1, 4, "rint", TOKEN_PRINT);
     case 'r':
       return checkKeyword(1, 2, "et", TOKEN_RETURN);
+    case 's':
+      return checkKeyword(1, 2, "tr", TOKEN_STR);
     case 't':
       return checkKeyword(2, 2, "ue", TOKEN_TRUE);
     case 'v':
@@ -384,17 +386,15 @@ Token scanToken() {
 /**
  * @brief Lookup table for keywords to get their required valueType.
  */
-ValueType keywordTypes[] = {
-    [TOKEN_INT] = VALUE_INTEGER,
-    [TOKEN_DOUBLE] = VALUE_DOUBLE,
-    [TOKEN_BOOL] = VALUE_BOOL,
-    [TOKEN_CHARACTER] = VALUE_CHARACTER,
-    [TOKEN_IDENTIFIER] = VALUE_OBJECT
-};
+ValueType keywordTypes[] = {[TOKEN_INT] = VALUE_INTEGER,
+                            [TOKEN_DOUBLE] = VALUE_DOUBLE,
+                            [TOKEN_BOOL] = VALUE_BOOL,
+                            [TOKEN_CHARACTER] = VALUE_CHARACTER,
+                            [TOKEN_IDENTIFIER] = VALUE_OBJECT};
 
 /**
  * @brief Helper to lookup the valueType of a keyword.
- * 
+ *
  * @param type TokenType of the keyword
  * @return ValueType the valueType of the keyword
  */
