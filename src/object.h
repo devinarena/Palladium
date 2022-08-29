@@ -22,7 +22,7 @@
 #define TO_FUNCTION(value) ((PdFunction*)value.data.object)
 #define TO_BUILTIN(value) ((PdBuiltin*)value.data.object)
 
-typedef Value (*NativeFn)();
+typedef Value (*NativeFn)(int argCount, Value* args);
 
 typedef enum { ObjectString, ObjectFunction, ObjectBuiltin } ObjectType;
 
@@ -57,7 +57,7 @@ typedef struct {
 PdString* newString(char* chars, int length);
 PdString* copyString(const char* chars, int length);
 PdFunction* newFunction(ValueType returnType, PdString* name);
-PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef);
+PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity);
 void printObject(Value value);
 
 #endif

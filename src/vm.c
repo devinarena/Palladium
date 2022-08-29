@@ -394,11 +394,11 @@ static InterpretResult run() {
             return INTERPRET_RUNTIME_ERROR;
           }
           if (builtin->returnType == VALUE_NULL) {
-            builtin->builtinRef();
+            builtin->builtinRef(argCount, (vm.stack.data + vm.stackTop) - argCount);
             for (int i = 0; i < argCount + 1; i++)
               pop();
           } else {
-            Value top = builtin->builtinRef();
+            Value top = builtin->builtinRef(argCount, (vm.stack.data + vm.stackTop) - argCount);
             for (int i = 0; i < argCount + 1; i++)
               pop();
             push(top);

@@ -1,6 +1,3 @@
+int x = 5;
 
-void test() {
-    print clock();
-}
-
-test();
+print pdsquare(5);

@@ -122,11 +122,11 @@ PdFunction* newFunction(ValueType returnType, PdString* name) {
   return function;
 }
 
-PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef) {
+PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity) {
   PdBuiltin* builtin = ALLOCATE_OBJ(PdBuiltin, ObjectBuiltin);
   builtin->returnType = returnType;
   builtin->builtinRef = builtinRef;
-  builtin->arity = 0;
+  builtin->arity = arity;
   return builtin;
 }
 
