@@ -9,9 +9,9 @@
 #ifndef PALLADIUM_OBJECT_H
 #define PALLADIUM_OBJECT_H
 
+#include "chunk.h"
 #include "commons.h"
 #include "value.h"
-#include "chunk.h"
 
 #define OBJ_TYPE(value) (((Object*)value.data.object)->type)
 
@@ -20,11 +20,11 @@
 #define TO_STRING(value) ((PdString*)value.data.object)
 #define TO_CSTRING(value) ((TO_STRING(value)->chars))
 #define TO_FUNCTION(value) ((PdFunction*)value.data.object)
+#define TO_BUILTIN(value) ((PdBuiltin*)value.data.object)
 
-typedef enum {
-  ObjectString,
-  ObjectFunction
-} ObjectType;
+typedef Value (*NativeFn)();
+
+typedef enum { ObjectString, ObjectFunction, ObjectBuiltin } ObjectType;
 
 struct Object {
   ObjectType type;
@@ -47,9 +47,17 @@ typedef struct {
   PdString* name;
 } PdFunction;
 
+typedef struct {
+  Object object;
+  uint8_t arity;
+  NativeFn builtinRef;
+  ValueType returnType;
+} PdBuiltin;
+
 PdString* newString(char* chars, int length);
 PdString* copyString(const char* chars, int length);
 PdFunction* newFunction(ValueType returnType, PdString* name);
+PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef);
 void printObject(Value value);
 
 #endif

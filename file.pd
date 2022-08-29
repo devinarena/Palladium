@@ -1,4 +1,6 @@
 
-str string = "Hello World";
+void test() {
+    print clock();
+}
 
-print string;
+test();

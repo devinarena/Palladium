@@ -13,6 +13,7 @@
 #include "chunk.h"
 #include "object.h"
 
+void initBuiltins();
 PdFunction* compile(const char* source);
 
 #endif

@@ -122,6 +122,14 @@ PdFunction* newFunction(ValueType returnType, PdString* name) {
   return function;
 }
 
+PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef) {
+  PdBuiltin* builtin = ALLOCATE_OBJ(PdBuiltin, ObjectBuiltin);
+  builtin->returnType = returnType;
+  builtin->builtinRef = builtinRef;
+  builtin->arity = 0;
+  return builtin;
+}
+
 /**
  * @brief Outputs an object to standard output.
  *
@@ -149,6 +157,27 @@ void printObject(Value value) {
           break;
         case VALUE_NULL:
           printf("<void %s>", TO_FUNCTION(value)->name->chars);
+          break;
+      }
+      break;
+    }
+    case ObjectBuiltin: {
+      PdBuiltin* fun = TO_BUILTIN(value);
+      switch(fun->returnType) {
+        case VALUE_BOOL:
+          printf("<builtin bool %p>", TO_BUILTIN(value)->builtinRef);
+          break;
+        case VALUE_CHARACTER:
+          printf("<builtin char %p>", TO_BUILTIN(value)->builtinRef);
+          break;
+        case VALUE_INTEGER:
+          printf("<builtin int %p>", TO_BUILTIN(value)->builtinRef);
+          break;
+        case VALUE_DOUBLE:
+          printf("<builtin double %p>", TO_BUILTIN(value)->builtinRef);
+          break;
+        case VALUE_NULL:
+          printf("<builtin void %p>", TO_BUILTIN(value)->builtinRef);
           break;
       }
       break;

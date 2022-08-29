@@ -14,6 +14,7 @@
 #include "dynamic_array.h"
 #include "scanner.h"
 #include "table.h"
+#include "vm.h"
 #ifdef DEBUG_PRINT_OPCODES
 #include "disassembler.h"
 #endif
@@ -624,58 +625,28 @@ static void unary(bool canAssign) {
   }
 }
 
-#define BINARY_OPERATOR_CASE_NUM_RESULT(operator, instruction)        \
-  case (operator): {                                                  \
-    if (before == VALUE_INTEGER && after == VALUE_INTEGER) {          \
-      emitByte(OP_##instruction##_INT);                               \
-      pushType(VALUE_INTEGER);                                        \
-    } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {     \
-      emitByte(OP_##instruction##_DOUBLE);                            \
-      pushType(VALUE_DOUBLE);                                         \
-    } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) {    \
-      emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                        \
-      emitByte(OP_##instruction##_DOUBLE);                            \
-      pushType(VALUE_DOUBLE);                                         \
-    } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) {    \
-      emitByte(OP_SWAP);                                              \
-      emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                        \
-      emitByte(OP_SWAP);                                              \
-      emitByte(OP_##instruction##_DOUBLE);                            \
-      pushType(VALUE_DOUBLE);                                         \
-    } else if ((before == VALUE_POINTER && after == VALUE_INTEGER) || \
-               (before == VALUE_INTEGER && after == VALUE_POINTER)) { \
-    } else {                                                          \
-      parseError("Binary operator invalid for given values.");        \
-    }                                                                 \
-    break;                                                            \
-  }
-
-#define BINARY_OPERATOR_CASE_NUM_RESULT_POINTERS(operator, instruction) \
-  case (operator): {                                                    \
-    if (before == VALUE_INTEGER && after == VALUE_INTEGER) {            \
-      emitByte(OP_##instruction##_INT);                                 \
-      pushType(VALUE_INTEGER);                                          \
-    } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {       \
-      emitByte(OP_##instruction##_DOUBLE);                              \
-      pushType(VALUE_DOUBLE);                                           \
-    } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) {      \
-      emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                          \
-      emitByte(OP_##instruction##_DOUBLE);                              \
-      pushType(VALUE_DOUBLE);                                           \
-    } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) {      \
-      emitByte(OP_SWAP);                                                \
-      emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                          \
-      emitByte(OP_SWAP);                                                \
-      emitByte(OP_##instruction##_DOUBLE);                              \
-      pushType(VALUE_DOUBLE);                                           \
-    } else if (before == VALUE_POINTER && after == VALUE_INTEGER) {     \
-      emitByte(OP_##instruction##_POINTER);                             \
-    } else if (before == VALUE_INTEGER && after == VALUE_POINTER) {     \
-      emitBytes(OP_SWAP, OP_##instruction##_POINTER);                   \
-    } else {                                                            \
-      parseError("Binary operator invalid for given values.");          \
-    }                                                                   \
-    break;                                                              \
+#define BINARY_OPERATOR_CASE_MUL_DIV(operator, instruction)        \
+  case (operator): {                                               \
+    if (before == VALUE_INTEGER && after == VALUE_INTEGER) {       \
+      emitByte(OP_##instruction##_INT);                            \
+      pushType(VALUE_INTEGER);                                     \
+    } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {  \
+      emitByte(OP_##instruction##_DOUBLE);                         \
+      pushType(VALUE_DOUBLE);                                      \
+    } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) { \
+      emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
+      emitByte(OP_##instruction##_DOUBLE);                         \
+      pushType(VALUE_DOUBLE);                                      \
+    } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) { \
+      emitByte(OP_SWAP);                                           \
+      emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
+      emitByte(OP_SWAP);                                           \
+      emitByte(OP_##instruction##_DOUBLE);                         \
+      pushType(VALUE_DOUBLE);                                      \
+    } else {                                                       \
+      parseError("Binary operator invalid for given values.");     \
+    }                                                              \
+    break;                                                         \
   }
 
 #define BINARY_OPERATOR_CASE_BOOL_RESULT(operator, instruction)    \
@@ -715,14 +686,66 @@ static void binary(bool canAssign) {
   ValueType after = popType();
 
   switch (operator) {
-    BINARY_OPERATOR_CASE_NUM_RESULT_POINTERS(TOKEN_PLUS, ADD);
-    BINARY_OPERATOR_CASE_NUM_RESULT_POINTERS(TOKEN_MINUS, SUB);
-    BINARY_OPERATOR_CASE_NUM_RESULT(TOKEN_STAR, MUL);
-    BINARY_OPERATOR_CASE_NUM_RESULT(TOKEN_SLASH, DIV);
-    BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_GREATER, GREATER);
-    BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_GREATER_EQUAL, GREATER_EQUAL);
-    BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_LESS, LESS);
-    BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_LESS_EQUAL, LESS_EQUAL);
+    case TOKEN_PLUS: {
+      if (before == VALUE_INTEGER && after == VALUE_INTEGER) {
+        emitByte(OP_ADD_INT);
+        pushType(VALUE_INTEGER);
+      } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {
+        emitByte(OP_ADD_DOUBLE);
+        pushType(VALUE_DOUBLE);
+      } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) {
+        emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
+        emitByte(OP_ADD_DOUBLE);
+        pushType(VALUE_DOUBLE);
+      } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) {
+        emitByte(OP_SWAP);
+        emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
+        emitByte(OP_SWAP);
+        emitByte(OP_ADD_DOUBLE);
+        pushType(VALUE_DOUBLE);
+      } else if (before == VALUE_POINTER && after == VALUE_INTEGER) {
+        emitByte(OP_ADD_POINTER);
+      } else if (before == VALUE_INTEGER && after == VALUE_POINTER) {
+        emitBytes(OP_SWAP, OP_ADD_POINTER);
+      } else if (before == VALUE_OBJECT && after == VALUE_OBJECT) {
+        emitByte(OP_ADD_OBJECT);
+      } else {
+        parseError("Addition invalid for given values.");
+      }
+      break;
+    }
+    case TOKEN_MINUS: {
+      if (before == VALUE_INTEGER && after == VALUE_INTEGER) {
+        emitByte(OP_SUB_INT);
+        pushType(VALUE_INTEGER);
+      } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {
+        emitByte(OP_SUB_DOUBLE);
+        pushType(VALUE_DOUBLE);
+      } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) {
+        emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
+        emitByte(OP_SUB_DOUBLE);
+        pushType(VALUE_DOUBLE);
+      } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) {
+        emitByte(OP_SWAP);
+        emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
+        emitByte(OP_SWAP);
+        emitByte(OP_SUB_DOUBLE);
+        pushType(VALUE_DOUBLE);
+      } else if (before == VALUE_POINTER && after == VALUE_INTEGER) {
+        emitByte(OP_SUB_POINTER);
+      } else if (before == VALUE_INTEGER && after == VALUE_POINTER) {
+        emitBytes(OP_SWAP, OP_SUB_POINTER);
+      } else {
+        parseError("Subtraction invalid for given values.");
+      }
+      break;
+    }
+      BINARY_OPERATOR_CASE_MUL_DIV(TOKEN_STAR, MUL);
+      BINARY_OPERATOR_CASE_MUL_DIV(TOKEN_SLASH, DIV);
+      BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_GREATER, GREATER);
+      BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_GREATER_EQUAL, GREATER_EQUAL);
+      BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_LESS, LESS);
+      BINARY_OPERATOR_CASE_BOOL_RESULT(TOKEN_LESS_EQUAL, LESS_EQUAL);
     case TOKEN_EQUAL_EQUAL: {
       if (typesEqual(before, after, true)) {
         emitByte(OP_EQUALITY);
@@ -1394,6 +1417,7 @@ PdFunction* compile(const char* source) {
 
   INIT_DYNAMIC_ARRAY(ValueType, parser.typeStack);
   initTable(&parser.globals);
+  tableAddAll(&vm.globals, &parser.globals); 
 
   parser.hadError = false;
   parser.panicMode = false;

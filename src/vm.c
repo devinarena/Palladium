@@ -9,7 +9,9 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
+#include "builtins.h"
 #include "compiler.h"
 #include "disassembler.h"
 #include "vm.h"
@@ -25,6 +27,12 @@ static void resetStack() {
   vm.callStackSize = 0;
 }
 
+/**
+ * @brief Helper for displaying a formatted runtime error.
+ *
+ * @param format the format string
+ * @param ... the arguments to the format string
+ */
 static void runtimeError(const char* format, ...) {
   va_list args;
   va_start(args, format);
@@ -47,6 +55,8 @@ void initVM() {
   initTable(&vm.strings);
   initTable(&vm.globals);
   resetStack();
+
+  initBuiltins(&vm.globals);
 }
 
 /**
@@ -166,7 +176,8 @@ static InterpretResult run() {
         for (int i = 0; i < old; i++) {
           pop();
         }
-        push(result);
+        if (result.type != VALUE_NULL)
+          push(result);
         continue;
       }
       case OP_NULL: {
@@ -277,6 +288,24 @@ static InterpretResult run() {
       case OP_SUB_POINTER: {
         break;
       }
+      case OP_ADD_OBJECT: {
+        Object* b = pop().data.object;
+        Object* a = pop().data.object;
+        if (a->type == ObjectString && b->type == ObjectString) {
+          PdString* astr = TO_STRING(FROM_OBJECT(a));
+          PdString* bstr = TO_STRING(FROM_OBJECT(b));
+          size_t length = astr->length + bstr->length + 1;
+          char* nstring = malloc(sizeof(char) * (length));
+          strcpy(nstring, astr->chars);
+          strcat(nstring, bstr->chars);
+          nstring[length - 1] = '\0';
+          push(FROM_OBJECT(newString(nstring, length)));
+        } else {
+          runtimeError("Given objects are not of a summable type.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        break;
+      }
         ARITHMETIC_OPS_BOOL(GREATER, >)
         ARITHMETIC_OPS_BOOL(LESS, <)
         ARITHMETIC_OPS_BOOL(GREATER_EQUAL, >=)
@@ -352,26 +381,47 @@ static InterpretResult run() {
 #endif
         uint8_t argCount = READ_BYTE();
         Value fun = peek(argCount);
-        if (!IS_OBJECT(fun) || TO_OBJECT(fun)->type != ObjectFunction) {
+        if (!IS_OBJECT(fun)) {
           runtimeError("Cannot call non-function.");
           return INTERPRET_RUNTIME_ERROR;
         }
-        PdFunction* fn = TO_FUNCTION(fun);
-        if (argCount != fn->arity) {
-          runtimeError("Expected %d arguments but got %d.", fn->arity,
-                       argCount);
-          return INTERPRET_RUNTIME_ERROR;
-        }
-        for (int i = vm.stackTop - argCount - 1; i < vm.stackTop - 1; i++) {
-          if (peek(i).type != fn->locals.data[i - vm.stackTop + argCount + 1]) {
-            runtimeError("Mismatched argument type for position %d.",
-                         (vm.stackTop - 1) - i - 1);
+        Object* funObj = TO_OBJECT(fun);
+        if (funObj->type == ObjectBuiltin) {
+          PdBuiltin* builtin = TO_BUILTIN(fun);
+          if (builtin->arity != argCount) {
+            runtimeError("Builtin function expected %d arguments but got %d.",
+                         builtin->arity, argCount);
             return INTERPRET_RUNTIME_ERROR;
           }
+          if (builtin->returnType == VALUE_NULL) {
+            builtin->builtinRef();
+            for (int i = 0; i < argCount + 1; i++)
+              pop();
+          } else {
+            Value top = builtin->builtinRef();
+            for (int i = 0; i < argCount + 1; i++)
+              pop();
+            push(top);
+          }
+        } else {
+          PdFunction* fn = TO_FUNCTION(fun);
+          if (argCount != fn->arity) {
+            runtimeError("Expected %d arguments but got %d.", fn->arity,
+                         argCount);
+            return INTERPRET_RUNTIME_ERROR;
+          }
+          for (int i = vm.stackTop - argCount - 1; i < vm.stackTop - 1; i++) {
+            if (peek(i).type !=
+                fn->locals.data[i - vm.stackTop + argCount + 1]) {
+              runtimeError("Mismatched argument type for position %d.",
+                           (vm.stackTop - 1) - i - 1);
+              return INTERPRET_RUNTIME_ERROR;
+            }
+          }
+          call(fn, argCount);
+          frame = &vm.callStack[vm.callStackSize - 1];
+          continue;
         }
-        call(fn, argCount);
-        frame = &vm.callStack[vm.callStackSize - 1];
-        continue;
       }
     }
       // I like to see the stack after the operation happens

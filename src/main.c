@@ -69,7 +69,7 @@ static void runFile(const char* path) {
 
   interpret(source);
 
-  free(source); 
+  free(source);
 }
 
 int main(int argc, const char* argv[]) {

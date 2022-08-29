@@ -55,5 +55,10 @@ void freeObject(Object* object) {
       FREE(ObjectFunction, object);
       break;
     }
+    case ObjectBuiltin: {
+      PdFunction* func = (PdFunction*)object;
+      FREE(ObjectBuiltin, object);
+      break;
+    }
   }
 }
