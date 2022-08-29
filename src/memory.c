@@ -6,11 +6,11 @@
  * @since 6/22/2022
  **/
 
-#include <stdlib.h>
 #include <stdio.h>
+#include <stdlib.h>
 
-#include "memory.h"
 #include "chunk.h"
+#include "memory.h"
 
 /**
  * @brief Reallocates memory for the specified pointer. Can be used to grow or
@@ -41,7 +41,7 @@ void* reallocate(void* pointer, size_t oldSize, size_t newSize) {
 }
 
 void freeObject(Object* object) {
-  switch(object->type) {
+  switch (object->type) {
     case ObjectString: {
       PdString* str = (PdString*)object;
       FREE_ARRAY(char, str->chars, str->length + 1);
@@ -56,7 +56,8 @@ void freeObject(Object* object) {
       break;
     }
     case ObjectBuiltin: {
-      PdFunction* func = (PdFunction*)object;
+      PdBuiltin* func = (PdBuiltin*)object;
+      FREE_DYNAMIC_ARRAY(ValueType, func->argt);
       FREE(ObjectBuiltin, object);
       break;
     }

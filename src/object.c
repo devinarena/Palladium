@@ -127,6 +127,7 @@ PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity) {
   builtin->returnType = returnType;
   builtin->builtinRef = builtinRef;
   builtin->arity = arity;
+  INIT_DYNAMIC_ARRAY(ValueType, builtin->argt);
   return builtin;
 }
 
@@ -142,7 +143,7 @@ void printObject(Value value) {
       break;
     case ObjectFunction: {
       PdFunction* fun = TO_FUNCTION(value);
-      switch(fun->returnType) {
+      switch (fun->returnType) {
         case VALUE_BOOL:
           printf("<bool %s>", TO_FUNCTION(value)->name->chars);
           break;
@@ -163,7 +164,7 @@ void printObject(Value value) {
     }
     case ObjectBuiltin: {
       PdBuiltin* fun = TO_BUILTIN(value);
-      switch(fun->returnType) {
+      switch (fun->returnType) {
         case VALUE_BOOL:
           printf("<builtin bool %p>", TO_BUILTIN(value)->builtinRef);
           break;

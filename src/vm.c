@@ -393,12 +393,21 @@ static InterpretResult run() {
                          builtin->arity, argCount);
             return INTERPRET_RUNTIME_ERROR;
           }
+          for (int i = 0; i < argCount; i++) {
+            if (peek(i).type != builtin->argt.data[argCount - i - 1]) {
+              runtimeError("Mismatched argument type for position %d.",
+                           i);
+              return INTERPRET_RUNTIME_ERROR;
+            }
+          }
           if (builtin->returnType == VALUE_NULL) {
-            builtin->builtinRef(argCount, (vm.stack.data + vm.stackTop) - argCount);
+            builtin->builtinRef(argCount,
+                                (vm.stack.data + vm.stackTop) - argCount);
             for (int i = 0; i < argCount + 1; i++)
               pop();
           } else {
-            Value top = builtin->builtinRef(argCount, (vm.stack.data + vm.stackTop) - argCount);
+            Value top = builtin->builtinRef(
+                argCount, (vm.stack.data + vm.stackTop) - argCount);
             for (int i = 0; i < argCount + 1; i++)
               pop();
             push(top);

@@ -50,6 +50,7 @@ typedef struct {
 typedef struct {
   Object object;
   uint8_t arity;
+  DYNAMIC_ARRAY(ValueType) argt;
   NativeFn builtinRef;
   ValueType returnType;
 } PdBuiltin;

@@ -1,3 +1,5 @@
-int x = 5;
+fun test() {
+    print pdsquare(2);
+}
 
-print pdsquare(5);
+test();

@@ -25,6 +25,7 @@ static Value pdsquare(int argCount, Value* args) {
 void initBuiltins(Table* globals) {
   tableSet(globals, copyString("clock", 5),
            FROM_OBJECT(newBuiltin(VALUE_INTEGER, &pdclock, 0)));
-  tableSet(globals, copyString("pdsquare", 8),
-           FROM_OBJECT(newBuiltin(VALUE_INTEGER, &pdsquare, 1)));
+  PdBuiltin* bin = newBuiltin(VALUE_INTEGER, &pdsquare, 1);
+  INSERT_DYNAMIC_ARRAY(ValueType, bin->argt, VALUE_INTEGER);
+  tableSet(globals, copyString("pdsquare", 8), FROM_OBJECT(bin));
 }
