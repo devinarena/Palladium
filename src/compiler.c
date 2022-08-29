@@ -816,6 +816,9 @@ static void namedVariable(Token* name, bool canAssign) {
         parseError("Referenced variable is undefined.");
         return;
       }
+      if (IS_OBJECT(value) && TO_OBJECT(value)->type == ObjectFunction) {
+        pushType(TO_FUNCTION(value)->returnType);
+      }
       pushType(value.type);
     }
   }

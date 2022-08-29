@@ -35,7 +35,8 @@
 #define FROM_DOUBLE(value) ((Value){VALUE_DOUBLE, {.double_ = value}})
 #define FROM_BOOL(value) ((Value){VALUE_BOOL, {.boolean = value}})
 #define FROM_CHARACTER(value) ((Value){VALUE_CHARACTER, {.character = value}})
-#define FROM_POINTER(value) ((Value){VALUE_POINTER, {.pointer = (struct Value*)value}})
+#define FROM_POINTER(value) \
+  ((Value){VALUE_POINTER, {.pointer = (struct Value*)value}})
 #define FROM_OBJECT(obj) ((Value){VALUE_OBJECT, {.object = (Object*)obj}})
 
 // note: types must go in order of cast priority ascending
@@ -59,7 +60,8 @@ typedef struct {
     int integer;
     double double_;
     char character;
-    // should look into this, these always point to the same thing. some optimizations could probably be made.
+    // should look into this, these always point to the same thing. some
+    // optimizations could probably be made.
     struct Value* pointer;
     Object* object;
   } data;

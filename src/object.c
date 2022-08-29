@@ -145,19 +145,23 @@ void printObject(Value value) {
       PdFunction* fun = TO_FUNCTION(value);
       switch (fun->returnType) {
         case VALUE_BOOL:
-          printf("<bool %s>", TO_FUNCTION(value)->name->chars);
+          printf("<bool %s>", fun->name->chars);
           break;
         case VALUE_CHARACTER:
-          printf("<char %s>", TO_FUNCTION(value)->name->chars);
+          printf("<char %s>", fun->name->chars);
           break;
         case VALUE_INTEGER:
-          printf("<int %s>", TO_FUNCTION(value)->name->chars);
+          printf("<int %s>", fun->name->chars);
           break;
         case VALUE_DOUBLE:
-          printf("<double %s>", TO_FUNCTION(value)->name->chars);
+          printf("<double %s>", fun->name->chars);
           break;
+        case VALUE_OBJECT: {
+          printf("<pointer %s>", fun->name->chars);
+          break;
+        }
         case VALUE_NULL:
-          printf("<void %s>", TO_FUNCTION(value)->name->chars);
+          printf("<void %s>", fun->name->chars);
           break;
       }
       break;

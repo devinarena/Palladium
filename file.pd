@@ -1,5 +1,10 @@
-fun test() {
-    print pdsquare(2);
+
+str tfun() {
+    ret "tfun";
 }
 
-test();
+str* test = &tfun;
+
+print test;
+print *test;
+print (*test)() + "!";
