@@ -1,0 +1,8 @@
+
+int test() {
+    ret 50;
+}
+
+int* t = &test;
+
+print pdsquare((*t)());

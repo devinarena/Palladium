@@ -6,9 +6,6 @@ Palladium is a hobby programming language I built after reading some great onlin
 ### Whats the purpose of Palladium?
 Overall, the purpose of this project was to research and learn about all aspects of language development (lexing, parsing, interpreting, compiling, virtual machines, etc...). Palladium essentially is a hobby project, but one I hope to make incredibly useful. My goal for Palladium is to replicate the C programming language, but to make some aspects of it simpler (no forward declarations, better memory management, etc.).
 
-### Why replicate C?
-An excellent question. I just enjoy writing code in C and like the style of its syntax. Sometimes I just wish my head didn't hurt so much from memory management.
-
 ### When did I start working on Palladium?
 Palldium development began at the beginning of June 2022.
 

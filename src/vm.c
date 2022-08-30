@@ -395,8 +395,7 @@ static InterpretResult run() {
           }
           for (int i = 0; i < argCount; i++) {
             if (peek(i).type != builtin->argt.data[argCount - i - 1]) {
-              runtimeError("Mismatched argument type for position %d.",
-                           i);
+              runtimeError("Mismatched argument type for position %d.", i);
               return INTERPRET_RUNTIME_ERROR;
             }
           }
@@ -494,7 +493,7 @@ void push(Value value) {
  * @return Value the value popped off of the stack.
  */
 Value pop() {
-  vm.stack.data[vm.stack.count--] = NULL_VAL;
+  vm.stack.data[vm.stackTop] = NULL_VAL;
   vm.stackTop--;
   return vm.stack.data[vm.stackTop];
 }
