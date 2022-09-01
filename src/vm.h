@@ -14,6 +14,9 @@
 #include "table.h"
 #include "value.h"
 
+#define FRAMES_MAX 64
+#define STACK_MAX (FRAMES_MAX * sizeof(uint8_t))
+
 typedef struct {
   Chunk* chunk;
   uint8_t* ip;
@@ -22,12 +25,12 @@ typedef struct {
 } CallFrame;
 
 typedef struct {
-  CallFrame callStack[255];
+  CallFrame callStack[FRAMES_MAX];
   int callStackSize;
-  DYNAMIC_ARRAY(Value) stack;
+  Value stack[STACK_MAX];
+  Value* stackTop;
   Table strings;
   Table globals;
-  int stackTop;
   Object* heap;
 } VM;
 

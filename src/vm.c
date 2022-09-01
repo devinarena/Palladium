@@ -23,7 +23,7 @@ VM vm;
  * stack.
  */
 static void resetStack() {
-  vm.stackTop = 0;
+  vm.stackTop = vm.stack;
   vm.callStackSize = 0;
 }
 
@@ -50,11 +50,10 @@ static void runtimeError(const char* format, ...) {
  * @brief Initializes the VM by zeroing out memory.
  */
 void initVM() {
-  INIT_DYNAMIC_ARRAY(Value, vm.stack);
   vm.heap = NULL;
+  resetStack();
   initTable(&vm.strings);
   initTable(&vm.globals);
-  resetStack();
 
   initBuiltins(&vm.globals);
 }
@@ -92,13 +91,13 @@ static void addGlobal(PdString* name, Value value) {
  * @param function PdFunction* the function to call
  */
 static void call(PdFunction* function, uint8_t argCount) {
-  if (vm.callStackSize == 255) {
+  if (vm.callStackSize == FRAMES_MAX) {
     runtimeError("Stack overflow.");
   }
   CallFrame frame;
   frame.chunk = &function->chunk;
   frame.ip = function->chunk.code;
-  frame.slot = vm.stack.data + vm.stackTop - argCount;
+  frame.slot = vm.stackTop - argCount;
   frame.returnType = function->returnType;
   vm.callStack[vm.callStackSize] = frame;
   vm.callStackSize++;
@@ -163,7 +162,6 @@ static InterpretResult run() {
         if (vm.callStackSize == 0) {
           return INTERPRET_OK;
         }
-        int old = (vm.stack.data + vm.stackTop) - frame->slot;
         Value result;
         result = pop();
         if (result.type != frame->returnType) {
@@ -172,10 +170,8 @@ static InterpretResult run() {
                        getValueTypeName(frame->returnType));
           return INTERPRET_RUNTIME_ERROR;
         }
+        vm.stackTop = frame->slot - 1;
         frame = &vm.callStack[vm.callStackSize - 1];
-        for (int i = 0; i < old; i++) {
-          pop();
-        }
         if (result.type != VALUE_NULL)
           push(result);
         continue;
@@ -400,29 +396,23 @@ static InterpretResult run() {
             }
           }
           if (builtin->returnType == VALUE_NULL) {
-            builtin->builtinRef(argCount,
-                                (vm.stack.data + vm.stackTop) - argCount);
-            for (int i = 0; i < argCount + 1; i++)
-              pop();
+            builtin->builtinRef(argCount, vm.stackTop - argCount);
+            vm.stackTop -= argCount;
           } else {
-            Value top = builtin->builtinRef(
-                argCount, (vm.stack.data + vm.stackTop) - argCount);
-            for (int i = 0; i < argCount + 1; i++)
-              pop();
+            Value top = builtin->builtinRef(argCount, vm.stackTop - argCount);
+            vm.stackTop -= argCount;
             push(top);
           }
         } else {
           PdFunction* fn = TO_FUNCTION(fun);
           if (argCount != fn->arity) {
-            runtimeError("Expected %d arguments but got %d.", fn->arity,
-                         argCount);
+            runtimeError("%s expected %d arguments but got %d.",
+                         fn->name->chars, fn->arity, argCount);
             return INTERPRET_RUNTIME_ERROR;
           }
-          for (int i = vm.stackTop - argCount - 1; i < vm.stackTop - 1; i++) {
-            if (peek(i).type !=
-                fn->locals.data[i - vm.stackTop + argCount + 1]) {
-              runtimeError("Mismatched argument type for position %d.",
-                           (vm.stackTop - 1) - i - 1);
+          for (int i = 0; i < argCount; i++) {
+            if (peek(i).type != fn->locals.data[argCount - i - 1]) {
+              runtimeError("Mismatched argument type for position %d.", i);
               return INTERPRET_RUNTIME_ERROR;
             }
           }
@@ -437,9 +427,9 @@ static InterpretResult run() {
     disassembleInstruction(frame->chunk,
                            (int)(frame->ip - traveled - frame->chunk->code));
     printf("        ");
-    for (int slot = 0; slot < vm.stackTop; slot++) {
+    for (Value* slot = vm.stack; slot < vm.stackTop; slot++) {
       printf("[");
-      printValue(vm.stack.data[slot]);
+      printValue(*slot);
       printf("]");
     }
     printf("\n");
@@ -483,7 +473,7 @@ InterpretResult interpret(const char* source) {
  * @param value Value the value to push.
  */
 void push(Value value) {
-  INSERT_DYNAMIC_ARRAY(Value, vm.stack, value);
+  *vm.stackTop = value;
   vm.stackTop++;
 }
 
@@ -493,9 +483,8 @@ void push(Value value) {
  * @return Value the value popped off of the stack.
  */
 Value pop() {
-  vm.stack.data[vm.stackTop] = NULL_VAL;
   vm.stackTop--;
-  return vm.stack.data[vm.stackTop];
+  return *vm.stackTop;
 }
 
 /**
@@ -505,7 +494,7 @@ Value pop() {
  * @return Value The value at the given distance from the top of the stack.
  */
 Value peek(int distance) {
-  return vm.stack.data[vm.stackTop - 1 - distance];
+  return vm.stackTop[-1 - distance];
 }
 
 /**
@@ -522,8 +511,6 @@ void swap() {
  * @brief Frees any memory allocated by the VM.
  */
 void freeVM() {
-  FREE_DYNAMIC_ARRAY(Value, vm.stack);
-
   freeTable(&vm.globals);
   freeTable(&vm.strings);
   Object* current = vm.heap;
