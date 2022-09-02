@@ -21,10 +21,16 @@
 #define TO_CSTRING(value) ((TO_STRING(value)->chars))
 #define TO_FUNCTION(value) ((PdFunction*)value.data.object)
 #define TO_BUILTIN(value) ((PdBuiltin*)value.data.object)
+#define TO_STRUCT(value) ((PdStruct*)value.data.object)
 
 typedef Value (*NativeFn)(int argCount, Value* args);
 
-typedef enum { ObjectString, ObjectFunction, ObjectBuiltin, ObjectStruct } ObjectType;
+typedef enum {
+  ObjectString,
+  ObjectFunction,
+  ObjectBuiltin,
+  ObjectStruct
+} ObjectType;
 
 struct Object {
   ObjectType type;
@@ -55,10 +61,15 @@ typedef struct {
   ValueType returnType;
 } PdBuiltin;
 
+typedef struct {
+  Object object;
+} PdStruct;
+
 PdString* newString(char* chars, int length);
 PdString* copyString(const char* chars, int length);
 PdFunction* newFunction(ValueType returnType, PdString* name);
 PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity);
+PdStruct* newStruct();
 void printObject(Value value);
 
 #endif

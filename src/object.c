@@ -131,6 +131,11 @@ PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity) {
   return builtin;
 }
 
+PdStruct* newStruct() {
+  PdStruct* pstruct = ALLOCATE_OBJ(PdStruct, ObjectStruct);
+  return pstruct;
+}
+
 /**
  * @brief Outputs an object to standard output.
  *
@@ -185,6 +190,10 @@ void printObject(Value value) {
           printf("<builtin void %p>", TO_BUILTIN(value)->builtinRef);
           break;
       }
+      break;
+    }
+    case ObjectStruct: {
+      printf("<struct %p>", TO_STRUCT(value));
       break;
     }
     default:

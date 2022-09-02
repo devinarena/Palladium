@@ -808,7 +808,10 @@ static void namedVariable(Token* name, bool canAssign) {
     } else {
       emitBytes(OP_GLOBAL_GET, arg);
       Value value;
-      if (!tableGet(&parser.globals, (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[arg]), &value)) {
+      if (!tableGet(&parser.globals,
+                    (PdString*)TO_OBJECT(
+                        compiler->current->chunk.constants.data[arg]),
+                    &value)) {
         parseError("Referenced variable is undefined.");
         return;
       }
@@ -936,6 +939,8 @@ ParseRule rules[] = {
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_INT] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOUBLE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_STR] = {NULL, NULL, PREC_NONE},
+    [TOKEN_STRUCT] = {NULL, NULL, PREC_NONE},
     [TOKEN_BOOL] = {NULL, NULL, PREC_NONE},
     [TOKEN_RETURN] = {NULL, NULL, PREC_NONE},
     [TOKEN_WHILE] = {NULL, NULL, PREC_NONE},
@@ -1367,6 +1372,27 @@ static void declarationVoid() {
 }
 
 /**
+ * @brief Descent case for parsing structs.
+ */
+static void declarationStruct() {
+  if (compiler->scopeDepth > 0) {
+    parseError("Structs cannot be declared inside functions.");
+    return;
+  }
+  uint8_t index = parseVariable("Expected variable name.");
+  Token name = parser.previous;
+  consume(TOKEN_LEFT_BRACE, "Expected '{' before struct body.");
+  consume(TOKEN_RIGHT_BRACE, "Expected '}' after struct body.");
+  PdStruct* pstruct = newStruct();
+  uint8_t ref = addConstant(&compiler->current->chunk, FROM_OBJECT(pstruct));
+  emitBytes(OP_CONSTANT_POINTER, ref);
+  tableSet(&parser.globals,
+           (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[index]),
+           (Value){.type = VALUE_OBJECT});
+  emitBytes(OP_GLOBAL_DEFINE, index);
+}
+
+/**
  * @brief Descent case for parsing declarations, e.g. var, function, etc.
  */
 static void declaration() {
@@ -1380,6 +1406,8 @@ static void declaration() {
     declarationCharacter();
   } else if (match(TOKEN_STR)) {
     declarationString();
+  } else if (match(TOKEN_STRUCT)) {
+    declarationStruct();
   } else if (match(TOKEN_VOID)) {
     declarationVoid();
   } else {

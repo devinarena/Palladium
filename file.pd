@@ -1,4 +1,6 @@
 
-str test = "hello";
+struct test {
+
+}
 
 print test;

@@ -61,5 +61,10 @@ void freeObject(Object* object) {
       FREE(ObjectBuiltin, object);
       break;
     }
+    case ObjectStruct: {
+      PdStruct* pstruct = (PdStruct*)object;
+      FREE(ObjectStruct, object);
+      break;
+    }
   }
 }
