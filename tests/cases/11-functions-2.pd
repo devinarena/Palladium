@@ -5,4 +5,4 @@ int test() {
 
 int* t = &test;
 
-print pdsquare();
+print p_square((*t)());

@@ -609,7 +609,6 @@ static void unary(bool canAssign) {
         return;
       }
       emitByte(OP_REFERENCE);
-      pushType(current);
       pushType(VALUE_POINTER);
       break;
     case TOKEN_STAR:
@@ -1202,10 +1201,7 @@ static void returnStatement() {
     emitReturn();
   } else {
     expression();
-    if (compiler->current->returnType != popType()) {
-      parseError("Return type does not match expected.");
-      return;
-    }
+    popType();
     emitByte(OP_RETURN);
   }
   consume(TOKEN_SEMICOLON, "Expected ';' after return statement.");
@@ -1420,7 +1416,7 @@ PdFunction* compile(const char* source) {
 
   INIT_DYNAMIC_ARRAY(ValueType, parser.typeStack);
   initTable(&parser.globals);
-  tableAddAll(&vm.globals, &parser.globals); 
+  tableAddAll(&vm.globals, &parser.globals);
 
   parser.hadError = false;
   parser.panicMode = false;
