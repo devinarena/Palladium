@@ -397,10 +397,10 @@ static InterpretResult run() {
           }
           if (builtin->returnType == VALUE_NULL) {
             builtin->builtinRef(argCount, vm.stackTop - argCount);
-            vm.stackTop -= argCount;
+            vm.stackTop -= argCount + 1;
           } else {
             Value top = builtin->builtinRef(argCount, vm.stackTop - argCount);
-            vm.stackTop -= argCount;
+            vm.stackTop -= argCount + 1;
             push(top);
           }
         } else {

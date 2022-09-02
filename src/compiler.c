@@ -808,15 +808,9 @@ static void namedVariable(Token* name, bool canAssign) {
     } else {
       emitBytes(OP_GLOBAL_GET, arg);
       Value value;
-      if (!tableGet(&parser.globals,
-                    (PdString*)TO_OBJECT(
-                        compiler->current->chunk.constants.data[arg]),
-                    &value)) {
+      if (!tableGet(&parser.globals, (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[arg]), &value)) {
         parseError("Referenced variable is undefined.");
         return;
-      }
-      if (IS_OBJECT(value) && TO_OBJECT(value)->type == ObjectFunction) {
-        pushType(TO_FUNCTION(value)->returnType);
       }
       pushType(value.type);
     }

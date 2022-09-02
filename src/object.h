@@ -24,7 +24,7 @@
 
 typedef Value (*NativeFn)(int argCount, Value* args);
 
-typedef enum { ObjectString, ObjectFunction, ObjectBuiltin } ObjectType;
+typedef enum { ObjectString, ObjectFunction, ObjectBuiltin, ObjectStruct } ObjectType;
 
 struct Object {
   ObjectType type;

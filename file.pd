@@ -1,10 +1,4 @@
 
+str test = "hello";
 
-int test() {
-    int* x = &10;
-    ret (*x);
-}
-
-int* t = &test;
-
-print p_square((*t)());
+print test;
