@@ -10,15 +10,16 @@
 #define PALLADIUM_TABLE_H
 
 #include "commons.h"
-#include "object.h"
 #include "value.h"
+
+typedef struct PdString PdString;
 
 typedef struct {
   PdString* key;
   Value value;
 } Entry;
 
-typedef struct {
+typedef struct Table {
   int count;
   int capacity;
   Entry* entries;

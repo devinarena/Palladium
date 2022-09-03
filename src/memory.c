@@ -11,6 +11,7 @@
 
 #include "chunk.h"
 #include "memory.h"
+#include "table.h"
 
 /**
  * @brief Reallocates memory for the specified pointer. Can be used to grow or
@@ -61,8 +62,15 @@ void freeObject(Object* object) {
       FREE(ObjectBuiltin, object);
       break;
     }
+    case ObjectStructTemplate: {
+      PdStructTemplate* pstruct = (PdStructTemplate*)object;
+      FREE_DYNAMIC_ARRAY(ValueType, pstruct->fields);
+      FREE(ObjectStruct, object);
+      break;
+    }
     case ObjectStruct: {
       PdStruct* pstruct = (PdStruct*)object;
+      FREE_DYNAMIC_ARRAY(Value, pstruct->fields);
       FREE(ObjectStruct, object);
       break;
     }

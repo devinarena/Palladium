@@ -1,6 +1,5 @@
 
 struct test {
-
 }
 
 print test;

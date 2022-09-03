@@ -83,6 +83,7 @@ typedef enum {
   OP_GLOBAL_DEFINE,
   OP_LOCAL_SET,
   OP_LOCAL_GET,
+  OP_STRUCT_INSTANCE,
   OP_PRINT,
   // Functions
   OP_CALL

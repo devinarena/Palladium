@@ -363,6 +363,13 @@ static InterpretResult run() {
         traveled++;
         break;
       }
+      case OP_STRUCT_INSTANCE: {
+        PdStructTemplate* ctemplate = TO_STRUCT_TEMPLATE(READ_CONSTANT());
+        PdStruct* instance = newStruct(ctemplate);
+        push(FROM_OBJECT(instance));
+        traveled++;
+        break;
+      }
       case OP_PRINT: {
         Value value = pop();
         printValue(value);

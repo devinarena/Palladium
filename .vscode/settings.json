@@ -15,6 +15,7 @@
         "disassembler.h": "c",
         "compiler.h": "c",
         "scanner.h": "c",
-        "chunk.h": "c"
+        "chunk.h": "c",
+        "string.h": "c"
     }
 }

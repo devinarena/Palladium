@@ -11,6 +11,7 @@
 
 #include "chunk.h"
 #include "commons.h"
+#include "table.h"
 #include "value.h"
 
 #define OBJ_TYPE(value) (((Object*)value.data.object)->type)
@@ -21,6 +22,7 @@
 #define TO_CSTRING(value) ((TO_STRING(value)->chars))
 #define TO_FUNCTION(value) ((PdFunction*)value.data.object)
 #define TO_BUILTIN(value) ((PdBuiltin*)value.data.object)
+#define TO_STRUCT_TEMPLATE(value) ((PdStructTemplate*)value.data.object)
 #define TO_STRUCT(value) ((PdStruct*)value.data.object)
 
 typedef Value (*NativeFn)(int argCount, Value* args);
@@ -29,6 +31,7 @@ typedef enum {
   ObjectString,
   ObjectFunction,
   ObjectBuiltin,
+  ObjectStructTemplate,
   ObjectStruct
 } ObjectType;
 
@@ -63,13 +66,21 @@ typedef struct {
 
 typedef struct {
   Object object;
+  DYNAMIC_ARRAY(ValueType) fields;
+} PdStructTemplate;
+
+typedef struct {
+  Object object;
+  PdStructTemplate* template;
+  DYNAMIC_ARRAY(Value) fields;
 } PdStruct;
 
 PdString* newString(char* chars, int length);
 PdString* copyString(const char* chars, int length);
 PdFunction* newFunction(ValueType returnType, PdString* name);
 PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity);
-PdStruct* newStruct();
+PdStructTemplate* newStructTemplate();
+PdStruct* newStruct(PdStructTemplate* template);
 void printObject(Value value);
 
 #endif

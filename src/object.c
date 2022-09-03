@@ -12,6 +12,7 @@
 #include "memory.h"
 #include "object.h"
 #include "vm.h"
+#include "table.h"
 
 #define ALLOCATE_OBJ(type, objectType) \
   (type*)allocateObject(sizeof(type), objectType)
@@ -131,9 +132,17 @@ PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity) {
   return builtin;
 }
 
-PdStruct* newStruct() {
-  PdStruct* pstruct = ALLOCATE_OBJ(PdStruct, ObjectStruct);
+PdStructTemplate* newStructTemplate() {
+  PdStructTemplate* pstruct = ALLOCATE_OBJ(PdStructTemplate, ObjectStructTemplate);
+  INIT_DYNAMIC_ARRAY(ValueType, pstruct->fields);
   return pstruct;
+}
+
+PdStruct* newStruct(PdStructTemplate* pstruct) {
+  PdStruct* instance = ALLOCATE_OBJ(PdStruct, ObjectStruct);
+  instance->template = pstruct;
+  INIT_DYNAMIC_ARRAY(Value, instance->fields);
+  return instance;
 }
 
 /**
@@ -161,10 +170,9 @@ void printObject(Value value) {
         case VALUE_DOUBLE:
           printf("<double %s>", fun->name->chars);
           break;
-        case VALUE_OBJECT: {
+        case VALUE_OBJECT:
           printf("<pointer %s>", fun->name->chars);
           break;
-        }
         case VALUE_NULL:
           printf("<void %s>", fun->name->chars);
           break;
@@ -190,6 +198,10 @@ void printObject(Value value) {
           printf("<builtin void %p>", TO_BUILTIN(value)->builtinRef);
           break;
       }
+      break;
+    }
+    case ObjectStructTemplate: {
+      printf("<struct template %p>", TO_STRUCT_TEMPLATE(value));
       break;
     }
     case ObjectStruct: {

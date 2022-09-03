@@ -12,6 +12,7 @@
 #include <time.h>
 
 #include "builtins.h"
+#include "object.h"
 
 static Value pdclock(int argCount, Value* args) {
   return FROM_INTEGER(time(NULL));

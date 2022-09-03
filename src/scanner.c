@@ -228,7 +228,18 @@ static TokenType identifierType() {
           case 'f':
             return checkKeyword(1, 1, "f", TOKEN_IF);
           case 'n':
-            return checkKeyword(2, 1, "t", TOKEN_INT);
+            if (scanner.current - scanner.start > 2) {
+              switch (scanner.start[2]) {
+                case 't':
+                  if (scanner.current - scanner.start == 3)
+                    return TOKEN_INT;
+                  return TOKEN_IDENTIFIER;
+                case 's':
+                  return checkKeyword(3, 1, "t", TOKEN_INST);
+                default:
+                  return TOKEN_IDENTIFIER;
+              }
+            }
           default:
             return TOKEN_IDENTIFIER;
         }
@@ -317,8 +328,8 @@ static Token string() {
  * @brief Recursively generates a token from the scanner based on the source
  * string.
  *
- * @return Token the proper token for whats in the source string, or an error if
- * its not a valid token
+ * @return Token the proper token for whats in the source string, or an error
+ * if its not a valid token
  */
 Token scanToken() {
   skipWhitespace();
