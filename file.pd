@@ -3,3 +3,7 @@ struct test {
 }
 
 print test;
+
+inst test t;
+
+print t;

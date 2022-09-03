@@ -1414,6 +1414,12 @@ static void declarationStructInstance() {
       PdStructTemplate* pstruct = (PdStructTemplate*)TO_OBJECT(pstructv);
       uint8_t ctemplateIdx = addConstant(&compiler->current->chunk, pstructv);
       uint8_t index = parseVariable("Expected variable name.");
+      if (tableGet(&parser.globals,
+                   (PdString*)TO_OBJECT(
+                       compiler->current->chunk.constants.data[index]),
+                   &pstructv)) {
+        parseError("Global variable already defined.");
+      }
       emitBytes(OP_STRUCT_INSTANCE, ctemplateIdx);
       if (compiler->scopeDepth == 0) {
         emitBytes(OP_GLOBAL_DEFINE, index);
