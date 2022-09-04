@@ -1,0 +1,12 @@
+
+struct test {
+    int a;
+    int b;
+}
+
+inst test t;
+
+t.a = 10;
+
+print t.a;
+print t.b;

@@ -1,7 +1,7 @@
 
 
 int test() {
-    int* x = &10;
+    int* x = &50;
     ret (*x);
 }
 

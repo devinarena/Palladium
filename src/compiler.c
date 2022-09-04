@@ -38,7 +38,7 @@ typedef struct {
 typedef struct {
   Token name;
   int depth;
-  ValueType valueType;
+  Value valueData;
 } Local;
 
 typedef struct {
@@ -408,7 +408,7 @@ static int resolveLocal(Token* name) {
  * @param name Token name of the local
  * @param type ValueType type of the local
  */
-static void addLocal(Token name, ValueType type) {
+static void addLocal(Token name, Value valueData) {
   if (compiler->scopeDepth == 0) {
     parseError("Cannot declare local variables at the top level.");
     return;
@@ -426,7 +426,7 @@ static void addLocal(Token name, ValueType type) {
   }
   Local local;
   local.name = name;
-  local.valueType = type;
+  local.valueData = valueData;
   local.depth = -1;
   INSERT_DYNAMIC_ARRAY(Local, compiler->locals, local);
 }
@@ -783,7 +783,7 @@ static void namedVariable(Token* name, bool canAssign) {
     if (canAssign && match(TOKEN_EQUAL)) {
       expression();
       ValueType type = popType().type;
-      if (type != local.valueType) {
+      if (type != local.valueData.type) {
         parseError("Cannot assign value of different type.");
       }
       emitBytes(OP_LOCAL_SET, (uint8_t)arg);
@@ -791,7 +791,11 @@ static void namedVariable(Token* name, bool canAssign) {
       local.depth = compiler->scopeDepth;
     } else {
       emitBytes(OP_LOCAL_GET, (uint8_t)arg);
-      pushType((Value){.type = local.valueType});
+      if (local.valueData.type == VALUE_OBJECT) {
+        pushType(local.valueData);
+      } else {
+        pushType((Value){.type = local.valueData.type});
+      }
     }
   } else {
     arg = identifierConstant(name);
@@ -916,7 +920,13 @@ static void call(bool canAssign) {
  * @param canAssign bool whether or not the expression can be assigned to
  */
 static void dot(bool canAssign) {
-  PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(popType());
+  Value pstructv = popType();
+  if (pstructv.type != VALUE_OBJECT ||
+      TO_OBJECT(pstructv)->type != ObjectStructTemplate) {
+    parseError("Cannot assign to non-structure object.");
+    return;
+  }
+  PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(pstructv);
   uint8_t name = parseVariable("Expect identifier after '.'.");
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
@@ -1092,7 +1102,7 @@ static void function(ValueType returnType, FunctionType type, uint8_t index) {
       ValueType type = getValueTypeOfKeyword(typeToken.type);
       Token name = parser.current;
       parseVariable("Expected variable name.");
-      addLocal(name, type);
+      addLocal(name, (Value){.type = type});
       compiler->locals.data[argCount++].depth = compiler->scopeDepth;
       INSERT_DYNAMIC_ARRAY(ValueType, compiler->current->locals, type);
     } while (match(TOKEN_COMMA));
@@ -1293,7 +1303,7 @@ static void statement() {
                       (Value){.type = VALUE_POINTER, .pointerType = (value)})) \
           parseError("Global variable already defined.");                      \
       } else {                                                                 \
-        addLocal(name, VALUE_POINTER);                                         \
+        addLocal(name, (Value){.type = VALUE_POINTER});                        \
         op = OP_LOCAL_SET;                                                     \
       }                                                                        \
       consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");    \
@@ -1303,7 +1313,7 @@ static void statement() {
             compiler->scopeDepth;                                              \
       }                                                                        \
     } else {                                                                   \
-      uint8_t index = parseVariable("Expected function name.");                \
+      uint8_t index = parseVariable("Expected identifier name.");              \
       Token name = parser.previous;                                            \
       if (match(TOKEN_EQUAL)) {                                                \
         expression();                                                          \
@@ -1318,7 +1328,7 @@ static void statement() {
                         (Value){.type = (value)}))                             \
             parseError("Global variable already defined.");                    \
         } else {                                                               \
-          addLocal(name, (value));                                             \
+          addLocal(name, (Value){.type = (value)});                            \
           op = OP_LOCAL_SET;                                                   \
         }                                                                      \
         consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");  \
@@ -1394,7 +1404,7 @@ static void declarationVoid() {
               (Value){.type = VALUE_POINTER, .pointerType = popType().type}))
         parseError("Global variable already defined.");
     } else {
-      addLocal(name, VALUE_POINTER);
+      addLocal(name, (Value){.type = VALUE_POINTER});
       op = OP_LOCAL_SET;
     }
     consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
@@ -1435,7 +1445,7 @@ static void declarationStructTemplate() {
     uint8_t vIndex = parseVariable("Expected variable name.");
     tableSet(&pstruct->fieldTypes,
              TO_STRING(compiler->current->chunk.constants.data[vIndex]),
-             (Value){.type = type, .data.integer = 0});
+             (Value){.type = type});
     consume(TOKEN_SEMICOLON, "Expected ';' after field declaration.");
   }
 
@@ -1473,9 +1483,9 @@ static void declarationStructInstance() {
         tableSet(&parser.globals,
                  (PdString*)TO_OBJECT(
                      compiler->current->chunk.constants.data[index]),
-                 (Value){.type = VALUE_OBJECT, {.object = (Object*)pstruct}});
+                 FROM_OBJECT(pstruct));
       } else {
-        addLocal(parser.previous, VALUE_OBJECT);
+        addLocal(parser.previous, FROM_OBJECT(pstruct));
         emitBytes(OP_LOCAL_SET, index);
         compiler->locals.data[compiler->locals.count - 1].depth =
             compiler->scopeDepth;
@@ -1507,10 +1517,10 @@ static void declaration() {
     declarationString();
   } else if (match(TOKEN_STRUCT)) {
     declarationStructTemplate();
-  } else if (match(TOKEN_VOID)) {
-    declarationVoid();
   } else if (match(TOKEN_INST)) {
     declarationStructInstance();
+  } else if (match(TOKEN_VOID)) {
+    declarationVoid();
   } else {
     statement();
   }

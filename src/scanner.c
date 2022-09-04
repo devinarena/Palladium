@@ -244,7 +244,7 @@ static TokenType identifierType() {
             return TOKEN_IDENTIFIER;
         }
       }
-      break;
+      return TOKEN_IDENTIFIER;
     case 'n':
       return checkKeyword(1, 3, "ull", TOKEN_NULL);
     case 'p':
@@ -405,7 +405,7 @@ Token scanToken() {
 ValueType keywordTypes[] = {[TOKEN_INT] = VALUE_INTEGER,
                             [TOKEN_DOUBLE] = VALUE_DOUBLE,
                             [TOKEN_BOOL] = VALUE_BOOL,
-                            [TOKEN_CHARACTER] = VALUE_CHARACTER,
+                            [TOKEN_CHAR] = VALUE_CHARACTER,
                             [TOKEN_IDENTIFIER] = VALUE_OBJECT};
 
 /**
