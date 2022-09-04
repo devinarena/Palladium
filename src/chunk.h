@@ -84,6 +84,8 @@ typedef enum {
   OP_LOCAL_SET,
   OP_LOCAL_GET,
   OP_STRUCT_INSTANCE,
+  OP_STRUCT_GET,
+  OP_STRUCT_SET,
   OP_PRINT,
   // Functions
   OP_CALL

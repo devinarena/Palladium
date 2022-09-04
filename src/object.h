@@ -66,13 +66,13 @@ typedef struct {
 
 typedef struct {
   Object object;
-  DYNAMIC_ARRAY(ValueType) fields;
+  Table fieldTypes;
 } PdStructTemplate;
 
 typedef struct {
   Object object;
   PdStructTemplate* template;
-  DYNAMIC_ARRAY(Value) fields;
+  Table fields;
 } PdStruct;
 
 PdString* newString(char* chars, int length);

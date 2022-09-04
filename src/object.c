@@ -11,8 +11,8 @@
 
 #include "memory.h"
 #include "object.h"
-#include "vm.h"
 #include "table.h"
+#include "vm.h"
 
 #define ALLOCATE_OBJ(type, objectType) \
   (type*)allocateObject(sizeof(type), objectType)
@@ -133,15 +133,17 @@ PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity) {
 }
 
 PdStructTemplate* newStructTemplate() {
-  PdStructTemplate* pstruct = ALLOCATE_OBJ(PdStructTemplate, ObjectStructTemplate);
-  INIT_DYNAMIC_ARRAY(ValueType, pstruct->fields);
+  PdStructTemplate* pstruct =
+      ALLOCATE_OBJ(PdStructTemplate, ObjectStructTemplate);
+  initTable(&pstruct->fieldTypes);
   return pstruct;
 }
 
 PdStruct* newStruct(PdStructTemplate* pstruct) {
   PdStruct* instance = ALLOCATE_OBJ(PdStruct, ObjectStruct);
   instance->template = pstruct;
-  INIT_DYNAMIC_ARRAY(Value, instance->fields);
+  initTable(&instance->fields);
+  tableAddAll(&pstruct->fieldTypes, &instance->fields);
   return instance;
 }
 

@@ -1,9 +1,12 @@
 
 struct test {
+    int a;
 }
 
 print test;
 
 inst test t;
 
-print t;
+t.a = 10;
+
+print t.a;

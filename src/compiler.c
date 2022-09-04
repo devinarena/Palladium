@@ -30,8 +30,8 @@ typedef struct {
   Token last;
   bool hadError;
   bool panicMode;
-  DYNAMIC_ARRAY(ValueType) typeStack;
-  ValueType* typeStackTop;
+  DYNAMIC_ARRAY(Value) typeStack;
+  Value* typeStackTop;
   Table globals;
 } Parser;
 
@@ -220,9 +220,9 @@ static void synchronize() {
  *
  * @param type ValueType the type to push.
  */
-static void pushType(uint32_t type) {
+static void pushType(Value type) {
   uint8_t dist = (parser.typeStackTop - parser.typeStack.data);
-  INSERT_DYNAMIC_ARRAY_AT(ValueType, parser.typeStack, dist, type);
+  INSERT_DYNAMIC_ARRAY_AT(Value, parser.typeStack, dist, type);
   parser.typeStackTop = parser.typeStack.data + dist + 1;
 }
 
@@ -231,9 +231,9 @@ static void pushType(uint32_t type) {
  *
  * @return ValueType the type popped.
  */
-static uint32_t popType() {
+static Value popType() {
   if (parser.typeStackTop == parser.typeStack.data)
-    return VALUE_NULL;
+    return NULL_VAL;
   parser.typeStackTop--;
   return *parser.typeStackTop;
 }
@@ -243,9 +243,9 @@ static uint32_t popType() {
  *
  * @return ValueType the type at the top of the stack.
  */
-static uint32_t peekType() {
+static Value peekType() {
   if (parser.typeStackTop == parser.typeStack.data)
-    return VALUE_NULL;
+    return NULL_VAL;
   return *(parser.typeStackTop - 1);
 }
 
@@ -253,8 +253,8 @@ static uint32_t peekType() {
  * @brief Swaps the top two types on the type stack for type checking.
  */
 static void swapTypes() {
-  ValueType a = popType();
-  ValueType b = popType();
+  Value a = popType();
+  Value b = popType();
   pushType(a);
   pushType(b);
 }
@@ -491,8 +491,9 @@ static void declaration();
  */
 static void integer(bool canAssign) {
   int value = atoi(parser.previous.start);
-  emitConstant(OP_CONSTANT_INT, FROM_INTEGER(value));
-  pushType(VALUE_INTEGER);
+  Value rValue = FROM_INTEGER(value);
+  emitConstant(OP_CONSTANT_INT, rValue);
+  pushType(rValue);
 }
 
 /**
@@ -503,8 +504,9 @@ static void integer(bool canAssign) {
  */
 static void double_(bool canAssign) {
   double value = strtod(parser.previous.start, NULL);
+  Value rValue = FROM_DOUBLE(value);
   emitConstant(OP_CONSTANT_DOUBLE, FROM_DOUBLE(value));
-  pushType(VALUE_DOUBLE);
+  pushType(rValue);
 }
 
 /**
@@ -516,11 +518,12 @@ static void double_(bool canAssign) {
 static void literal(bool canAssign) {
   if (parser.previous.type == TOKEN_NULL) {
     emitByte(OP_NULL);
-    pushType(VALUE_NULL);
+    pushType(NULL_VAL);
     return;
   }
-  emitConstant(OP_CONSTANT_BOOL, FROM_BOOL(parser.previous.type == TOKEN_TRUE));
-  pushType(VALUE_BOOL);
+  Value rValue = FROM_BOOL(parser.previous.type == TOKEN_TRUE);
+  emitConstant(OP_CONSTANT_BOOL, rValue);
+  pushType(rValue);
 }
 
 /**
@@ -531,8 +534,9 @@ static void literal(bool canAssign) {
  */
 static void char_(bool canAssign) {
   char c = *(parser.previous.start + 1);
-  emitConstant(OP_CONSTANT_CHARACTER, FROM_CHARACTER(c));
-  pushType(VALUE_CHARACTER);
+  Value rValue = FROM_CHARACTER(c);
+  emitConstant(OP_CONSTANT_CHARACTER, rValue);
+  pushType(rValue);
 }
 
 /**
@@ -545,7 +549,7 @@ static void string(bool canAssign) {
   emitConstant(OP_CONSTANT_STRING,
                FROM_OBJECT(copyString(parser.previous.start + 1,
                                       parser.previous.length - 2)));
-  pushType(VALUE_OBJECT);
+  pushType((Value){.type = VALUE_OBJECT});
 }
 
 /**
@@ -568,18 +572,18 @@ static void unary(bool canAssign) {
 
   parsePrecedence(PREC_UNARY);
 
-  ValueType current = popType();
+  Value current = popType();
 
   switch (previous) {
     case TOKEN_MINUS:
-      switch (current) {
+      switch (current.type) {
         case VALUE_INTEGER:
           emitByte(OP_NEGATE_INT);
-          pushType(VALUE_INTEGER);
+          pushType((Value){.type = VALUE_INTEGER});
           break;
         case VALUE_DOUBLE:
           emitByte(OP_NEGATE_DOUBLE);
-          pushType(VALUE_DOUBLE);
+          pushType((Value){.type = VALUE_DOUBLE});
           break;
         default:
           parseError("Cannot negate non-numeric value.");
@@ -587,8 +591,8 @@ static void unary(bool canAssign) {
       }
       break;
     case TOKEN_BANG:
-      pushType(VALUE_BOOL);
-      switch (current) {
+      pushType((Value){.type = VALUE_BOOL});
+      switch (current.type) {
         case VALUE_INTEGER:
           emitByte(OP_NOT_NUMBER);
           break;
@@ -604,19 +608,19 @@ static void unary(bool canAssign) {
       }
       break;
     case TOKEN_REFERENCE:
-      if (current == VALUE_NULL) {
+      if (current.type == VALUE_NULL) {
         parseError("Cannot create reference to null.");
         return;
       }
       emitByte(OP_REFERENCE);
-      pushType(VALUE_POINTER);
+      pushType((Value){.type = VALUE_POINTER});
       break;
     case TOKEN_STAR:
-      if (current != VALUE_POINTER) {
+      if (current.type != VALUE_POINTER) {
         parseError("Cannot dereference non-pointer value.");
       }
       emitByte(OP_DEREFERENCE);
-      pushType(VALUE_OBJECT);
+      pushType((Value){.type = VALUE_OBJECT});
       break;
     default:
       parseError("Unary operator expected");
@@ -628,20 +632,20 @@ static void unary(bool canAssign) {
   case (operator): {                                               \
     if (before == VALUE_INTEGER && after == VALUE_INTEGER) {       \
       emitByte(OP_##instruction##_INT);                            \
-      pushType(VALUE_INTEGER);                                     \
+      pushType((Value){.type = VALUE_INTEGER});                    \
     } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {  \
       emitByte(OP_##instruction##_DOUBLE);                         \
-      pushType(VALUE_DOUBLE);                                      \
+      pushType((Value){.type = VALUE_DOUBLE});                     \
     } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) { \
       emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
       emitByte(OP_##instruction##_DOUBLE);                         \
-      pushType(VALUE_DOUBLE);                                      \
+      pushType((Value){.type = VALUE_DOUBLE});                     \
     } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) { \
       emitByte(OP_SWAP);                                           \
       emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);                     \
       emitByte(OP_SWAP);                                           \
       emitByte(OP_##instruction##_DOUBLE);                         \
-      pushType(VALUE_DOUBLE);                                      \
+      pushType((Value){.type = VALUE_DOUBLE});                     \
     } else {                                                       \
       parseError("Binary operator invalid for given values.");     \
     }                                                              \
@@ -666,7 +670,7 @@ static void unary(bool canAssign) {
       parseError("Binary operator invalid for given values.");     \
       return;                                                      \
     }                                                              \
-    pushType(VALUE_BOOL);                                          \
+    pushType((Value){.type = VALUE_BOOL});                         \
     break;                                                         \
   }
 
@@ -681,27 +685,27 @@ static void binary(bool canAssign) {
 
   parsePrecedence((Precedence)(rule->precedence + 1));
 
-  ValueType before = popType();
-  ValueType after = popType();
+  ValueType before = popType().type;
+  ValueType after = popType().type;
 
   switch (operator) {
     case TOKEN_PLUS: {
       if (before == VALUE_INTEGER && after == VALUE_INTEGER) {
         emitByte(OP_ADD_INT);
-        pushType(VALUE_INTEGER);
+        pushType((Value){.type = VALUE_INTEGER});
       } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {
         emitByte(OP_ADD_DOUBLE);
-        pushType(VALUE_DOUBLE);
+        pushType((Value){.type = VALUE_DOUBLE});
       } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) {
         emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
         emitByte(OP_ADD_DOUBLE);
-        pushType(VALUE_DOUBLE);
+        pushType((Value){.type = VALUE_DOUBLE});
       } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) {
         emitByte(OP_SWAP);
         emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
         emitByte(OP_SWAP);
         emitByte(OP_ADD_DOUBLE);
-        pushType(VALUE_DOUBLE);
+        pushType((Value){.type = VALUE_DOUBLE});
       } else if (before == VALUE_POINTER && after == VALUE_INTEGER) {
         emitByte(OP_ADD_POINTER);
       } else if (before == VALUE_INTEGER && after == VALUE_POINTER) {
@@ -716,20 +720,20 @@ static void binary(bool canAssign) {
     case TOKEN_MINUS: {
       if (before == VALUE_INTEGER && after == VALUE_INTEGER) {
         emitByte(OP_SUB_INT);
-        pushType(VALUE_INTEGER);
+        pushType((Value){.type = VALUE_INTEGER});
       } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {
         emitByte(OP_SUB_DOUBLE);
-        pushType(VALUE_DOUBLE);
+        pushType((Value){.type = VALUE_DOUBLE});
       } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) {
         emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
         emitByte(OP_SUB_DOUBLE);
-        pushType(VALUE_DOUBLE);
+        pushType((Value){.type = VALUE_DOUBLE});
       } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) {
         emitByte(OP_SWAP);
         emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
         emitByte(OP_SWAP);
         emitByte(OP_SUB_DOUBLE);
-        pushType(VALUE_DOUBLE);
+        pushType((Value){.type = VALUE_DOUBLE});
       } else if (before == VALUE_POINTER && after == VALUE_INTEGER) {
         emitByte(OP_SUB_POINTER);
       } else if (before == VALUE_INTEGER && after == VALUE_POINTER) {
@@ -748,7 +752,7 @@ static void binary(bool canAssign) {
     case TOKEN_EQUAL_EQUAL: {
       if (typesEqual(before, after, true)) {
         emitByte(OP_EQUALITY);
-        pushType(VALUE_BOOL);
+        pushType((Value){.type = VALUE_BOOL});
       } else {
         parseError("Cannot compare values of different type.");
       }
@@ -757,7 +761,7 @@ static void binary(bool canAssign) {
     case TOKEN_BANG_EQUAL: {
       if (typesEqual(before, after, true)) {
         emitBytes(OP_EQUALITY, OP_NOT_BOOL);
-        pushType(VALUE_BOOL);
+        pushType((Value){.type = VALUE_BOOL});
       } else {
         parseError("Cannot compare values of different type.");
       }
@@ -778,7 +782,7 @@ static void namedVariable(Token* name, bool canAssign) {
     Local local = compiler->locals.data[arg];
     if (canAssign && match(TOKEN_EQUAL)) {
       expression();
-      ValueType type = popType();
+      ValueType type = popType().type;
       if (type != local.valueType) {
         parseError("Cannot assign value of different type.");
       }
@@ -787,13 +791,13 @@ static void namedVariable(Token* name, bool canAssign) {
       local.depth = compiler->scopeDepth;
     } else {
       emitBytes(OP_LOCAL_GET, (uint8_t)arg);
-      pushType(local.valueType);
+      pushType((Value){.type = local.valueType});
     }
   } else {
     arg = identifierConstant(name);
     if (canAssign && match(TOKEN_EQUAL)) {
       expression();
-      ValueType type = popType();
+      ValueType type = popType().type;
       Value value;
       if (!tableGet(&parser.globals,
                     (PdString*)TO_OBJECT(
@@ -815,7 +819,7 @@ static void namedVariable(Token* name, bool canAssign) {
         parseError("Referenced variable is undefined.");
         return;
       }
-      pushType(value.type);
+      pushType((Value){.type = value.type});
     }
   }
 }
@@ -836,19 +840,19 @@ static void variable(bool canAssign) {
  * (false)
  */
 static void and (bool canAssign) {
-  ValueType a = popType();
+  ValueType a = popType().type;
   if (a != VALUE_BOOL) {
     parseError("And operator must be used with boolean operands.");
   }
   int jump = emitJump(OP_JUMP_IF_FALSE);
   emitByte(OP_POP);
   parsePrecedence(PREC_AND);
-  ValueType b = popType();
+  ValueType b = popType().type;
   if (b != VALUE_BOOL) {
     parseError("And operator must be used with boolean operands.");
   }
   patchJump(jump);
-  pushType(VALUE_BOOL);
+  pushType((Value){.type = VALUE_BOOL});
 }
 
 /**
@@ -859,19 +863,19 @@ static void and (bool canAssign) {
  * (false)
  */
 static void or (bool canAssign) {
-  ValueType a = popType();
+  ValueType a = popType().type;
   if (a != VALUE_BOOL) {
     parseError("Or operator must be used with boolean operands.");
   }
   int jump = emitJump(OP_JUMP_IF_TRUE);
   emitByte(OP_POP);
   parsePrecedence(PREC_OR);
-  ValueType b = popType();
+  ValueType b = popType().type;
   if (b != VALUE_BOOL) {
     parseError("Or operator must be used with boolean operands.");
   }
   patchJump(jump);
-  pushType(VALUE_BOOL);
+  pushType((Value){.type = VALUE_BOOL});
 }
 
 /**
@@ -884,7 +888,7 @@ static void call(bool canAssign) {
   // BIG NOTE: THIS FORCES FUNCTIONS TO REQUIRE FORWARD DECLARATIONS.
   // SOMETHING THAT MUST BE LOOKED INTO.
   // DEVIN CHECK: does this always work?
-  if (popType() != VALUE_OBJECT) {
+  if (popType().type != VALUE_OBJECT) {
     parseError("Cannot call non-object as function.");
     return;
   }
@@ -902,13 +906,30 @@ static void call(bool canAssign) {
   emitBytes(OP_CALL, argCount);
 }
 
+/**
+ * @brief Descent case for dot calls, mainly for structs.
+ *
+ * @param canAssign bool whether or not the expression can be assigned to
+ */
+static void dot(bool canAssign) {
+  Value pstructv = popType();
+  uint8_t name = parseVariable("Expect identifier after '.'.");
+  if (canAssign && match(TOKEN_EQUAL)) {
+    expression();
+    emitBytes(OP_STRUCT_SET, name);
+    popType();
+  } else {
+    emitBytes(OP_STRUCT_GET, name);
+  }
+}
+
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
-    [TOKEN_DOT] = {NULL, NULL, PREC_CALL},
+    [TOKEN_DOT] = {NULL, dot, PREC_CALL},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
     [TOKEN_REFERENCE] = {unary, NULL, PREC_NONE},
     [TOKEN_BANG] = {unary, NULL, PREC_NONE},
@@ -1081,7 +1102,7 @@ static void function(ValueType returnType, FunctionType type, uint8_t index) {
 static void ifStatement() {
   consume(TOKEN_LEFT_PAREN, "Expected '(' after if.");
   expression();
-  if (popType() != VALUE_BOOL) {
+  if (popType().type != VALUE_BOOL) {
     parseError("Expected boolean condition.");
   }
   consume(TOKEN_RIGHT_PAREN, "Expected ')' after if condition.");
@@ -1120,7 +1141,7 @@ static void whileStatement() {
   int loopStart = compiler->current->chunk.count - 3;
   consume(TOKEN_LEFT_PAREN, "Expected '(' after while.");
   expression();
-  if (popType() != VALUE_BOOL) {
+  if (popType().type != VALUE_BOOL) {
     parseError("Expected boolean condition.");
   }
   consume(TOKEN_RIGHT_PAREN, "Expected ')' after while condition.");
@@ -1241,7 +1262,7 @@ static void statement() {
           popType();                                                           \
         } else {                                                               \
           expression();                                                        \
-          if (popType() != VALUE_POINTER) {                                    \
+          if (popType().type != VALUE_POINTER) {                               \
             parseError("Initializer does not match declared type.");           \
           }                                                                    \
           popType();                                                           \
@@ -1270,7 +1291,7 @@ static void statement() {
       Token name = parser.previous;                                            \
       if (match(TOKEN_EQUAL)) {                                                \
         expression();                                                          \
-        if (popType() != (value)) {                                            \
+        if (popType().type != (value)) {                                       \
           parseError("Initializer does not match declared type.");             \
           return;                                                              \
         }                                                                      \
@@ -1341,7 +1362,7 @@ static void declarationVoid() {
         popType();
       } else {
         expression();
-        if (popType() != VALUE_POINTER) {
+        if (popType().type != VALUE_POINTER) {
           parseError("Initializer does not match declared type.");
         }
         popType();
@@ -1350,10 +1371,11 @@ static void declarationVoid() {
       emitByte(OP_NULL_POINTER);
     }
     if (compiler->scopeDepth == 0) {
-      if (!tableSet(&parser.globals,
-                    (PdString*)TO_OBJECT(
-                        compiler->current->chunk.constants.data[index]),
-                    (Value){.type = VALUE_POINTER, .pointerType = popType()}))
+      if (!tableSet(
+              &parser.globals,
+              (PdString*)TO_OBJECT(
+                  compiler->current->chunk.constants.data[index]),
+              (Value){.type = VALUE_POINTER, .pointerType = popType().type}))
         parseError("Global variable already defined.");
     } else {
       addLocal(name, VALUE_POINTER);
@@ -1380,16 +1402,25 @@ static void declarationStructTemplate() {
     return;
   }
   uint8_t index = parseVariable("Expected variable name.");
-  Token name = parser.previous;
+  Value chk;
+  if (tableGet(
+          &parser.globals,
+          (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[index]),
+          &chk)) {
+    parseError("Struct already defined.");
+    return;
+  }
   consume(TOKEN_LEFT_BRACE, "Expected '{' before struct body.");
   PdStructTemplate* pstruct = newStructTemplate();
 
-  pushScope();
   while (!check(TOKEN_RIGHT_BRACE)) {
     advance();
     ValueType type = getValueTypeOfKeyword(parser.previous.type);
     uint8_t vIndex = parseVariable("Expected variable name.");
-    INSERT_DYNAMIC_ARRAY(ValueType, pstruct->fields, type);
+    tableSet(&pstruct->fieldTypes,
+             TO_STRING(compiler->current->chunk.constants.data[vIndex]),
+             (Value){.type = type, .data.integer = 0});
+    consume(TOKEN_SEMICOLON, "Expected ';' after field declaration.");
   }
 
   consume(TOKEN_RIGHT_BRACE, "Expected '}' after struct body.");
@@ -1423,6 +1454,10 @@ static void declarationStructInstance() {
       emitBytes(OP_STRUCT_INSTANCE, ctemplateIdx);
       if (compiler->scopeDepth == 0) {
         emitBytes(OP_GLOBAL_DEFINE, index);
+        tableSet(&parser.globals,
+                 (PdString*)TO_OBJECT(
+                     compiler->current->chunk.constants.data[index]),
+                 (Value){.type = VALUE_OBJECT, {.object = (Object*)pstruct}});
       } else {
         addLocal(parser.previous, VALUE_OBJECT);
         emitBytes(OP_LOCAL_SET, index);
@@ -1500,10 +1535,12 @@ PdFunction* compile(const char* source) {
 
 #ifdef DEBUG_TRACE_EXEC
     printf("\tType Stack: ", parser.previous.type);
-    for (ValueType* slot = parser.typeStack.data; slot < parser.typeStackTop;
+    for (Value* slot = parser.typeStack.data; slot < parser.typeStackTop;
          slot++) {
-      ValueType t = *slot;
-      printf("[%d]", t);
+      Value t = *slot;
+      printf("[");
+      printValue(t);
+      printf("]");
     }
     printf("\n");
 #endif

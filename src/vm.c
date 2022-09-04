@@ -370,6 +370,26 @@ static InterpretResult run() {
         traveled++;
         break;
       }
+      case OP_STRUCT_GET: {
+        PdString* name = READ_STRING();
+        PdStruct* instance = TO_STRUCT(pop());
+        Value value;
+        if (!tableGet(&instance->fields, name, &value)) {
+          runtimeError("Undefined field '%s'.", name->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        push(value);
+        traveled++;
+        break;
+      }
+      case OP_STRUCT_SET: {
+        PdString* name = READ_STRING();
+        Value value = pop();
+        PdStruct* instance = TO_STRUCT(pop());
+        tableSet(&instance->fields, name, value);
+        traveled++;
+        break;
+      }
       case OP_PRINT: {
         Value value = pop();
         printValue(value);

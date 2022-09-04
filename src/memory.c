@@ -64,13 +64,13 @@ void freeObject(Object* object) {
     }
     case ObjectStructTemplate: {
       PdStructTemplate* pstruct = (PdStructTemplate*)object;
-      FREE_DYNAMIC_ARRAY(ValueType, pstruct->fields);
+      freeTable(&pstruct->fieldTypes);
       FREE(ObjectStruct, object);
       break;
     }
     case ObjectStruct: {
       PdStruct* pstruct = (PdStruct*)object;
-      FREE_DYNAMIC_ARRAY(Value, pstruct->fields);
+      freeTable(&pstruct->fields);
       FREE(ObjectStruct, object);
       break;
     }
