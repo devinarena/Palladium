@@ -819,7 +819,11 @@ static void namedVariable(Token* name, bool canAssign) {
         parseError("Referenced variable is undefined.");
         return;
       }
-      pushType((Value){.type = value.type});
+      if (value.type == VALUE_OBJECT) {
+        pushType(value);
+      } else {
+        pushType((Value){.type = value.type});
+      }
     }
   }
 }
@@ -912,12 +916,24 @@ static void call(bool canAssign) {
  * @param canAssign bool whether or not the expression can be assigned to
  */
 static void dot(bool canAssign) {
-  Value pstructv = popType();
+  PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(popType());
   uint8_t name = parseVariable("Expect identifier after '.'.");
   if (canAssign && match(TOKEN_EQUAL)) {
     expression();
+    Value expected;
+    if (!tableGet(
+            &structTemplate->fieldTypes,
+            (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[name]),
+            &expected)) {
+      parseError("Cannot assign to undeclared field.");
+      return;
+    }
+    ValueType type = popType().type;
+    if (type != expected.type) {
+      parseError("Type assignment mismatch.");
+      return;
+    }
     emitBytes(OP_STRUCT_SET, name);
-    popType();
   } else {
     emitBytes(OP_STRUCT_GET, name);
   }

@@ -7,6 +7,6 @@ print test;
 
 inst test t;
 
-t.a = 10;
+t.c = 10;
 
 print t.a;
