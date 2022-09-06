@@ -230,7 +230,7 @@ static InterpretResult run() {
       case OP_REFERENCE: {
         Value value = pop();
         PdReference* reference = newReference(value);
-        Value pointer = FROM_POINTER(reference);
+        Value pointer = FROM_POINTER(&reference->value);
         push(pointer);
         break;
       }

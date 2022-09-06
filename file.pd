@@ -16,3 +16,4 @@ t.test = &test;
 int* a = &5;
 
 print *t.test;
+print *a;
