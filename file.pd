@@ -4,16 +4,30 @@ void test() {
 }
 
 struct Test {
-    void* test;
-    int a;
-    bool b;
+    void* v;
+    int* i;
+    char* c;
+    double* d;
+    bool* b;
 }
 
 inst Test t;
 
-t.test = &test;
+t.v = &test;
+t.i = &5;
+t.c = &'a';
+t.d = &3.14;
+t.b = &true;
 
-int* a = &5;
+print t.v;
+print t.i;
+print t.c;
+print t.d;
+print t.b;
 
-print *t.test;
-print *a;
+print *t.v;
+(*t.v)();
+print *t.i;
+print *t.c;
+print *t.d;
+print *t.b;

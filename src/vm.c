@@ -374,7 +374,6 @@ static InterpretResult run() {
         PdString* name = READ_STRING();
         PdStruct* instance = TO_STRUCT(pop());
         Value value;
-        printf("Getting %s\n", name->chars);
         if (!tableGet(&instance->fields, name, &value)) {
           runtimeError("Undefined field '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
