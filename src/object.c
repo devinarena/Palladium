@@ -147,6 +147,12 @@ PdStruct* newStruct(PdStructTemplate* pstruct) {
   return instance;
 }
 
+PdReference* newReference(Value value) {
+  PdReference* reference = ALLOCATE_OBJ(PdReference, ObjectReference);
+  reference->value = value;
+  return reference;
+}
+
 /**
  * @brief Outputs an object to standard output.
  *

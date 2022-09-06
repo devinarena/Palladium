@@ -74,5 +74,10 @@ void freeObject(Object* object) {
       FREE(ObjectStruct, object);
       break;
     }
+    case ObjectReference: {
+      PdReference* ref = (PdReference*)object;
+      FREE(ObjectReference, object);
+      break;
+    }
   }
 }

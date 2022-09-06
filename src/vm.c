@@ -154,8 +154,8 @@ static InterpretResult run() {
     switch ((instruction = READ_BYTE())) {
       case OP_RETURN: {
 #ifdef DEBUG_TRACE_EXEC
-        disassembleInstruction(
-            frame->chunk, (int)(frame->ip - frame->chunk->code - traveled));
+        disassembleInstruction(frame->chunk,
+                               (int)(frame->ip - frame->chunk->code - 1));
         printf("==================================\n");
 #endif
         vm.callStackSize--;
@@ -172,8 +172,7 @@ static InterpretResult run() {
         }
         vm.stackTop = frame->slot - 1;
         frame = &vm.callStack[vm.callStackSize - 1];
-        if (result.type != VALUE_NULL)
-          push(result);
+        push(result);
         continue;
       }
       case OP_NULL: {
@@ -230,7 +229,8 @@ static InterpretResult run() {
       }
       case OP_REFERENCE: {
         Value value = pop();
-        Value pointer = FROM_POINTER((struct Value*)&value);
+        PdReference* reference = newReference(value);
+        Value pointer = FROM_POINTER(reference);
         push(pointer);
         break;
       }
@@ -374,6 +374,7 @@ static InterpretResult run() {
         PdString* name = READ_STRING();
         PdStruct* instance = TO_STRUCT(pop());
         Value value;
+        printf("Getting %s\n", name->chars);
         if (!tableGet(&instance->fields, name, &value)) {
           runtimeError("Undefined field '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;

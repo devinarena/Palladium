@@ -1,14 +1,18 @@
-struct test {
+
+void test() {
+    print "Hello world!";
+}
+
+struct Test {
+    void* test;
     int a;
-    char b;
+    bool b;
 }
 
-void func() {
-    inst test t;
-    t.a = 1;
-    t.b = 'a';
-    print t.a;
-    print t.b;
-}
+inst Test t;
 
-func();
+t.test = &test;
+
+int* a = &5;
+
+print *t.test;

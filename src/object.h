@@ -32,7 +32,8 @@ typedef enum {
   ObjectFunction,
   ObjectBuiltin,
   ObjectStructTemplate,
-  ObjectStruct
+  ObjectStruct,
+  ObjectReference
 } ObjectType;
 
 struct Object {
@@ -75,12 +76,18 @@ typedef struct {
   Table fields;
 } PdStruct;
 
+typedef struct {
+  Object object;
+  Value value;
+} PdReference;
+
 PdString* newString(char* chars, int length);
 PdString* copyString(const char* chars, int length);
 PdFunction* newFunction(ValueType returnType, PdString* name);
 PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity);
 PdStructTemplate* newStructTemplate();
 PdStruct* newStruct(PdStructTemplate* template);
+PdReference* newReference(Value value);
 void printObject(Value value);
 
 #endif

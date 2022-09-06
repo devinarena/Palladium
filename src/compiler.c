@@ -945,6 +945,14 @@ static void dot(bool canAssign) {
     }
     emitBytes(OP_STRUCT_SET, name);
   } else {
+    Value expected;
+    if (!tableGet(
+            &structTemplate->fieldTypes,
+            (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[name]),
+            &expected)) {
+      parseError("Cannot access undeclared field.");
+    }
+    pushType(expected);
     emitBytes(OP_STRUCT_GET, name);
   }
 }
@@ -1084,7 +1092,6 @@ static void function(ValueType returnType, FunctionType type, uint8_t index) {
   newCompiler.scopeDepth = compiler->scopeDepth;
   compiler = &newCompiler;
 
-  consume(TOKEN_LEFT_PAREN, "Expect '(' after function name.");
   uint8_t argCount = 0;
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
@@ -1315,30 +1322,40 @@ static void statement() {
     } else {                                                                   \
       uint8_t index = parseVariable("Expected identifier name.");              \
       Token name = parser.previous;                                            \
-      if (match(TOKEN_EQUAL)) {                                                \
-        expression();                                                          \
-        if (popType().type != (value)) {                                       \
-          parseError("Initializer does not match declared type.");             \
-          return;                                                              \
-        }                                                                      \
-        if (compiler->scopeDepth == 0) {                                       \
-          if (!tableSet(&parser.globals,                                       \
-                        (PdString*)TO_OBJECT(                                  \
-                            compiler->current->chunk.constants.data[index]),   \
-                        (Value){.type = (value)}))                             \
-            parseError("Global variable already defined.");                    \
-        } else {                                                               \
-          addLocal(name, (Value){.type = (value)});                            \
-          op = OP_LOCAL_SET;                                                   \
-        }                                                                      \
-        consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");  \
-        emitBytes(op, index);                                                  \
-        if (op == OP_LOCAL_SET) {                                              \
-          compiler->locals.data[compiler->locals.count - 1].depth =            \
-              compiler->scopeDepth;                                            \
-        }                                                                      \
-      } else {                                                                 \
+      if (match(TOKEN_LEFT_PAREN)) {                                           \
         function((value), TYPE_FUNCTION, index);                               \
+      } else {                                                                 \
+        if (match(TOKEN_EQUAL)) {                                              \
+          expression();                                                        \
+          if (popType().type != (value)) {                                     \
+            parseError("Initializer does not match declared type.");           \
+            return;                                                            \
+          }                                                                    \
+        } else {                                                               \
+          if (compiler->scopeDepth > 0) {                                      \
+            addLocal(name, (Value){.type = (value)});                          \
+            compiler->locals.data[compiler->locals.count - 1].depth =          \
+                compiler->scopeDepth;                                          \
+            consume(TOKEN_SEMICOLON,                                           \
+                    "Expected ';' after variable declaration.");               \
+            return;                                                            \
+          }                                                                    \
+        }                                                                      \
+      }                                                                        \
+      if (compiler->scopeDepth == 0) {                                         \
+        if (!tableSet(&parser.globals,                                         \
+                      (PdString*)TO_OBJECT(                                    \
+                          compiler->current->chunk.constants.data[index]),     \
+                      (Value){.type = (value)}))                               \
+          parseError("Global variable already defined.");                      \
+      } else {                                                                 \
+        addLocal(name, (Value){.type = (value)});                              \
+        op = OP_LOCAL_SET;                                                     \
+      }                                                                        \
+      consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");    \
+      if (op == OP_LOCAL_SET) {                                                \
+        compiler->locals.data[compiler->locals.count - 1].depth =              \
+            compiler->scopeDepth;                                              \
       }                                                                        \
     }                                                                          \
   }
@@ -1415,6 +1432,7 @@ static void declarationVoid() {
     }
   } else {
     uint8_t index = parseVariable("Expected function name.");
+    consume(TOKEN_LEFT_PAREN, "Expected '(' after function name.");
     function(VALUE_NULL, TYPE_FUNCTION, index);
   }
 }
@@ -1442,11 +1460,28 @@ static void declarationStructTemplate() {
   while (!check(TOKEN_RIGHT_BRACE)) {
     advance();
     ValueType type = getValueTypeOfKeyword(parser.previous.type);
-    uint8_t vIndex = parseVariable("Expected variable name.");
-    tableSet(&pstruct->fieldTypes,
-             TO_STRING(compiler->current->chunk.constants.data[vIndex]),
-             (Value){.type = type});
-    consume(TOKEN_SEMICOLON, "Expected ';' after field declaration.");
+    if (type != VALUE_INTEGER && type != VALUE_DOUBLE && type != VALUE_BOOL &&
+        type != VALUE_CHARACTER && type != VALUE_OBJECT &&
+        (type == VALUE_NULL && !check(TOKEN_STAR))) {
+      parseError("Invalid type for struct member.");
+      return;
+    }
+    if (match(TOKEN_STAR)) {
+      uint8_t vIndex = parseVariable("Expected variable name.");
+      if (!tableSet(&pstruct->fieldTypes,
+                    TO_STRING(compiler->current->chunk.constants.data[vIndex]),
+                    (Value){.type = VALUE_POINTER, .pointerType = type})) {
+        parseError("Duplicate field name.");
+        return;
+      }
+      consume(TOKEN_SEMICOLON, "Expected ';' after field declaration.");
+    } else {
+      uint8_t vIndex = parseVariable("Expected variable name.");
+      tableSet(&pstruct->fieldTypes,
+               TO_STRING(compiler->current->chunk.constants.data[vIndex]),
+               (Value){.type = type});
+      consume(TOKEN_SEMICOLON, "Expected ';' after field declaration.");
+    }
   }
 
   consume(TOKEN_RIGHT_BRACE, "Expected '}' after struct body.");
