@@ -984,6 +984,7 @@ ParseRule rules[] = {
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
+    [TOKEN_PLUS_EQUAL] = {NULL, binary, PREC_NONE},
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {unary, binary, PREC_FACTOR},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
