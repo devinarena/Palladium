@@ -1309,7 +1309,6 @@ static void statement() {
                           compiler->current->chunk.constants.data[index]),     \
                       (Value){.type = VALUE_POINTER, .pointerType = (value)})) \
           parseError("Global variable already defined.");                      \
-        op = OP_GLOBAL_DEFINE;                                                 \
       } else {                                                                 \
         addLocal(name, (Value){.type = VALUE_POINTER});                        \
         op = OP_LOCAL_SET;                                                     \
@@ -1342,23 +1341,22 @@ static void statement() {
             return;                                                            \
           }                                                                    \
         }                                                                      \
-      }                                                                        \
-      if (compiler->scopeDepth == 0) {                                         \
-        if (!tableSet(&parser.globals,                                         \
-                      (PdString*)TO_OBJECT(                                    \
-                          compiler->current->chunk.constants.data[index]),     \
-                      (Value){.type = (value)}))                               \
-          parseError("Global variable already defined.");                      \
-        op = OP_GLOBAL_DEFINE;                                                 \
-      } else {                                                                 \
-        addLocal(name, (Value){.type = (value)});                              \
-        op = OP_LOCAL_SET;                                                     \
-      }                                                                        \
-      consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");    \
-      emitBytes(op, index);                                                    \
-      if (op == OP_LOCAL_SET) {                                                \
-        compiler->locals.data[compiler->locals.count - 1].depth =              \
-            compiler->scopeDepth;                                              \
+        if (compiler->scopeDepth == 0) {                                       \
+          if (!tableSet(&parser.globals,                                       \
+                        (PdString*)TO_OBJECT(                                  \
+                            compiler->current->chunk.constants.data[index]),   \
+                        (Value){.type = (value)}))                             \
+            parseError("Global variable already defined.");                    \
+        } else {                                                               \
+          addLocal(name, (Value){.type = (value)});                            \
+          op = OP_LOCAL_SET;                                                   \
+        }                                                                      \
+        consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");  \
+        emitBytes(op, index);                                                  \
+        if (op == OP_LOCAL_SET) {                                              \
+          compiler->locals.data[compiler->locals.count - 1].depth =            \
+              compiler->scopeDepth;                                            \
+        }                                                                      \
       }                                                                        \
     }                                                                          \
   }
