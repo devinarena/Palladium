@@ -634,7 +634,9 @@ static void unary(bool canAssign) {
         return;
       }
       emitByte(OP_REFERENCE);
-      pushType((Value){.type = VALUE_POINTER, .data.pointer = (struct Value*) &current, .pointerType = current.type});
+      pushType((Value){.type = VALUE_POINTER,
+                       .data.pointer = (struct Value*)&current,
+                       .pointerType = current.type});
       break;
     default:
       parseError("Unary operator expected");
@@ -654,7 +656,7 @@ static void dereference(bool canAssign) {
     return;
   }
   if (current.pointerType == VALUE_OBJECT) {
-    pushType((*(Value*)current.data.pointer));
+    pushType(FROM_OBJECT(current.data.object));
   } else
     pushType((Value){.type = current.pointerType});
   emitByte(OP_DEREFERENCE);
@@ -829,7 +831,7 @@ static void namedVariable(Token* name, bool canAssign) {
     arg = identifierConstant(name);
     if (canAssign && match(TOKEN_EQUAL)) {
       expression();
-      ValueType type = popType().type;
+      Value type = popType();
       Value value;
       if (!tableGet(&parser.globals,
                     (PdString*)TO_OBJECT(
@@ -837,9 +839,13 @@ static void namedVariable(Token* name, bool canAssign) {
                     &value)) {
         parseError("Cannot assign to undeclared variable.");
       }
-      if (type != value.type) {
+      if (type.type != value.type) {
         parseError("Cannot assign value of different type.");
       }
+      tableSet(
+          &parser.globals,
+          (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[arg]),
+          type);
       emitBytes(OP_GLOBAL_SET, arg);
     } else {
       emitBytes(OP_GLOBAL_GET, arg);
@@ -997,11 +1003,15 @@ static void dot(bool canAssign) {
       parseError("Cannot assign to undeclared field.");
       return;
     }
-    ValueType type = popType().type;
-    if (type != expected.type) {
+    Value type = popType();
+    if (type.type != expected.type) {
       parseError("Type assignment mismatch.");
       return;
     }
+    tableSet(
+        &structTemplate->fieldTypes,
+        (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[name]),
+        type);
     emitBytes(OP_STRUCT_SET, name);
   } else {
     Value expected;
@@ -1586,24 +1596,24 @@ static void declarationStructInstance() {
           }
         } else {
           emitByte(OP_NULL_POINTER);
-          pushType((Value){.type = VALUE_NULL});
+          pushType((Value){.type = VALUE_POINTER, .pointerType = VALUE_OBJECT});
         }
         if (compiler->scopeDepth == 0) {
-          if (!tableSet(
-                  &parser.globals,
-                  (PdString*)TO_OBJECT(
-                      compiler->current->chunk.constants.data[index]),
-                  (Value){.type = VALUE_POINTER,
-                          .data.pointer = (struct Value*) &pstructv,
-                          .pointerType = popType().pointerType})) {
+          Value res = (Value){.type = VALUE_POINTER,
+                              .pointerType = popType().pointerType};
+          if (res.pointerType != VALUE_NULL)
+            res.data.object = TO_OBJECT(pstructv);
+          if (!tableSet(&parser.globals,
+                        (PdString*)TO_OBJECT(
+                            compiler->current->chunk.constants.data[index]),
+                        res)) {
             parseError("Global variable already defined.");
             return;
           }
         } else {
-          addLocal(name,
-                   (Value){.type = VALUE_POINTER,
-                           .data.pointer = (struct Value*) &pstructv,
-                           .pointerType = VALUE_OBJECT});
+          addLocal(name, (Value){.type = VALUE_POINTER,
+                                 .data.pointer = (struct Value*)&pstructv,
+                                 .pointerType = VALUE_OBJECT});
           op = OP_LOCAL_SET;
         }
         consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
