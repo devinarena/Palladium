@@ -1,33 +1,13 @@
 
-void test() {
-    print "Hello world!";
+struct Circle {
+    int radius;
+    double area;
 }
 
-struct Test {
-    void* v;
-    int* i;
-    char* c;
-    double* d;
-    bool* b;
-}
+inst Circle c;
 
-inst Test t;
+c.radius = 5;
+c.area = PI * p_square(c.radius);
 
-t.v = &test;
-t.i = &5;
-t.c = &'a';
-t.d = &3.14;
-t.b = &true;
-
-print t.v;
-print t.i;
-print t.c;
-print t.d;
-print t.b;
-
-print *t.v;
-(*t.v)();
-print *t.i;
-print *t.c;
-print *t.d;
-print *t.b;
+print c.radius;
+print c.area;

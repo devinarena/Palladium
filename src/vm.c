@@ -411,17 +411,6 @@ static InterpretResult run() {
         Object* funObj = TO_OBJECT(fun);
         if (funObj->type == ObjectBuiltin) {
           PdBuiltin* builtin = TO_BUILTIN(fun);
-          if (builtin->arity != argCount) {
-            runtimeError("Builtin function expected %d arguments but got %d.",
-                         builtin->arity, argCount);
-            return INTERPRET_RUNTIME_ERROR;
-          }
-          for (int i = 0; i < argCount; i++) {
-            if (peek(i).type != builtin->argt.data[argCount - i - 1]) {
-              runtimeError("Mismatched argument type for position %d.", i);
-              return INTERPRET_RUNTIME_ERROR;
-            }
-          }
           if (builtin->returnType == VALUE_NULL) {
             builtin->builtinRef(argCount, vm.stackTop - argCount);
             vm.stackTop -= argCount + 1;
@@ -432,17 +421,6 @@ static InterpretResult run() {
           }
         } else {
           PdFunction* fn = TO_FUNCTION(fun);
-          if (argCount != fn->arity) {
-            runtimeError("%s expected %d arguments but got %d.",
-                         fn->name->chars, fn->arity, argCount);
-            return INTERPRET_RUNTIME_ERROR;
-          }
-          for (int i = 0; i < argCount; i++) {
-            if (peek(i).type != fn->locals.data[argCount - i - 1]) {
-              runtimeError("Mismatched argument type for position %d.", i);
-              return INTERPRET_RUNTIME_ERROR;
-            }
-          }
           call(fn, argCount);
           frame = &vm.callStack[vm.callStackSize - 1];
           continue;

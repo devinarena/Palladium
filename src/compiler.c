@@ -6,6 +6,7 @@
  * @since 6/23/2022
  **/
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -119,6 +120,23 @@ static void errorAtToken(Token* token, const char* message) {
 static void parseError(const char* message) {
   errorAtToken(&parser.previous, message);
   parser.panicMode = true;
+}
+
+/**
+ * @brief Helper for displaying a formatted parse error.
+ *
+ * @param format the format string
+ * @param ... the arguments to the format string
+ */
+static void parseErrorf(const char* error, const char* message, ...) {
+  parseError(error);
+  fprintf(stderr, "%-10s| ", "");
+
+  va_list args;
+  va_start(args, message);
+  vfprintf(stderr, message, args);
+  va_end(args);
+  fputs("\n", stderr);
 }
 
 /**
@@ -243,10 +261,10 @@ static Value popType() {
  *
  * @return ValueType the type at the top of the stack.
  */
-static Value peekType() {
+static Value peekType(int dist) {
   if (parser.typeStackTop == parser.typeStack.data)
     return NULL_VAL;
-  return *(parser.typeStackTop - 1);
+  return *(parser.typeStackTop - 1 - dist);
 }
 
 /**
@@ -896,19 +914,54 @@ static void call(bool canAssign) {
   // BIG NOTE: THIS FORCES FUNCTIONS TO REQUIRE FORWARD DECLARATIONS.
   // SOMETHING THAT MUST BE LOOKED INTO.
   // DEVIN CHECK: does this always work?
-  if (popType().type != VALUE_OBJECT) {
+  Value fnV = popType();
+  if (fnV.type != VALUE_OBJECT || (TO_OBJECT(fnV)->type != ObjectFunction &&
+                                   TO_OBJECT(fnV)->type != ObjectBuiltin)) {
     parseError("Cannot call non-object as function.");
     return;
   }
   if (!check(TOKEN_RIGHT_PAREN)) {
     do {
       expression();
-      popType();
       argCount++;
       if (argCount > 255) {
         parseError("Cannot have more than 255 arguments.");
       }
     } while (match(TOKEN_COMMA));
+  }
+  if (TO_OBJECT(fnV)->type == ObjectFunction) {
+    PdFunction* fn = TO_FUNCTION(fnV);
+    if (argCount != fn->arity) {
+      parseErrorf("Argument count mismatch.",
+                  "Expected %d arguments but got %d.", fn->arity, argCount);
+      return;
+    }
+    for (int i = 0; i < argCount; i++) {
+      if (peekType(i).type != fn->locals.data[argCount - i - 1]) {
+        parseErrorf("Argument type mismatch.",
+                    "Expected %s but received %s for argument %d.",
+                    getValueTypeName(fn->locals.data[argCount - i - 1]),
+                    getValueTypeName(peekType(i).type), i);
+        return;
+      }
+    }
+  } else if (TO_OBJECT(fnV)->type == ObjectBuiltin) {
+    PdBuiltin* builtin = TO_BUILTIN(fnV);
+    if (builtin->arity != argCount) {
+      parseErrorf("Argument count mismatch.",
+                  "Builtin function expected %d arguments but got %d.",
+                  builtin->arity, argCount);
+      return;
+    }
+    for (int i = 0; i < argCount; i++) {
+      if (peekType(i).type != builtin->argt.data[argCount - i - 1]) {
+        parseErrorf("Argument type mismatch.",
+                    "Expected %s but received %s for argument %d.",
+                    getValueTypeName(builtin->argt.data[argCount - i - 1]),
+                    getValueTypeName(peekType(i).type), i);
+        return;
+      }
+    }
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
   emitBytes(OP_CALL, argCount);
