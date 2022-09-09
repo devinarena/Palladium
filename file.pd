@@ -1,1 +1,10 @@
 
+struct Test {
+    int a;
+}
+
+inst Test t;
+
+inst Test* tpointer = &t;
+
+print (tpointer~).a;

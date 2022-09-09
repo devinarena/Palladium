@@ -634,7 +634,7 @@ static void unary(bool canAssign) {
         return;
       }
       emitByte(OP_REFERENCE);
-      pushType((Value){.type = VALUE_POINTER, .pointerType = current.type});
+      pushType((Value){.type = VALUE_POINTER, .data.pointer = (struct Value*) &current, .pointerType = current.type});
       break;
     default:
       parseError("Unary operator expected");
@@ -653,8 +653,11 @@ static void dereference(bool canAssign) {
     parseError("Cannot dereference non-pointer value.");
     return;
   }
+  if (current.pointerType == VALUE_OBJECT) {
+    pushType((*(Value*)current.data.pointer));
+  } else
+    pushType((Value){.type = current.pointerType});
   emitByte(OP_DEREFERENCE);
-  pushType((Value){.type = current.pointerType});
 }
 
 #define BINARY_OPERATOR_CASE_MUL_DIV(operator, instruction)        \
@@ -1565,6 +1568,53 @@ static void declarationStructInstance() {
     if (pstructv.type == VALUE_OBJECT &&
         TO_OBJECT(pstructv)->type == ObjectStructTemplate) {
       PdStructTemplate* pstruct = (PdStructTemplate*)TO_OBJECT(pstructv);
+      // can either be a struct instance or a pointer
+      if (match(TOKEN_STAR)) {
+        uint8_t index = parseVariable("Expected variable name.");
+        uint8_t op = OP_GLOBAL_DEFINE;
+        Token name = parser.previous;
+        if (match(TOKEN_EQUAL)) {
+          if (match(TOKEN_NULL)) {
+            emitByte(OP_NULL_POINTER);
+            pushType((Value){.type = VALUE_NULL});
+          } else {
+            expression();
+            if (peekType(0).type != VALUE_POINTER) {
+              parseError("Initializer does not match declared type.");
+              return;
+            }
+          }
+        } else {
+          emitByte(OP_NULL_POINTER);
+          pushType((Value){.type = VALUE_NULL});
+        }
+        if (compiler->scopeDepth == 0) {
+          if (!tableSet(
+                  &parser.globals,
+                  (PdString*)TO_OBJECT(
+                      compiler->current->chunk.constants.data[index]),
+                  (Value){.type = VALUE_POINTER,
+                          .data.pointer = (struct Value*) &pstructv,
+                          .pointerType = popType().pointerType})) {
+            parseError("Global variable already defined.");
+            return;
+          }
+        } else {
+          addLocal(name,
+                   (Value){.type = VALUE_POINTER,
+                           .data.pointer = (struct Value*) &pstructv,
+                           .pointerType = VALUE_OBJECT});
+          op = OP_LOCAL_SET;
+        }
+        consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
+        emitBytes(op, index);
+        if (op == OP_LOCAL_SET) {
+          compiler->locals.data[compiler->locals.count - 1].depth =
+              compiler->scopeDepth;
+        }
+        return;
+      }
+      // not a pointer
       uint8_t ctemplateIdx = addConstant(&compiler->current->chunk, pstructv);
       uint8_t index = parseVariable("Expected variable name.");
       if (tableGet(&parser.globals,
