@@ -5,6 +5,9 @@ struct Test {
 
 inst Test t;
 
-inst Test* tpointer = &t;
+t.a = 20;
 
-print (tpointer~).a;
+inst Test* tpointer;
+tpointer = &t;
+
+print tpointer~.a * 2;
