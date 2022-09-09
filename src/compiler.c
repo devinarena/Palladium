@@ -566,10 +566,10 @@ static void char_(bool canAssign) {
  * @param canAssign bool whether or not the constant can be assigned to (never)
  */
 static void string(bool canAssign) {
-  emitConstant(OP_CONSTANT_STRING,
-               FROM_OBJECT(copyString(parser.previous.start + 1,
-                                      parser.previous.length - 2)));
-  pushType((Value){.type = VALUE_OBJECT});
+  Value str = FROM_OBJECT(
+      copyString(parser.previous.start + 1, parser.previous.length - 2));
+  emitConstant(OP_CONSTANT_STRING, str);
+  pushType(str);
 }
 
 /**
@@ -599,11 +599,12 @@ static void unary(bool canAssign) {
       switch (current.type) {
         case VALUE_INTEGER:
           emitByte(OP_NEGATE_INT);
-          pushType((Value){.type = VALUE_INTEGER});
+          pushType(current);
           break;
         case VALUE_DOUBLE:
           emitByte(OP_NEGATE_DOUBLE);
-          pushType((Value){.type = VALUE_DOUBLE});
+          current.type = VALUE_DOUBLE;
+          pushType(current);
           break;
         default:
           parseError("Cannot negate non-numeric value.");
@@ -633,7 +634,7 @@ static void unary(bool canAssign) {
         return;
       }
       emitByte(OP_REFERENCE);
-      pushType((Value){.type = VALUE_POINTER});
+      pushType((Value){.type = VALUE_POINTER, .pointerType = current.type});
       break;
     default:
       parseError("Unary operator expected");
@@ -653,7 +654,7 @@ static void dereference(bool canAssign) {
     return;
   }
   emitByte(OP_DEREFERENCE);
-  pushType((Value){.type = VALUE_OBJECT});
+  pushType((Value){.type = current.pointerType});
 }
 
 #define BINARY_OPERATOR_CASE_MUL_DIV(operator, instruction)        \
@@ -819,11 +820,7 @@ static void namedVariable(Token* name, bool canAssign) {
       local.depth = compiler->scopeDepth;
     } else {
       emitBytes(OP_LOCAL_GET, (uint8_t)arg);
-      if (local.valueData.type == VALUE_OBJECT) {
-        pushType(local.valueData);
-      } else {
-        pushType((Value){.type = local.valueData.type});
-      }
+      pushType(local.valueData);
     }
   } else {
     arg = identifierConstant(name);
@@ -851,11 +848,7 @@ static void namedVariable(Token* name, bool canAssign) {
         parseError("Referenced variable is undefined.");
         return;
       }
-      if (value.type == VALUE_OBJECT) {
-        pushType(value);
-      } else {
-        pushType((Value){.type = value.type});
-      }
+      pushType(value);
     }
   }
 }
