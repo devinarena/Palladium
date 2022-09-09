@@ -19,9 +19,9 @@ t.c = &'a';
 t.d = &3.14;
 t.b = &true;
 
-print *t.v;
-(*t.v)();
-print *t.i;
-print *t.c;
-print *t.d;
-print *t.b;
+print t.v~;
+(t.v~)();
+print t.i~;
+print t.c~;
+print t.d~;
+print t.b~;

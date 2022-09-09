@@ -1,13 +1,12 @@
 
-struct Test {
-    int a;
+
+int test() {
+    int* x = &50;
+    ret (x~);
 }
 
-inst Test t;
+int* t = &test;
 
-t.a = 20;
-
-inst Test* tpointer;
-tpointer = &t;
-
-print tpointer~.a * 2;
+print t;
+print t~;
+print (t~)();

@@ -2,9 +2,9 @@
 
 int test() {
     int* x = &50;
-    ret (*x);
+    ret (x~);
 }
 
 int* t = &test;
 
-print p_square((*t)());
+print p_square((t~)());
