@@ -1,13 +1,6 @@
 
-struct Circle {
-    int radius;
-    double area;
-}
+int* test = &10;
 
-inst Circle c;
+print test;
 
-c.radius = 5;
-c.area = PI * p_square(c.radius);
-
-print c.radius;
-print c.area;
+print test~ < 3;

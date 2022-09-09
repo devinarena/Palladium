@@ -1,0 +1,13 @@
+
+struct Circle {
+    int radius;
+    double area;
+}
+
+inst Circle c;
+
+c.radius = 5;
+c.area = PI * p_square(c.radius);
+
+print c.radius;
+print c.area;

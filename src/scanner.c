@@ -396,6 +396,8 @@ Token scanToken() {
       return makeToken(match('=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
     case '>':
       return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+    case '~':
+      return makeToken(TOKEN_TILDE);
     case '\'': {
       advance();
       Token tchar = makeToken(TOKEN_CHARACTER);

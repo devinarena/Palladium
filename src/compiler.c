@@ -60,8 +60,10 @@ typedef enum {
   PREC_TERM,        // + -
   PREC_FACTOR,      // * /
   PREC_UNARY,       // ! -
-  PREC_CALL,        // . ()
-  PREC_PRIMARY
+  PREC_PRIMARY,
+  PREC_PREFIX,
+  PREC_POSTFIX,
+  PREC_CALL,  // . ()
 } Precedence;
 
 typedef void (*ParseFn)(bool canAssign);
@@ -633,17 +635,25 @@ static void unary(bool canAssign) {
       emitByte(OP_REFERENCE);
       pushType((Value){.type = VALUE_POINTER});
       break;
-    case TOKEN_STAR:
-      if (current.type != VALUE_POINTER) {
-        parseError("Cannot dereference non-pointer value.");
-      }
-      emitByte(OP_DEREFERENCE);
-      pushType((Value){.type = VALUE_OBJECT});
-      break;
     default:
       parseError("Unary operator expected");
       break;
   }
+}
+
+/**
+ * @brief Handles dereferencing expressions. Dereferencing is a postfix ~.
+ *
+ * @param canAssign bool whether or not the constant can be assigned to (never)
+ */
+static void dereference(bool canAssign) {
+  Value current = popType();
+  if (current.type != VALUE_POINTER) {
+    parseError("Cannot dereference non-pointer value.");
+    return;
+  }
+  emitByte(OP_DEREFERENCE);
+  pushType((Value){.type = VALUE_OBJECT});
 }
 
 #define BINARY_OPERATOR_CASE_MUL_DIV(operator, instruction)        \
@@ -1031,15 +1041,17 @@ ParseRule rules[] = {
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER_INTEGER] = {integer, NULL, PREC_NONE},
     [TOKEN_NUMBER_FLOATING] = {double_, NULL, PREC_NONE},
-    // char is the keyword, character is the literal
+    // char is the keyword, characterNULL,he   literal
     [TOKEN_CHARACTER] = {char_, NULL, PREC_NONE},
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
+    [TOKEN_MINUS_EQUAL] = {NULL, binary, PREC_NONE},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
     [TOKEN_PLUS_EQUAL] = {NULL, binary, PREC_NONE},
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {unary, binary, PREC_FACTOR},
+    [TOKEN_TILDE] = {NULL, dereference, PREC_POSTFIX},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, and, PREC_AND},
@@ -1087,6 +1099,7 @@ static void parsePrecedence(Precedence prec) {
 
   prefix(canAssign);
 
+  // handle infix rules
   while (prec <= getRule(parser.current.type)->precedence) {
     advance();
     ParseFn infix = getRule(parser.previous.type)->infix;
