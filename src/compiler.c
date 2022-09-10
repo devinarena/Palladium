@@ -1378,7 +1378,7 @@ static void statement() {
         emitByte(OP_NULL_POINTER);                                            \
       }                                                                       \
       if (compiler->scopeDepth == 0) {                                        \
-        Value top = pop();                                                    \
+        Value top = popType();                                                    \
         if (top.type != VALUE_POINTER) {                                      \
           parseError("Expected pointer type.");                               \
           return;                                                             \
@@ -1386,9 +1386,7 @@ static void statement() {
         if (!tableSet(                                                        \
                 &parser.globals,                                              \
                 TO_STRING(compiler->current->chunk.constants.data[index]),    \
-                (Value){.type = VALUE_POINTER,                                \
-                        .data.pointer = (struct Value*)FROM_POINTER(top),     \
-                        .pointerType = (value)})) {                           \
+                top)) {                                                       \
           parseError("Global variable already defined.");                     \
           return;                                                             \
         }                                                                     \

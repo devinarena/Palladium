@@ -1,12 +1,10 @@
 
-
-int test() {
-    int* x = &50;
-    ret (x~);
+struct Test {
+    int a;
 }
 
-int* t = &test;
+inst Test t;
 
-print t;
-print t~;
-print (t~)();
+inst Test* tpointer = &t;
+
+print (tpointer~).a;
