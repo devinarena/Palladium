@@ -39,6 +39,7 @@ typedef enum {
   OP_POP,
   OP_JUMP,
   OP_LOOP,
+  OP_NOP,
   // Unary
   OP_NOT_NUMBER,
   OP_NOT_BOOL,
@@ -86,6 +87,7 @@ typedef enum {
   OP_STRUCT_INSTANCE,
   OP_STRUCT_GET,
   OP_STRUCT_SET,
+  OP_ASSIGN,
   OP_PRINT,
   // Functions
   OP_CALL

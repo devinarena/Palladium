@@ -119,7 +119,7 @@ PdFunction* newFunction(ValueType returnType, PdString* name) {
   function->returnType = returnType;
   function->name = name;
   function->arity = 0;
-  INIT_DYNAMIC_ARRAY(ValueType, function->locals);
+  INIT_DYNAMIC_ARRAY(Value, function->locals);
   return function;
 }
 
@@ -128,7 +128,7 @@ PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity) {
   builtin->returnType = returnType;
   builtin->builtinRef = builtinRef;
   builtin->arity = arity;
-  INIT_DYNAMIC_ARRAY(ValueType, builtin->argt);
+  INIT_DYNAMIC_ARRAY(Value, builtin->argt);
   return builtin;
 }
 

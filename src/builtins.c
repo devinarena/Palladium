@@ -29,7 +29,7 @@ void initBuiltins(Table* globals) {
   tableSet(globals, copyString("clock", 5),
            FROM_OBJECT(newBuiltin(VALUE_INTEGER, &p_clock, 0)));
   PdBuiltin* bin = newBuiltin(VALUE_INTEGER, &p_square, 1);
-  INSERT_DYNAMIC_ARRAY(ValueType, bin->argt, VALUE_INTEGER);
+  INSERT_DYNAMIC_ARRAY(Value, bin->argt, FROM_INTEGER(0));
   tableSet(globals, copyString("p_square", 8), FROM_OBJECT(bin));
   tableSet(globals, copyString("PI", 2), PI);
 }

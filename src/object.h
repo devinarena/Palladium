@@ -24,6 +24,7 @@
 #define TO_BUILTIN(value) ((PdBuiltin*)value.data.object)
 #define TO_STRUCT_TEMPLATE(value) ((PdStructTemplate*)value.data.object)
 #define TO_STRUCT(value) ((PdStruct*)value.data.object)
+#define TO_REFERENCE(value) ((PdReference*)value.data.object)
 
 typedef Value (*NativeFn)(int argCount, Value* args);
 
@@ -52,7 +53,7 @@ typedef struct {
   Object object;
   Chunk chunk;
   uint8_t arity;
-  DYNAMIC_ARRAY(ValueType) locals;
+  DYNAMIC_ARRAY(Value) locals;
   ValueType returnType;
   PdString* name;
 } PdFunction;
@@ -60,7 +61,7 @@ typedef struct {
 typedef struct {
   Object object;
   uint8_t arity;
-  DYNAMIC_ARRAY(ValueType) argt;
+  DYNAMIC_ARRAY(Value) argt;
   NativeFn builtinRef;
   ValueType returnType;
 } PdBuiltin;

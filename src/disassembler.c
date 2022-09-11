@@ -40,8 +40,9 @@ static int simpleInstruction(const char* name, int offset) {
 }
 
 /**
- * @brief Helper for displaying a byte instruction, an instruction followed by a single byte.
- * 
+ * @brief Helper for displaying a byte instruction, an instruction followed by a
+ * single byte.
+ *
  * @param name const char* the name of the instruction
  * @param chunk Chunk* the chunk to disassemble
  * @param offset int the offset of the instruction
@@ -208,6 +209,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_STRUCT_GET", chunk, offset);
     case OP_STRUCT_SET:
       return constantInstruction("OP_STRUCT_SET", chunk, offset);
+    case OP_ASSIGN:
+      return simpleInstruction("OP_ASSIGN", offset);
+    case OP_NOP:
+      return simpleInstruction("OP_NOP", offset);
     // Function calls
     case OP_CALL:
       return byteInstruction("OP_CALL", chunk, offset);

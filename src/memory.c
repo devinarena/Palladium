@@ -52,13 +52,13 @@ void freeObject(Object* object) {
     case ObjectFunction: {
       PdFunction* func = (PdFunction*)object;
       freeChunk(&func->chunk);
-      FREE_DYNAMIC_ARRAY(ValueType, func->locals);
+      FREE_DYNAMIC_ARRAY(Value, func->locals);
       FREE(ObjectFunction, object);
       break;
     }
     case ObjectBuiltin: {
       PdBuiltin* func = (PdBuiltin*)object;
-      FREE_DYNAMIC_ARRAY(ValueType, func->argt);
+      FREE_DYNAMIC_ARRAY(Value, func->argt);
       FREE(ObjectBuiltin, object);
       break;
     }

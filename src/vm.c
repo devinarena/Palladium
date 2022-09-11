@@ -230,18 +230,21 @@ static InterpretResult run() {
       case OP_REFERENCE: {
         Value value = pop();
         PdReference* reference = newReference(value);
-        Value pointer = FROM_POINTER(&reference->value);
-        push(pointer);
+        push(FROM_OBJECT(reference));
         break;
       }
       case OP_DEREFERENCE: {
-        Value value = pop();
-        if (value.data.pointer == NULL) {
-          runtimeError("Dereferencing NULL pointer.");
-          exit(1);
+        Value ref = pop();
+        if (!IS_OBJECT(ref) || TO_OBJECT(ref)->type != ObjectReference) {
+          runtimeError("Can't dereference non-reference type.");
+          return INTERPRET_RUNTIME_ERROR;
         }
-        Value deref = *(Value*)value.data.pointer;
-        push(deref);
+        PdReference* reference = (PdReference*)TO_OBJECT(ref);
+        if (reference->value.type == VALUE_NULL) {
+          runtimeError("Can't dereference null reference.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        push(reference->value);
         break;
       }
       case OP_ARITHMETIC_CAST_INT_DOUBLE: {
@@ -390,6 +393,17 @@ static InterpretResult run() {
         traveled++;
         break;
       }
+      case OP_ASSIGN: {
+        Value value = pop();
+        Value reference = pop();
+        if (!IS_OBJECT(reference) || TO_OBJECT(reference)->type != ObjectReference) {
+          runtimeError("Can't assign to non-reference.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        PdReference* ref = TO_REFERENCE(reference);
+        ref->value = value;
+        break;
+      }
       case OP_PRINT: {
         Value value = pop();
         printValue(value);
@@ -427,7 +441,7 @@ static InterpretResult run() {
         }
       }
     }
-      // I like to see the stack after the operation happens
+      // see the stack after the operation happens
 #ifdef DEBUG_TRACE_EXEC
     disassembleInstruction(frame->chunk,
                            (int)(frame->ip - traveled - frame->chunk->code));

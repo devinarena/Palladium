@@ -64,8 +64,8 @@ static char* readFile(const char* path) {
  *
  * @param path const char* the path to the source file
  */
-static void runFile(const char* path) {
-  char* source = readFile(path);
+static void runFile(int argc, const char* argv[]) {
+  char* source = readFile(argv[1]);
 
   interpret(source);
 
@@ -73,10 +73,8 @@ static void runFile(const char* path) {
 }
 
 int main(int argc, const char* argv[]) {
-  if (argc == 1) {
-    // repl();
-  } else if (argc == 2) {
-    runFile(argv[1]);
+  if (argc >= 2) {
+    runFile(argc, argv);
   } else {
     fprintf(stderr, "Usage: palladium [script]\n");
     exit(64);
