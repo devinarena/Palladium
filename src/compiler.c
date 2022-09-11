@@ -664,7 +664,7 @@ static void dereference(bool canAssign) {
   if (current.pointerType == VALUE_OBJECT) {
     pushType(FROM_OBJECT(TO_OBJECT(current)));
   } else
-    pushType(FROM_POINTER(TO_POINTER(current)));
+    pushType((Value){.type = current.pointerType});
   emitByte(OP_DEREFERENCE);
 }
 
@@ -941,6 +941,7 @@ static void call(bool canAssign) {
       argCount++;
       if (argCount > 255) {
         parseError("Cannot have more than 255 arguments.");
+        return;
       }
     } while (match(TOKEN_COMMA));
   }
@@ -960,6 +961,7 @@ static void call(bool canAssign) {
         return;
       }
     }
+    pushType((Value){.type = fn->returnType});
   } else if (TO_OBJECT(fnV)->type == ObjectBuiltin) {
     PdBuiltin* builtin = TO_BUILTIN(fnV);
     if (builtin->arity != argCount) {
@@ -977,6 +979,7 @@ static void call(bool canAssign) {
         return;
       }
     }
+    pushType((Value){.type = builtin->returnType});
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
   emitBytes(OP_CALL, argCount);
@@ -1011,17 +1014,14 @@ static void dot(bool canAssign) {
       parseError("Type assignment mismatch.");
       return;
     }
-    tableSet(
-        &structTemplate->fieldTypes,
-        (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[name]),
-        type);
+    tableSet(&structTemplate->fieldTypes,
+             TO_STRING(compiler->current->chunk.constants.data[name]), type);
     emitBytes(OP_STRUCT_SET, name);
   } else {
     Value expected;
-    if (!tableGet(
-            &structTemplate->fieldTypes,
-            (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[name]),
-            &expected)) {
+    if (!tableGet(&structTemplate->fieldTypes,
+                  TO_STRING(compiler->current->chunk.constants.data[name]),
+                  &expected)) {
       parseError("Cannot access undeclared field.");
     }
     pushType(expected);
@@ -1378,7 +1378,7 @@ static void statement() {
         emitByte(OP_NULL_POINTER);                                            \
       }                                                                       \
       if (compiler->scopeDepth == 0) {                                        \
-        Value top = popType();                                                    \
+        Value top = popType();                                                \
         if (top.type != VALUE_POINTER) {                                      \
           parseError("Expected pointer type.");                               \
           return;                                                             \
@@ -1391,7 +1391,12 @@ static void statement() {
           return;                                                             \
         }                                                                     \
       } else {                                                                \
-        addLocal(name, (Value){.type = VALUE_POINTER});                       \
+        Value top = popType();                                                \
+        if (top.type != VALUE_POINTER) {                                      \
+          parseError("Expected pointer type.");                               \
+          return;                                                             \
+        }                                                                     \
+        addLocal(name, top);                                                  \
         op = OP_LOCAL_SET;                                                    \
       }                                                                       \
       consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");   \
