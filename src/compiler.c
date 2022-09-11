@@ -952,6 +952,8 @@ static void assignment(bool canAssign) {
     }
     tableSet(&parser.globals,
              TO_STRING(compiler->current->chunk.constants.data[arg]), type);
+    emitBytes(OP_GLOBAL_SET, arg);
+    emitByte(OP_POP);
   } else {
     Local local = compiler->locals.data[arg];
     expression();
@@ -961,7 +963,7 @@ static void assignment(bool canAssign) {
       return;
     }
     emitBytes(OP_LOCAL_SET, (uint8_t)arg);
-    emitByte(OP_POP);
+    emitBytes(OP_POP, OP_POP);
     local.depth = compiler->scopeDepth;
   }
 }

@@ -5,8 +5,8 @@ void increment(int* p) {
 
 int main() {
     int* p = &0;
+    print p~;
     increment(p);
-    print p;
     print p~;
 
     ret 0;
