@@ -279,6 +279,10 @@ static void swapTypes() {
   pushType(b);
 }
 
+static int numTypes() {
+  return (parser.typeStackTop - parser.typeStack.data);
+}
+
 /**
  * @brief Helper for emitting an opcode. Writes the opcode or extra data to the
  * current chunk.
@@ -720,6 +724,7 @@ static void dereference(bool canAssign) {
  * @param canAssign bool whether or not the expression can be assigned to
  */
 static void binary(bool canAssign) {
+  Token name = parser.last;
   TokenType operator= parser.previous.type;
   ParseRule* rule = getRule(operator);
 
@@ -754,6 +759,7 @@ static void binary(bool canAssign) {
         emitByte(OP_ADD_OBJECT);
       } else {
         parseError("Addition invalid for given values.");
+        return;
       }
       break;
     }
@@ -780,6 +786,7 @@ static void binary(bool canAssign) {
         emitBytes(OP_SWAP, OP_SUB_POINTER);
       } else {
         parseError("Subtraction invalid for given values.");
+        return;
       }
       break;
     }
@@ -795,6 +802,7 @@ static void binary(bool canAssign) {
         pushType((Value){.type = VALUE_BOOL});
       } else {
         parseError("Cannot compare values of different type.");
+        return;
       }
       break;
     }
@@ -804,7 +812,53 @@ static void binary(bool canAssign) {
         pushType((Value){.type = VALUE_BOOL});
       } else {
         parseError("Cannot compare values of different type.");
+        return;
       }
+      break;
+    }
+    case TOKEN_PLUS_EQUAL: {
+      if (before == VALUE_INTEGER && after == VALUE_INTEGER) {
+        emitByte(OP_ADD_INT);
+        pushType((Value){.type = VALUE_INTEGER});
+      } else if (before == VALUE_DOUBLE && after == VALUE_DOUBLE) {
+        emitByte(OP_ADD_DOUBLE);
+        pushType((Value){.type = VALUE_DOUBLE});
+      } else if (before == VALUE_INTEGER && after == VALUE_DOUBLE) {
+        emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
+        emitByte(OP_ADD_DOUBLE);
+        pushType((Value){.type = VALUE_DOUBLE});
+      } else if (before == VALUE_DOUBLE && after == VALUE_INTEGER) {
+        emitByte(OP_SWAP);
+        emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
+        emitByte(OP_SWAP);
+        emitByte(OP_ADD_DOUBLE);
+        pushType((Value){.type = VALUE_DOUBLE});
+      } else if (before == VALUE_POINTER && after == VALUE_INTEGER) {
+        emitByte(OP_ADD_POINTER);
+        pushType((Value){.type = VALUE_POINTER});
+      } else if (before == VALUE_INTEGER && after == VALUE_POINTER) {
+        emitBytes(OP_SWAP, OP_ADD_POINTER);
+        pushType((Value){.type = VALUE_POINTER});
+      } else if (before == VALUE_OBJECT && after == VALUE_OBJECT) {
+        emitByte(OP_ADD_OBJECT);
+      } else {
+        parseError("Addition invalid for given values.");
+        return;
+      }
+      int arg = resolveLocal(&name);
+      uint8_t op = OP_LOCAL_SET;
+      if (arg == -1) {
+        op = OP_GLOBAL_SET;
+        arg = identifierConstant(&name);
+        if (tableSet(&parser.globals,
+                     TO_STRING(compiler->current->chunk.constants.data[arg]),
+                     popType())) {
+          parseError("Can only append to declared variables.");
+          return;
+        }
+      }
+      emitBytes(op, arg);
+      // could 
       break;
     }
   }
@@ -981,7 +1035,7 @@ static void call(bool canAssign) {
     }
     pushType((Value){.type = builtin->returnType});
   }
-  consume(TOKEN_RIGHT_PAREN, "Expect ')' after arguments.");
+  consume(TOKEN_RIGHT_PAREN, "Expect ')' after a rguments.");
   emitBytes(OP_CALL, argCount);
 }
 
@@ -1057,7 +1111,7 @@ ParseRule rules[] = {
     [TOKEN_MINUS] = {unary, binary, PREC_TERM},
     [TOKEN_MINUS_EQUAL] = {NULL, binary, PREC_NONE},
     [TOKEN_PLUS] = {NULL, binary, PREC_TERM},
-    [TOKEN_PLUS_EQUAL] = {NULL, binary, PREC_NONE},
+    [TOKEN_PLUS_EQUAL] = {NULL, binary, PREC_ASSIGNMENT},
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {unary, binary, PREC_FACTOR},
     [TOKEN_TILDE] = {NULL, dereference, PREC_POSTFIX},
@@ -1132,6 +1186,10 @@ static void expression() {
  */
 static void printStatement() {
   expression();
+  if (numTypes() == 0) {
+    parseError("Cannot print an empty expression.");
+    return;
+  }
   popType();
   consume(TOKEN_SEMICOLON, "Expected ';' after print statement.");
   emitByte(OP_PRINT);

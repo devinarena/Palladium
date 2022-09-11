@@ -1,10 +1,5 @@
 
 
-int test() {
-    int* x = &50;
-    ret (x~);
+int main() {
+    
 }
-
-int* t = &test;
-
-print p_square((t~)());
