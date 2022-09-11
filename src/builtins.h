@@ -11,6 +11,7 @@
 
 #include "table.h"
 
-void initBuiltins(Table* globals);
+void initBuiltins(Table* globals, int argc, const char* argv[]);
+void fixSTLStructs();
 
 #endif

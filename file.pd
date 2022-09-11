@@ -1,20 +1,4 @@
 
-void test(int a, bool b, char c, double d) {
-    print a;
-    print b;
-    print c;
-    print d;
-}
-
-int main() {
-    test(1, true, 'a', 1.0);
-    
-    int* a = &0;
-    bool* b = &true;
-    char* c = &'a';
-    double* d = &1.0;
-    
-    ret 0; 
-}
-
-main();
+print stl;
+print stl.argc;
+print stl.pi;

@@ -1087,7 +1087,7 @@ static void call(bool canAssign) {
 static void dot(bool canAssign) {
   Value pstructv = popType();
   if (pstructv.type != VALUE_OBJECT ||
-      TO_OBJECT(pstructv)->type != ObjectStructTemplate) {
+      (TO_OBJECT(pstructv)->type != ObjectStructTemplate)) {
     parseError("Cannot assign to non-structure object.");
     return;
   }
@@ -1740,8 +1740,7 @@ static void declarationStructInstance() {
       uint8_t ctemplateIdx = addConstant(&compiler->current->chunk, pstructv);
       uint8_t index = parseVariable("Expected variable name.");
       if (tableGet(&parser.globals,
-                   (PdString*)TO_OBJECT(
-                       compiler->current->chunk.constants.data[index]),
+                   TO_STRING(compiler->current->chunk.constants.data[index]),
                    &pstructv)) {
         parseError("Global variable already defined.");
       }
@@ -1749,8 +1748,7 @@ static void declarationStructInstance() {
       if (compiler->scopeDepth == 0) {
         emitBytes(OP_GLOBAL_DEFINE, index);
         tableSet(&parser.globals,
-                 (PdString*)TO_OBJECT(
-                     compiler->current->chunk.constants.data[index]),
+                 TO_STRING(compiler->current->chunk.constants.data[index]),
                  FROM_OBJECT(pstruct));
       } else {
         addLocal(parser.previous, FROM_OBJECT(pstruct));
@@ -1818,6 +1816,10 @@ PdFunction* compile(const char* source) {
   INIT_DYNAMIC_ARRAY(ValueType, parser.typeStack);
   initTable(&parser.globals);
   tableAddAll(&vm.globals, &parser.globals);
+  Value stl;
+  // for type checking we only need the template
+  tableGet(&parser.globals, copyString("stl", 3), &stl);
+  tableSet(&parser.globals, copyString("stl", 3), FROM_OBJECT(TO_STRUCT(stl)->template));
 
   parser.hadError = false;
   parser.panicMode = false;

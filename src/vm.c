@@ -470,8 +470,8 @@ static InterpretResult run() {
  * @param source const char* The source code to interpret.
  * @return InterpretResult the result of the interpretation.
  */
-InterpretResult interpret(const char* source) {
-  initVM();
+InterpretResult interpret(const char* source, int argc, const char* argv[]) {
+  initVM(argc, argv);
 
   PdFunction* fun = compile(source);
 

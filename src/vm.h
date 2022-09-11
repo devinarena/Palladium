@@ -42,8 +42,8 @@ typedef enum {
   INTERPRET_RUNTIME_ERROR
 } InterpretResult;
 
-void initVM();
-InterpretResult interpret(const char* source);
+void initVM(int argc, const char* argv[]);
+InterpretResult interpret(const char* source, int argc, const char* argv[]);
 void push(Value value);
 Value pop();
 Value peek(int distance);
