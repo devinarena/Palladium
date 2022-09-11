@@ -172,7 +172,8 @@ static InterpretResult run() {
         }
         vm.stackTop = frame->slot - 1;
         frame = &vm.callStack[vm.callStackSize - 1];
-        push(result);
+        if (result.type != VALUE_NULL)
+          push(result);
         continue;
       }
       case OP_NULL: {
@@ -396,7 +397,8 @@ static InterpretResult run() {
       case OP_ASSIGN: {
         Value value = pop();
         Value reference = pop();
-        if (!IS_OBJECT(reference) || TO_OBJECT(reference)->type != ObjectReference) {
+        if (!IS_OBJECT(reference) ||
+            TO_OBJECT(reference)->type != ObjectReference) {
           runtimeError("Can't assign to non-reference.");
           return INTERPRET_RUNTIME_ERROR;
         }

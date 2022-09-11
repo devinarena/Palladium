@@ -932,7 +932,7 @@ static void assignment(bool canAssign) {
     if (!tableGet(&parser.globals,
                   TO_STRING(compiler->current->chunk.constants.data[arg]),
                   &expected)) {
-      Value top = peekType(0);
+      Value top = popType();
       if (top.type == VALUE_NULL) {
         parseError("Cannot assign to undeclared variable.");
         return;
@@ -1472,18 +1472,15 @@ static void statement() {
           pushType((Value){.type = VALUE_POINTER, .pointerType = VALUE_NULL}); \
         } else {                                                               \
           expression();                                                        \
-          if (peekType(0).type != VALUE_POINTER) {                             \
-            parseError("Initializer does not match declared type.");           \
-          }                                                                    \
         }                                                                      \
       } else {                                                                 \
         emitByte(OP_NULL_POINTER);                                             \
         pushType((Value){.type = VALUE_POINTER, .pointerType = VALUE_NULL});   \
       }                                                                        \
+      Value top = popType();                                                   \
       if (compiler->scopeDepth == 0) {                                         \
-        Value top = popType();                                                 \
         if (top.type != VALUE_POINTER) {                                       \
-          parseError("Expected pointer type.");                                \
+          parseError("Initializer does not match declared type.");             \
           return;                                                              \
         }                                                                      \
         if (!tableSet(                                                         \
@@ -1494,9 +1491,8 @@ static void statement() {
           return;                                                              \
         }                                                                      \
       } else {                                                                 \
-        Value top = popType();                                                 \
         if (top.type != VALUE_POINTER) {                                       \
-          parseError("Expected pointer type.");                                \
+          parseError("Initializer does not match declared type.");             \
           return;                                                              \
         }                                                                      \
         addLocal(name, top);                                                   \

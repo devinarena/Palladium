@@ -1,0 +1,15 @@
+
+void increment(int* p) {
+    (p~) = (p~) + 5;
+}
+
+int main() {
+    int* p = &0;
+    print p~;
+    increment(p);
+    print p~;
+
+    ret 0;
+}
+
+main();

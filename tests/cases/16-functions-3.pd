@@ -6,6 +6,13 @@ void test(int a, bool b, char c, double d) {
     print d;
 }
 
+void test_p(int* a, bool* b, char* c, double* d) {
+    (a~) = (a~) + 5;
+    (b~) = !(b~);
+    (c~) = 'f';
+    (d~) = 3.14;
+}
+
 int main() {
     test(1, true, 'a', 1.0);
     
@@ -13,6 +20,9 @@ int main() {
     bool* b = &true;
     char* c = &'a';
     double* d = &1.0;
+    
+    test_p(a, b, c, d);
+    test(a~, b~, c~, d~);
     
     ret 0; 
 }
