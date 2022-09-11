@@ -1,4 +1,5 @@
 
 print stl;
 print stl.argc;
+print stl.argv~;
 print stl.pi;

@@ -237,12 +237,16 @@ static InterpretResult run() {
       case OP_DEREFERENCE: {
         Value ref = pop();
         if (!IS_OBJECT(ref) || TO_OBJECT(ref)->type != ObjectReference) {
-          runtimeError("Can't dereference non-reference type.");
+          if (ref.type == VALUE_POINTER) {
+            push(*(Value*)ref.data.pointer);
+            break;
+          }
+          runtimeError("Cannot dereference non-reference type.");
           return INTERPRET_RUNTIME_ERROR;
         }
         PdReference* reference = (PdReference*)TO_OBJECT(ref);
         if (reference->value.type == VALUE_NULL) {
-          runtimeError("Can't dereference null reference.");
+          runtimeError("Cannot dereference null reference.");
           return INTERPRET_RUNTIME_ERROR;
         }
         push(reference->value);

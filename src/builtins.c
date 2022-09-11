@@ -25,7 +25,12 @@ static Value p_square(int argCount, Value* args) {
 
 static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   PdStructTemplate* template = newStructTemplate();
+  PdString pargv[argc];
+  for (int i = 0; i < argc; i++) {
+    pargv[i] = *copyString(argv[i], strlen(argv[i]));
+  }
   tableSet(&template->fieldTypes, copyString("argc", 4), FROM_INTEGER(argc));
+  tableSet(&template->fieldTypes, copyString("argv", 4), FROM_POINTER(&pargv));
   tableSet(&template->fieldTypes, copyString("pi", 2), FROM_DOUBLE(3.14159265358979323846));
   return newStruct(template);
 }
