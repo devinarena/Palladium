@@ -49,13 +49,13 @@ static void runtimeError(const char* format, ...) {
 /**
  * @brief Initializes the VM by zeroing out memory.
  */
-void initVM() {
+void initVM(int argc, const char* argv[]) {
   vm.heap = NULL;
   resetStack();
   initTable(&vm.strings);
   initTable(&vm.globals);
 
-  initBuiltins(&vm.globals);
+  initBuiltins(&vm.globals, argc, argv);
 }
 
 /**
