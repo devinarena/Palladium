@@ -1,4 +1,10 @@
 
 
+struct Test {
+
+}
+
+inst Test t;
+
 // just to make you mad
-stl.p_print("Hello World");
+stl.write(t);

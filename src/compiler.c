@@ -1058,12 +1058,35 @@ static void call(bool canAssign) {
       return;
     }
     for (int i = 0; i < argCount; i++) {
-      if (peekType(i).type != fn->locals.data[argCount - i - 1].type) {
+      Value provided = peekType(i);
+      Value expected = fn->locals.data[i];
+      if (provided.type != expected.type) {
         parseErrorf("Argument type mismatch.",
                     "Expected %s but received %s for argument %d.",
-                    getValueTypeName(fn->locals.data[argCount - i - 1].type),
-                    getValueTypeName(peekType(i).type), i);
+                    getValueTypeName(expected.type),
+                    getValueTypeName(provided.type), i);
         return;
+      }
+      if (provided.type == VALUE_POINTER && expected.type == VALUE_POINTER) {
+        if (provided.pointerType != expected.pointerType) {
+          parseErrorf(
+              "Argument type mismatch.",
+              "Expected %s pointer but received %s pointer for argument %d.",
+              getValueTypeName(expected.pointerType),
+              getValueTypeName(provided.pointerType), i);
+          return;
+        }
+      }
+      if (provided.type == VALUE_OBJECT && expected.type == VALUE_OBJECT) {
+        Object* provObj = TO_OBJECT(provided);
+        Object* expObj = TO_OBJECT(expected);
+        if (provObj->type != expObj->type) {
+          parseErrorf(
+              "Argument type mismatch.",
+              "Expected %d object but received %d object for argument %d.",
+              expObj->type, provObj->type, i);
+          return;
+        }
       }
     }
     pushType((Value){.type = fn->returnType});
@@ -1076,12 +1099,35 @@ static void call(bool canAssign) {
       return;
     }
     for (int i = 0; i < argCount; i++) {
-      if (peekType(i).type != builtin->argt.data[argCount - i - 1].type) {
+      Value provided = peekType(i);
+      Value expected = builtin->argt.data[i];
+      if (provided.type != expected.type) {
         parseErrorf("Argument type mismatch.",
                     "Expected %s but received %s for argument %d.",
-                    getValueTypeName(builtin->argt.data[argCount - i - 1].type),
-                    getValueTypeName(peekType(i).type), i);
+                    getValueTypeName(expected.type),
+                    getValueTypeName(provided.type), i);
         return;
+      }
+      if (provided.type == VALUE_POINTER && expected.type == VALUE_POINTER) {
+        if (provided.pointerType != expected.pointerType) {
+          parseErrorf(
+              "Argument type mismatch.",
+              "Expected %s pointer but received %s pointer for argument %d.",
+              getValueTypeName(expected.pointerType),
+              getValueTypeName(provided.pointerType), i);
+          return;
+        }
+      }
+      if (provided.type == VALUE_OBJECT && expected.type == VALUE_OBJECT) {
+        Object* provObj = TO_OBJECT(provided);
+        Object* expObj = TO_OBJECT(expected);
+        if (provObj->type != expObj->type) {
+          parseErrorf(
+              "Argument type mismatch.",
+              "Expected %d object but received %d object for argument %d.",
+              expObj->type, provObj->type, i);
+          return;
+        }
       }
     }
     pushType((Value){.type = builtin->returnType});
@@ -1830,7 +1876,8 @@ PdFunction* compile(const char* source) {
   Value stl;
   // for type checking we only need the template
   tableGet(&parser.globals, copyString("stl", 3), &stl);
-  tableSet(&parser.globals, copyString("stl", 3), FROM_OBJECT(TO_STRUCT(stl)->template));
+  tableSet(&parser.globals, copyString("stl", 3),
+           FROM_OBJECT(TO_STRUCT(stl)->template));
 
   parser.hadError = false;
   parser.panicMode = false;
