@@ -123,7 +123,7 @@ PdFunction* newFunction(ValueType returnType, PdString* name) {
   return function;
 }
 
-PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity) {
+PdBuiltin* newBuiltin(Value returnType, NativeFn builtinRef, int arity) {
   PdBuiltin* builtin = ALLOCATE_OBJ(PdBuiltin, ObjectBuiltin);
   builtin->returnType = returnType;
   builtin->builtinRef = builtinRef;
@@ -189,7 +189,7 @@ void printObject(Value value) {
     }
     case ObjectBuiltin: {
       PdBuiltin* fun = TO_BUILTIN(value);
-      switch (fun->returnType) {
+      switch (fun->returnType.type) {
         case VALUE_BOOL:
           printf("<builtin bool %p>", TO_BUILTIN(value)->builtinRef);
           break;

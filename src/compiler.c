@@ -1091,6 +1091,9 @@ static void call(bool canAssign) {
         }
       }
     }
+    for (int i = 0; i < argCount; i++) {
+      popType();
+    }
     pushType((Value){.type = fn->returnType});
   } else if (TO_OBJECT(fnV)->type == ObjectBuiltin) {
     PdBuiltin* builtin = TO_BUILTIN(fnV);
@@ -1134,7 +1137,10 @@ static void call(bool canAssign) {
         }
       }
     }
-    pushType((Value){.type = builtin->returnType});
+    for (int i = 0; i < argCount; i++) {
+      popType();
+    }
+    pushType(builtin->returnType);
   }
   consume(TOKEN_RIGHT_PAREN, "Expect ')' after a rguments.");
   emitBytes(OP_CALL, argCount);

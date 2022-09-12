@@ -1,2 +1,16 @@
 
-print stl.tostr(x);
+int main() {
+    if (stl.argc < 3) {
+        stl.write("Usage: pal file.pd [int] - Squares the number\n");
+        ret 1;
+    }
+
+    int num = p_atoi((stl.argv + 2)~);
+    int result = num * num;
+    stl.write("Your number squared is:");
+    stl.write(stl.tostr(result));
+
+    ret 0;
+}
+
+main();

@@ -63,7 +63,7 @@ typedef struct {
   uint8_t arity;
   DYNAMIC_ARRAY(Value) argt;
   NativeFn builtinRef;
-  ValueType returnType;
+  Value returnType;
 } PdBuiltin;
 
 typedef struct {
@@ -85,7 +85,7 @@ typedef struct {
 PdString* newString(char* chars, int length);
 PdString* copyString(const char* chars, int length);
 PdFunction* newFunction(ValueType returnType, PdString* name);
-PdBuiltin* newBuiltin(ValueType returnType, NativeFn builtinRef, int arity);
+PdBuiltin* newBuiltin(Value returnType, NativeFn builtinRef, int arity);
 PdStructTemplate* newStructTemplate();
 PdStruct* newStruct(PdStructTemplate* template);
 PdReference* newReference(Value value);

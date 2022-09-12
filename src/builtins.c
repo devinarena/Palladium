@@ -59,12 +59,12 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
            FROM_DOUBLE(2.718281828459));
 
   PdString* p_write_name = copyString("write", 5);
-  PdBuiltin* bin = newBuiltin(VALUE_NULL, &write, 1);
+  PdBuiltin* bin = newBuiltin(NULL_VAL, &write, 1);
   INSERT_DYNAMIC_ARRAY(Value, bin->argt, FROM_OBJECT(p_write_name));
   tableSet(&template->fieldTypes, p_write_name, FROM_OBJECT(bin));
 
   PdString* p_to_str = copyString("tostr", 5);
-  bin = newBuiltin(VALUE_OBJECT, &tostr, 1);
+  bin = newBuiltin(FROM_OBJECT(p_to_str), &tostr, 1);
   INSERT_DYNAMIC_ARRAY(Value, bin->argt, NULL_VAL);
   tableSet(&template->fieldTypes, p_to_str, FROM_OBJECT(bin));
   return newStruct(template);
@@ -74,14 +74,14 @@ void initBuiltins(Table* globals, int argc, const char* argv[]) {
   stl = createSTLStruct(argc, argv);
 
   tableSet(globals, copyString("clock", 5),
-           FROM_OBJECT(newBuiltin(VALUE_INTEGER, &p_clock, 0)));
+           FROM_OBJECT(newBuiltin(FROM_INTEGER(0), &p_clock, 0)));
 
-  PdBuiltin* bin_psquare = newBuiltin(VALUE_INTEGER, &p_square, 1);
+  PdBuiltin* bin_psquare = newBuiltin(FROM_INTEGER(0), &p_square, 1);
   INSERT_DYNAMIC_ARRAY(Value, bin_psquare->argt, FROM_INTEGER(0));
   tableSet(globals, copyString("p_square", 8), FROM_OBJECT(bin_psquare));
 
   PdString* pdstr_patoi = copyString("p_atoi", 6);
-  PdBuiltin* bin_patoi = newBuiltin(VALUE_INTEGER, &p_atoi, 1);
+  PdBuiltin* bin_patoi = newBuiltin(FROM_INTEGER(0), &p_atoi, 1);
   INSERT_DYNAMIC_ARRAY(Value, bin_patoi->argt, FROM_OBJECT(pdstr_patoi));
   tableSet(globals, pdstr_patoi, FROM_OBJECT(bin_patoi));
 

@@ -434,7 +434,7 @@ static InterpretResult run() {
         Object* funObj = TO_OBJECT(fun);
         if (funObj->type == ObjectBuiltin) {
           PdBuiltin* builtin = TO_BUILTIN(fun);
-          if (builtin->returnType == VALUE_NULL) {
+          if (builtin->returnType.type == VALUE_NULL) {
             builtin->builtinRef(argCount, vm.stackTop - argCount);
             vm.stackTop -= argCount + 1;
           } else {
