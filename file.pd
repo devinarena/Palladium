@@ -1,10 +1,12 @@
 
 
 struct Test {
-
+    str* s;
 }
 
 inst Test t;
 
-// just to make you mad
-stl.write(t);
+t.s = stl.argv;
+
+stl.write(t.s~);
+stl.write(stl.argv~);

@@ -48,7 +48,7 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   tableSet(&template->fieldTypes, copyString("argv", 4),
            (Value){.type = VALUE_POINTER,
                    .data.pointer = (struct Value*)pargv,
-                   .pointerType = VALUE_OBJECT});
+                   .pointerType = VALUE_POINTER});
   tableSet(&template->fieldTypes, copyString("pi", 2),
            FROM_DOUBLE(3.14159265358979323846));
   tableSet(&template->fieldTypes, copyString("E", 1),

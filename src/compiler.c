@@ -684,6 +684,8 @@ static void dereference(bool canAssign) {
   }
   if (current.pointerType == VALUE_OBJECT) {
     pushType(FROM_OBJECT(TO_OBJECT(current)));
+  } else if (current.pointerType == VALUE_POINTER) {
+    pushType(*(Value*)current.data.pointer);
   } else
     pushType((Value){.type = current.pointerType});
   emitByte(OP_DEREFERENCE);
@@ -1081,10 +1083,10 @@ static void call(bool canAssign) {
         Object* provObj = TO_OBJECT(provided);
         Object* expObj = TO_OBJECT(expected);
         if (provObj->type != expObj->type) {
-          parseErrorf(
-              "Argument type mismatch.",
-              "Expected %s but received %s for argument %d.",
-              getObjectTypeName(expObj->type), getObjectTypeName(provObj->type), i);
+          parseErrorf("Argument type mismatch.",
+                      "Expected %s but received %s for argument %d.",
+                      getObjectTypeName(expObj->type),
+                      getObjectTypeName(provObj->type), i);
           return;
         }
       }
@@ -1122,10 +1124,10 @@ static void call(bool canAssign) {
         Object* provObj = TO_OBJECT(provided);
         Object* expObj = TO_OBJECT(expected);
         if (provObj->type != expObj->type) {
-          parseErrorf(
-              "Argument type mismatch.",
-              "Expected %s but received %s for argument %d.",
-              getObjectTypeName(expObj->type), getObjectTypeName(provObj->type), i);
+          parseErrorf("Argument type mismatch.",
+                      "Expected %s but received %s for argument %d.",
+                      getObjectTypeName(expObj->type),
+                      getObjectTypeName(provObj->type), i);
           return;
         }
       }
