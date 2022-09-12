@@ -32,6 +32,12 @@ static Value p_atoi(int argCount, Value* args) {
   return FROM_INTEGER(atoi(str));
 }
 
+static Value p_print(int argCount, Value* args) {
+  printValue(args[0]);
+  printf("\n");
+  return NULL_VAL;
+}
+
 static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   PdStructTemplate* template = newStructTemplate();
   pargv = ALLOCATE(Value, argc);
@@ -45,6 +51,13 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
                    .pointerType = VALUE_OBJECT});
   tableSet(&template->fieldTypes, copyString("pi", 2),
            FROM_DOUBLE(3.14159265358979323846));
+  tableSet(&template->fieldTypes, copyString("E", 1),
+           FROM_DOUBLE(2.718281828459));
+
+  PdString* p_print_name = copyString("p_print", 7);
+  PdBuiltin* bin = newBuiltin(VALUE_NULL, &p_print, 1);
+  INSERT_DYNAMIC_ARRAY(Value, bin->argt, FROM_OBJECT(p_print_name));
+  tableSet(&template->fieldTypes, p_print_name, FROM_OBJECT(bin));
   return newStruct(template);
 }
 

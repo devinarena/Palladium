@@ -1,7 +1,4 @@
 
-print stl.pi;
-print stl.argc;
-print stl.argv~;
-print (stl.argv + 1)~;
 
-print p_atoi((stl.argv + 2)~);
+// just to make you mad
+stl.p_print("Hello World");
