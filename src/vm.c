@@ -287,6 +287,9 @@ static InterpretResult run() {
         ARITHMETIC_OPS_NUM(MUL, *)
         ARITHMETIC_OPS_NUM(DIV, /)
       case OP_ADD_POINTER: {
+        Value ptr = pop();
+        Value offset = pop();
+        push(FROM_POINTER((TO_POINTER(ptr) + TO_INTEGER(offset))));
         break;
       }
       case OP_SUB_POINTER: {
@@ -439,6 +442,7 @@ static InterpretResult run() {
             vm.stackTop -= argCount + 1;
             push(top);
           }
+          continue;
         } else {
           PdFunction* fn = TO_FUNCTION(fun);
           call(fn, argCount);
@@ -488,6 +492,7 @@ InterpretResult interpret(const char* source, int argc, const char* argv[]) {
   InterpretResult res = run();
 
   freeVM();
+  freeBuiltins(&vm.globals);
 
   return res;
 }

@@ -1,0 +1,5 @@
+
+print stl.pi;
+print stl.argc;
+print stl.argv~;
+print (stl.argv + 1)~;

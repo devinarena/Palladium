@@ -1,5 +1,7 @@
 
-print stl;
+print stl.pi;
 print stl.argc;
 print stl.argv~;
-print stl.pi;
+print (stl.argv + 1)~;
+
+print p_atoi((stl.argv + 2)~);

@@ -226,6 +226,12 @@ static void synchronize() {
       case TOKEN_WHILE:
       case TOKEN_PRINT:
       case TOKEN_RETURN:
+      case TOKEN_INT:
+      case TOKEN_DOUBLE:
+      case TOKEN_BOOL:
+      case TOKEN_STR:
+      case TOKEN_STRUCT:
+      case TOKEN_INST:
         return;
       default:
         break;
@@ -741,8 +747,11 @@ static void binary(bool canAssign) {
 
   parsePrecedence((Precedence)(rule->precedence + 1));
 
-  ValueType before = popType().type;
-  ValueType after = popType().type;
+  Value aft = popType();
+  Value bef = popType();
+
+  ValueType before = aft.type;
+  ValueType after = bef.type;
 
   switch (operator) {
     case TOKEN_PLUS: {
@@ -764,8 +773,10 @@ static void binary(bool canAssign) {
         pushType((Value){.type = VALUE_DOUBLE});
       } else if (before == VALUE_POINTER && after == VALUE_INTEGER) {
         emitByte(OP_ADD_POINTER);
+        pushType(bef);
       } else if (before == VALUE_INTEGER && after == VALUE_POINTER) {
         emitBytes(OP_SWAP, OP_ADD_POINTER);
+        pushType(bef);
       } else if (before == VALUE_OBJECT && after == VALUE_OBJECT) {
         emitByte(OP_ADD_OBJECT);
       } else {
