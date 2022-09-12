@@ -1103,6 +1103,8 @@ static void call(bool canAssign) {
     for (int i = 0; i < argCount; i++) {
       Value provided = peekType(i);
       Value expected = builtin->argt.data[i];
+      if (expected.type == VALUE_NULL)
+        continue;
       if (provided.type != expected.type) {
         parseErrorf("Argument type mismatch.",
                     "Expected %s but received %s for argument %d.",

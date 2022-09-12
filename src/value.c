@@ -8,6 +8,7 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 
 #include "object.h"
 #include "value.h"
@@ -49,8 +50,47 @@ void printValue(Value value) {
 }
 
 /**
+ * @brief toString method for values (builtin function asstr)
+ *
+ * @param value Value* the value to convert to a string
+ * @return PdString* the string representation of the value
+ */
+PdString* toString(Value* value) {
+  switch (value->type) {
+    case VALUE_NULL:
+      return copyString("null", 4);
+    case VALUE_INTEGER: {
+      int enough = ceil(log10(abs(value->data.integer))) + 1;
+      char* str = malloc(sizeof(char) * enough);
+      sprintf(str, "%d", value->data.integer);
+      return copyString(str, enough);
+    }
+    case VALUE_DOUBLE: {
+      int enough = ceil(log10(abs(value->data.double_))) + 1;
+      char* str = malloc(sizeof(char) * enough);
+      sprintf(str, "%f", value->data.double_);
+      return copyString(str, enough);
+    }
+    case VALUE_BOOL:
+      return copyString(value->data.boolean ? "true" : "false", 4);
+    case VALUE_CHARACTER: {
+      char* str = malloc(sizeof(char) * 2);
+      str[0] = value->data.character;
+      str[1] = '\0';
+      return copyString(str, 2);
+    }
+    case VALUE_POINTER:
+      return copyString("pointer", 7);
+    case VALUE_OBJECT:
+      return copyString("object", 6);
+    default:
+      return copyString("Unknown value type", 18);
+  }
+}
+
+/**
  * @brief Get the the name of a value type.
- * 
+ *
  * @param type the type of the value
  * @return const char* the name of the value type
  */

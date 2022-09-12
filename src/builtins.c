@@ -38,6 +38,10 @@ static Value write(int argCount, Value* args) {
   return NULL_VAL;
 }
 
+static Value tostr(int argCount, Value* args) {
+  return FROM_OBJECT(toString(&args[0]));
+}
+
 static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   PdStructTemplate* template = newStructTemplate();
   pargv = ALLOCATE(Value, argc);
@@ -58,6 +62,11 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   PdBuiltin* bin = newBuiltin(VALUE_NULL, &write, 1);
   INSERT_DYNAMIC_ARRAY(Value, bin->argt, FROM_OBJECT(p_write_name));
   tableSet(&template->fieldTypes, p_write_name, FROM_OBJECT(bin));
+
+  PdString* p_to_str = copyString("tostr", 5);
+  bin = newBuiltin(VALUE_OBJECT, &tostr, 1);
+  INSERT_DYNAMIC_ARRAY(Value, bin->argt, NULL_VAL);
+  tableSet(&template->fieldTypes, p_to_str, FROM_OBJECT(bin));
   return newStruct(template);
 }
 

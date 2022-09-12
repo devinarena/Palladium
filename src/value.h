@@ -71,6 +71,7 @@ typedef struct {
 void printValue(Value value);
 bool valuesEqual(Value a, Value b);
 const char* getValueTypeName(ValueType type);
+PdString* toString(Value* value);
 
 static inline bool isNumberValue(Value value) {
   return IS_INTEGER(value) || IS_DOUBLE(value);

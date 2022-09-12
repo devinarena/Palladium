@@ -224,25 +224,25 @@ void printObject(Value value) {
 
 /**
  * @brief Gets the name of an object based on its type.
- * 
+ *
  * @param type The type of the object.
  * @return const char* The name of the object.
  */
 const char* getObjectTypeName(ObjectType type) {
   switch (type) {
     case ObjectString:
-      return "String";
+      return "string";
     case ObjectFunction:
-      return "Function";
+      return "function";
     case ObjectBuiltin:
-      return "Builtin";
+      return "builtin";
     case ObjectStructTemplate:
-      return "Struct Template";
+      return "struct template";
     case ObjectStruct:
-      return "Struct";
+      return "struct";
     case ObjectReference:
-      return "Reference";
+      return "reference";
     default:
-      return "Unknown";
+      return "unknown";
   }
 }
