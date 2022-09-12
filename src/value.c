@@ -48,7 +48,13 @@ void printValue(Value value) {
   }
 }
 
-char* getValueTypeName(ValueType type) {
+/**
+ * @brief Get the the name of a value type.
+ * 
+ * @param type the type of the value
+ * @return const char* the name of the value type
+ */
+const char* getValueTypeName(ValueType type) {
   switch (type) {
     case VALUE_NULL:
       return "null";

@@ -1083,8 +1083,8 @@ static void call(bool canAssign) {
         if (provObj->type != expObj->type) {
           parseErrorf(
               "Argument type mismatch.",
-              "Expected %d object but received %d object for argument %d.",
-              expObj->type, provObj->type, i);
+              "Expected %s but received %s for argument %d.",
+              getObjectTypeName(expObj->type), getObjectTypeName(provObj->type), i);
           return;
         }
       }
@@ -1124,8 +1124,8 @@ static void call(bool canAssign) {
         if (provObj->type != expObj->type) {
           parseErrorf(
               "Argument type mismatch.",
-              "Expected %d object but received %d object for argument %d.",
-              expObj->type, provObj->type, i);
+              "Expected %s but received %s for argument %d.",
+              getObjectTypeName(expObj->type), getObjectTypeName(provObj->type), i);
           return;
         }
       }

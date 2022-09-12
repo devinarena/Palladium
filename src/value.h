@@ -70,7 +70,7 @@ typedef struct {
 
 void printValue(Value value);
 bool valuesEqual(Value a, Value b);
-char* getValueTypeName(ValueType type);
+const char* getValueTypeName(ValueType type);
 
 static inline bool isNumberValue(Value value) {
   return IS_INTEGER(value) || IS_DOUBLE(value);

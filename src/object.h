@@ -90,5 +90,6 @@ PdStructTemplate* newStructTemplate();
 PdStruct* newStruct(PdStructTemplate* template);
 PdReference* newReference(Value value);
 void printObject(Value value);
+const char* getObjectTypeName(ObjectType type);
 
 #endif
