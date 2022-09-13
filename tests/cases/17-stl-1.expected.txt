@@ -1,4 +1,4 @@
 3.141593
 2
-..\palladium.exe
+..\bin\palladium.exe
 cases\17-stl-1.pd

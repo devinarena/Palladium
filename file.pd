@@ -1,7 +1,7 @@
 
 int main() {
     if (stl.argc < 3) {
-        stl.write("Usage: pal file.pd [int] - Squares the number\n");
+        stl.write("Usage: pal file.pd [int] - Squares the number");
         ret 1;
     }
 

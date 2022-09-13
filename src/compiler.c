@@ -1061,7 +1061,7 @@ static void call(bool canAssign) {
     }
     for (int i = 0; i < argCount; i++) {
       Value provided = peekType(i);
-      Value expected = fn->locals.data[i];
+      Value expected = fn->locals.data[argCount - i - 1];
       if (provided.type != expected.type) {
         parseErrorf("Argument type mismatch.",
                     "Expected %s but received %s for argument %d.",
@@ -1105,7 +1105,7 @@ static void call(bool canAssign) {
     }
     for (int i = 0; i < argCount; i++) {
       Value provided = peekType(i);
-      Value expected = builtin->argt.data[i];
+      Value expected = builtin->argt.data[argCount - i - 1];
       if (expected.type == VALUE_NULL)
         continue;
       if (provided.type != expected.type) {
