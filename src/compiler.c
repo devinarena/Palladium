@@ -1343,13 +1343,23 @@ static void function(ValueType returnType, FunctionType type, uint8_t index) {
       Token typeToken = parser.previous;
       if (typeToken.type != TOKEN_INT && typeToken.type != TOKEN_DOUBLE &&
           typeToken.type != TOKEN_BOOL && typeToken.type != TOKEN_CHAR &&
-          typeToken.type != TOKEN_IDENTIFIER) {
+          typeToken.type != TOKEN_STR && typeToken.type != TOKEN_IDENTIFIER) {
         parseError("Expected type for argument.");
+        return;
+      }
+      Object obj;
+      if (typeToken.type == TOKEN_STR) {
+        obj.type = ObjectString;
+      } else if (typeToken.type == TOKEN_IDENTIFIER) {
+        obj.type = ObjectStruct;
       }
       compiler->current->arity++;
-      Value type = (Value){.type = getValueTypeOfKeyword(typeToken.type)};
+      Value type = (Value){.data.object = &obj,
+                           .type = getValueTypeOfKeyword(typeToken.type)};
       if (match(TOKEN_STAR)) {
-        type = (Value){.type = VALUE_POINTER, .pointerType = type.type};
+        type = (Value){.type = VALUE_POINTER,
+                       .data.object = &obj,
+                       .pointerType = type.type};
       }
       Token name = parser.current;
       parseVariable("Expected variable name.");
@@ -1401,7 +1411,8 @@ static void ifStatement() {
 }
 
 /**
- * @brief Descent case for expression statements (expressions terminated with a
+ * @brief Descent case for expression statements (expressions terminated with
+ * a
  * ';')
  */
 static void expressionStatement() {
@@ -1620,8 +1631,8 @@ static void statement() {
 DECLARATION(Integer, VALUE_INTEGER)
 
 /**
- * @brief Descent case for double declaration, double followed by an identifier
- * and initializer.
+ * @brief Descent case for double declaration, double followed by an
+ * identifier and initializer.
  */
 DECLARATION(Double, VALUE_DOUBLE);
 
@@ -1632,14 +1643,14 @@ DECLARATION(Double, VALUE_DOUBLE);
 DECLARATION(Boolean, VALUE_BOOL);
 
 /**
- * @brief Descent case for character declaration, char followed by an identifier
- * and initializer.
+ * @brief Descent case for character declaration, char followed by an
+ * identifier and initializer.
  */
 DECLARATION(Character, VALUE_CHARACTER);
 
 /**
- * @brief Descent case for string declaration, string followed by an identifier
- * and initializer.
+ * @brief Descent case for string declaration, string followed by an
+ * identifier and initializer.
  */
 DECLARATION(String, VALUE_OBJECT);
 

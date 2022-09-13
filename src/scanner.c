@@ -420,6 +420,7 @@ ValueType keywordTypes[] = {[TOKEN_INT] = VALUE_INTEGER,
                             [TOKEN_DOUBLE] = VALUE_DOUBLE,
                             [TOKEN_BOOL] = VALUE_BOOL,
                             [TOKEN_CHAR] = VALUE_CHARACTER,
+                            [TOKEN_STR] = VALUE_OBJECT,
                             [TOKEN_IDENTIFIER] = VALUE_OBJECT};
 
 /**
