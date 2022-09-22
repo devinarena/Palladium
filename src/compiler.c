@@ -1516,6 +1516,18 @@ static void returnStatement() {
 }
 
 /**
+ * @brief Descent case for import statements, emits opcodes for loading the
+ * module.
+ */
+static void importStatement() {
+  consume(TOKEN_STRING, "Expected import path after import keyword.");
+  PdString* path = copyString(parser.previous.start, parser.previous.length);
+  Value value = FROM_OBJECT(path);
+  uint8_t reference = addConstant(&compiler->current->chunk, value);
+  emitBytes(OP_IMPORT, reference);
+}
+
+/**
  * @brief Descent case for parsing statements, e.g. print, if, while, etc.
  */
 static void statement() {
@@ -1529,6 +1541,8 @@ static void statement() {
     forStatement();
   } else if (match(TOKEN_RETURN)) {
     returnStatement();
+  } else if (match(TOKEN_IMP)) {
+    importStatement();
   } else if (match(TOKEN_LEFT_BRACE)) {
     pushScope();
     block();

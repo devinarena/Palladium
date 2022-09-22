@@ -450,6 +450,11 @@ static InterpretResult run() {
           continue;
         }
       }
+      case OP_IMPORT: {
+        PdString* name = READ_STRING();
+        traveled++;
+        break;
+      }
     }
       // see the stack after the operation happens
 #ifdef DEBUG_TRACE_EXEC

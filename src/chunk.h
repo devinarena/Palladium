@@ -90,7 +90,8 @@ typedef enum {
   OP_ASSIGN,
   OP_PRINT,
   // Functions
-  OP_CALL
+  OP_CALL,
+  OP_IMPORT
 } OpCode;
 
 #endif

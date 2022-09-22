@@ -1,4 +1,2 @@
 
-imp 'external.pd' as ext
-
-ext.test();
+imp "external.pd"

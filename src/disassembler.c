@@ -216,6 +216,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     // Function calls
     case OP_CALL:
       return byteInstruction("OP_CALL", chunk, offset);
+    case OP_IMPORT:
+      return constantInstruction("OP_IMPORT", chunk, offset);
     default:
       printf("Unknown opcode encountered: %d", instruction);
       exit(1);

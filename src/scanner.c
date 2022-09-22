@@ -227,6 +227,8 @@ static TokenType identifierType() {
         switch (scanner.start[1]) {
           case 'f':
             return checkKeyword(1, 1, "f", TOKEN_IF);
+          case 'm':
+            return checkKeyword(1, 2, "mp", TOKEN_IMP);
           case 'n':
             if (scanner.current - scanner.start > 2) {
               switch (scanner.start[2]) {
@@ -416,12 +418,10 @@ Token scanToken() {
 /**
  * @brief Lookup table for keywords to get their required valueType.
  */
-ValueType keywordTypes[] = {[TOKEN_INT] = VALUE_INTEGER,
-                            [TOKEN_DOUBLE] = VALUE_DOUBLE,
-                            [TOKEN_BOOL] = VALUE_BOOL,
-                            [TOKEN_CHAR] = VALUE_CHARACTER,
-                            [TOKEN_STR] = VALUE_OBJECT,
-                            [TOKEN_IDENTIFIER] = VALUE_OBJECT};
+ValueType keywordTypes[] = {
+    [TOKEN_INT] = VALUE_INTEGER, [TOKEN_DOUBLE] = VALUE_DOUBLE,
+    [TOKEN_BOOL] = VALUE_BOOL,   [TOKEN_CHAR] = VALUE_CHARACTER,
+    [TOKEN_STR] = VALUE_OBJECT,  [TOKEN_IDENTIFIER] = VALUE_OBJECT};
 
 /**
  * @brief Helper to lookup the valueType of a keyword.
