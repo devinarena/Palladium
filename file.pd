@@ -1,6 +1,4 @@
 
-void test(str* b) {
-    stl.write(b~);
-}
+imp 'external.pd' as ext
 
-test(&"hello");
+ext.test();
