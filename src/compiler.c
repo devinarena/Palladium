@@ -16,6 +16,7 @@
 #include "scanner.h"
 #include "table.h"
 #include "vm.h"
+#include "memory.h"
 #ifdef DEBUG_PRINT_OPCODES
 #include "disassembler.h"
 #endif
@@ -1524,6 +1525,7 @@ static void importStatement() {
   PdString* path = copyString(parser.previous.start, parser.previous.length);
   Value value = FROM_OBJECT(path);
   uint8_t reference = addConstant(&compiler->current->chunk, value);
+  PdFunction* script = compile()
   emitBytes(OP_IMPORT, reference);
 }
 
