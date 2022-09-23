@@ -2,10 +2,10 @@
 nspace Test {
     int x = 0;
 
-    void printZero() {
-        print 0;
+    int getX() {
+        ret Test.x;
     }
 }
 
-Test.printZero~();
-stl.write~(stl.tostr~(x));
+print stl.tostr;
+print stl.tostr~(Test.x);

@@ -8,5 +8,5 @@ inst Test t;
 
 t.s = stl.argv;
 
-stl.write(t.s~);
-stl.write(stl.argv~);
+stl.write~(t.s~);
+stl.write~(stl.argv~);

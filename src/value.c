@@ -60,9 +60,9 @@ PdString* toString(Value* value) {
     case VALUE_NULL:
       return copyString("null", 4);
     case VALUE_INTEGER: {
-      int enough = ceil(log10(abs(value->data.integer))) + 1;
+      int enough = ceil(log10(abs(value->data.integer))) + 12;
       char* str = malloc(sizeof(char) * enough);
-      sprintf(str, "%d", value->data.integer);
+      sprintf(str, "%d", TO_INTEGER((*value)));
       return copyString(str, enough);
     }
     case VALUE_DOUBLE: {

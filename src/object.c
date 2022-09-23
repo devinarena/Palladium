@@ -212,6 +212,9 @@ void printObject(Value value) {
         case VALUE_NULL:
           printf("<builtin void %p>", TO_BUILTIN(value)->builtinRef);
           break;
+        case VALUE_OBJECT:
+          printf("<builtin object %p>", TO_BUILTIN(value)->builtinRef);
+          break;
       }
       break;
     }
