@@ -25,6 +25,7 @@
 #define TO_STRUCT_TEMPLATE(value) ((PdStructTemplate*)value.data.object)
 #define TO_STRUCT(value) ((PdStruct*)value.data.object)
 #define TO_REFERENCE(value) ((PdReference*)value.data.object)
+#define TO_MODULE(value) ((PdModule*)value.data.object)
 
 typedef Value (*NativeFn)(int argCount, Value* args);
 
@@ -34,7 +35,8 @@ typedef enum {
   ObjectBuiltin,
   ObjectStructTemplate,
   ObjectStruct,
-  ObjectReference
+  ObjectReference,
+  ObjectModule
 } ObjectType;
 
 struct Object {
@@ -82,6 +84,12 @@ typedef struct {
   Value value;
 } PdReference;
 
+typedef struct {
+  Object object;
+  Table globals;
+  uint8_t nameIndex;
+} PdModule;
+
 PdString* newString(char* chars, int length);
 PdString* copyString(const char* chars, int length);
 PdFunction* newFunction(ValueType returnType, PdString* name);
@@ -89,6 +97,7 @@ PdBuiltin* newBuiltin(Value returnType, NativeFn builtinRef, int arity);
 PdStructTemplate* newStructTemplate();
 PdStruct* newStruct(PdStructTemplate* template);
 PdReference* newReference(Value value);
+PdModule* newModule();
 void printObject(Value value);
 const char* getObjectTypeName(ObjectType type);
 

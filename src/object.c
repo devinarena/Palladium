@@ -153,6 +153,13 @@ PdReference* newReference(Value value) {
   return reference;
 }
 
+PdModule* newModule() {
+  PdModule* module = ALLOCATE_OBJ(PdModule, ObjectModule);
+  initTable(&module->globals);
+  module->nameIndex = 0;
+  return module;
+}
+
 /**
  * @brief Outputs an object to standard output.
  *
@@ -216,6 +223,10 @@ void printObject(Value value) {
       printf("<struct %p>", TO_STRUCT(value));
       break;
     }
+    case ObjectModule: {
+      printf("<module %p>", TO_MODULE(value));
+      break;
+    }
     default:
       printf("%p", TO_OBJECT(value));
       break;
@@ -242,6 +253,8 @@ const char* getObjectTypeName(ObjectType type) {
       return "struct";
     case ObjectReference:
       return "reference";
+    case ObjectModule:
+      return "module";
     default:
       return "unknown";
   }

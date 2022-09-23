@@ -6,8 +6,8 @@
  **/
 
 #include <stdio.h>
-#include <string.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "scanner.h"
 
@@ -33,14 +33,14 @@ void initScanner(const char* source) {
 
 /**
  * @brief Inserts source code before the current source (for importing modules).
- * 
+ *
  * @param source the new source to insert
  */
 void insertSource(const char* source) {
   // copy contents of source before current
   int sourceLength = strlen(source);
   int startLength = strlen(scanner.start);
-  char* newSource = malloc(sourceLength + startLength + 1);
+  char* newSource = malloc(sourceLength + startLength + 2);
   memcpy(newSource, source, sourceLength);
   newSource[sourceLength] = '\n';
   memcpy(newSource + sourceLength + 1, scanner.start, startLength);
@@ -268,7 +268,16 @@ static TokenType identifierType() {
       }
       return TOKEN_IDENTIFIER;
     case 'n':
-      return checkKeyword(1, 3, "ull", TOKEN_NULL);
+      if (scanner.current - scanner.start > 1) {
+        switch (scanner.start[1]) {
+          case 'u':
+            return checkKeyword(2, 2, "ll", TOKEN_NULL);
+          case 's':
+            return checkKeyword(2, 4, "pace", TOKEN_NSPACE);
+        }
+        return TOKEN_IDENTIFIER;
+      } else
+        return TOKEN_IDENTIFIER;
     case 'p':
       return checkKeyword(1, 4, "rint", TOKEN_PRINT);
     case 'r':

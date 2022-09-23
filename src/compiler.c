@@ -13,10 +13,10 @@
 
 #include "compiler.h"
 #include "dynamic_array.h"
+#include "memory.h"
 #include "scanner.h"
 #include "table.h"
 #include "vm.h"
-#include "memory.h"
 #ifdef DEBUG_PRINT_OPCODES
 #include "disassembler.h"
 #endif
@@ -35,6 +35,7 @@ typedef struct {
   DYNAMIC_ARRAY(Value) typeStack;
   Value* typeStackTop;
   Table globals;
+  PdModule* namespace;
 } Parser;
 
 typedef struct {
@@ -679,11 +680,15 @@ static void unary(bool canAssign) {
  */
 static void dereference(bool canAssign) {
   Value current = popType();
-  if (current.type != VALUE_POINTER) {
+  if (current.type != VALUE_POINTER &&
+      (current.type != VALUE_OBJECT ||
+       TO_OBJECT(current)->type != ObjectReference)) {
     parseError("Cannot dereference non-pointer value.");
     return;
   }
-  if (current.pointerType == VALUE_OBJECT) {
+  if (current.type == VALUE_OBJECT) {
+    pushType(TO_REFERENCE(current)->value);
+  } else if (current.pointerType == VALUE_OBJECT) {
     pushType(FROM_OBJECT(TO_OBJECT(current)));
   } else if (current.pointerType == VALUE_POINTER) {
     pushType(*(Value*)current.data.pointer);
@@ -1153,41 +1158,73 @@ static void call(bool canAssign) {
  * @param canAssign bool whether or not the expression can be assigned to
  */
 static void dot(bool canAssign) {
-  Value pstructv = popType();
-  if (pstructv.type != VALUE_OBJECT ||
-      (TO_OBJECT(pstructv)->type != ObjectStructTemplate)) {
-    parseError("Cannot assign to non-structure object.");
+  Value namespace = popType();
+  if (namespace.type != VALUE_OBJECT) {
+    parseError("Cannot assign to given object.");
     return;
   }
-  PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(pstructv);
-  uint8_t name = parseVariable("Expect identifier after '.'.");
-  if (canAssign && match(TOKEN_EQUAL)) {
-    expression();
-    Value expected;
-    if (!tableGet(
-            &structTemplate->fieldTypes,
-            (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[name]),
-            &expected)) {
-      parseError("Cannot assign to undeclared field.");
-      return;
+  Object* obj = TO_OBJECT(namespace);
+  if (obj->type == ObjectStruct) {
+    PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(namespace);
+    uint8_t name = parseVariable("Expect identifier after '.'.");
+    if (canAssign && match(TOKEN_EQUAL)) {
+      expression();
+      Value expected;
+      if (!tableGet(&structTemplate->fieldTypes,
+                    (PdString*)TO_OBJECT(
+                        compiler->current->chunk.constants.data[name]),
+                    &expected)) {
+        parseError("Cannot assign to undeclared field.");
+        return;
+      }
+      Value type = popType();
+      if (type.type != expected.type) {
+        parseError("Type assignment mismatch.");
+        return;
+      }
+      tableSet(&structTemplate->fieldTypes,
+               TO_STRING(compiler->current->chunk.constants.data[name]), type);
+      emitBytes(OP_STRUCT_SET, name);
+    } else {
+      Value expected;
+      if (!tableGet(&structTemplate->fieldTypes,
+                    TO_STRING(compiler->current->chunk.constants.data[name]),
+                    &expected)) {
+        parseError("Cannot access undeclared field.");
+      }
+      pushType(expected);
+      emitBytes(OP_STRUCT_GET, name);
     }
-    Value type = popType();
-    if (type.type != expected.type) {
-      parseError("Type assignment mismatch.");
-      return;
+  } else if (obj->type == ObjectModule) {
+    PdModule* module = TO_MODULE(namespace);
+    uint8_t name = parseVariable("Expect identifier after '.'.");
+    if (canAssign && match(TOKEN_EQUAL)) {
+      expression();
+      Value expected;
+      if (!tableGet(&module->globals,
+                    TO_STRING(compiler->current->chunk.constants.data[name]),
+                    &expected)) {
+        parseError("Cannot assign to undeclared field.");
+        return;
+      }
+      Value type = popType();
+      if (type.type != expected.type) {
+        parseError("Type assignment mismatch.");
+        return;
+      }
+      tableSet(&module->globals,
+               TO_STRING(compiler->current->chunk.constants.data[name]), type);
+      emitBytes(OP_MODULE_SET, name);
+    } else {
+      Value expected;
+      if (!tableGet(&module->globals,
+                    TO_STRING(compiler->current->chunk.constants.data[name]),
+                    &expected)) {
+        parseError("Cannot access undeclared field.");
+      }
+      pushType(expected);
+      emitBytes(OP_MODULE_GET, name);
     }
-    tableSet(&structTemplate->fieldTypes,
-             TO_STRING(compiler->current->chunk.constants.data[name]), type);
-    emitBytes(OP_STRUCT_SET, name);
-  } else {
-    Value expected;
-    if (!tableGet(&structTemplate->fieldTypes,
-                  TO_STRING(compiler->current->chunk.constants.data[name]),
-                  &expected)) {
-      parseError("Cannot access undeclared field.");
-    }
-    pushType(expected);
-    emitBytes(OP_STRUCT_GET, name);
   }
 }
 
@@ -1327,10 +1364,11 @@ static void block() {
 static void function(ValueType returnType, FunctionType type, uint8_t index) {
   pushScope();
 
+  PdString* name = TO_STRING(compiler->current->chunk.constants.data[index]);
+
   Compiler newCompiler;
   initCompiler(&newCompiler, type);
-  newCompiler.current = newFunction(
-      returnType, TO_STRING(compiler->current->chunk.constants.data[index]));
+  newCompiler.current = newFunction(returnType, name);
   newCompiler.scopeDepth = compiler->scopeDepth;
   compiler = &newCompiler;
 
@@ -1375,10 +1413,21 @@ static void function(ValueType returnType, FunctionType type, uint8_t index) {
 
   PdFunction* fn = endCompiler();
   Value rValue = FROM_OBJECT(fn);
-  uint8_t reference = addConstant(&compiler->current->chunk, rValue);
-  emitBytes(OP_CONSTANT_POINTER, reference);
-  emitBytes(OP_GLOBAL_DEFINE, index);
-  tableSet(&parser.globals, fn->name, rValue);
+  if (parser.namespace != NULL) {
+    PdReference* ref = newReference(rValue);
+    if (!tableSet(&parser.namespace->globals, name, FROM_OBJECT(ref))) {
+      parseError("Cannot redefine function in module.");
+      return;
+    }
+  } else {
+    uint8_t reference = addConstant(&compiler->current->chunk, rValue);
+    emitBytes(OP_CONSTANT_POINTER, reference);
+    emitBytes(OP_GLOBAL_DEFINE, index);
+  }
+
+  if (!tableSet(&parser.globals, fn->name, rValue)) {
+    parseError("Cannot redefine global variable.");
+  }
 
   popScope();
 }
@@ -1517,13 +1566,15 @@ static void returnStatement() {
 }
 
 /**
- * @brief Descent case for import statements, emits opcodes for loading the
- * module.
+ * @brief Descent case for import statements, inserts the source code of the
+ * imported file into the current file.
  */
 static void importStatement() {
   consume(TOKEN_STRING, "Expected import path after import keyword.");
-  PdString* path = copyString(parser.previous.start + 1, parser.previous.length - 2);
+  PdString* path =
+      copyString(parser.previous.start + 1, parser.previous.length - 2);
   consume(TOKEN_SEMICOLON, "Expected ';' after import statement.");
+  // create a struct to hold newly imported code functions and variables
   insertSource(readFile(path->chars));
   advance();
 }
@@ -1861,6 +1912,36 @@ static void declarationStructInstance() {
 }
 
 /**
+ * @brief Descent case for a namespace declaration.
+ */
+static void declarationNamespace() {
+  uint8_t index = parseVariable("Expected namespace name.");
+  consume(TOKEN_LEFT_BRACE, "Expected '{' before namespace body.");
+  if (parser.namespace != NULL) {
+    parseError("Cannot nest namespaces.");
+    return;
+  }
+  if (compiler->scopeDepth != 0) {
+    parseError("Cannot declare a namespace inside a function.");
+    return;
+  }
+  PdModule* module = newModule();
+  module->nameIndex = index;
+  if (!tableSet(&parser.globals,
+                TO_STRING(compiler->current->chunk.constants.data[index]),
+                FROM_OBJECT(module))) {
+    parseError("Namespace already defined.");
+    return;
+  }
+  uint8_t modIndex = addConstant(&compiler->current->chunk, FROM_OBJECT(module));
+  parser.namespace = module;
+  block();
+  emitBytes(OP_CONSTANT_POINTER, modIndex);
+  emitBytes(OP_GLOBAL_DEFINE, index);
+  parser.namespace = NULL;
+}
+
+/**
  * @brief Descent case for parsing declarations, e.g. var, function, etc.
  */
 static void declaration() {
@@ -1880,6 +1961,8 @@ static void declaration() {
     declarationStructInstance();
   } else if (match(TOKEN_VOID)) {
     declarationVoid();
+  } else if (match(TOKEN_NSPACE)) {
+    declarationNamespace();
   } else {
     statement();
   }

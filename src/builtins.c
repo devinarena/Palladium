@@ -61,12 +61,14 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   PdString* p_write_name = copyString("write", 5);
   PdBuiltin* bin = newBuiltin(NULL_VAL, &write, 1);
   INSERT_DYNAMIC_ARRAY(Value, bin->argt, FROM_OBJECT(p_write_name));
-  tableSet(&template->fieldTypes, p_write_name, FROM_OBJECT(bin));
+  PdReference* ref = newReference(FROM_OBJECT(bin));
+  tableSet(&template->fieldTypes, p_write_name, FROM_OBJECT(ref));
 
   PdString* p_to_str = copyString("tostr", 5);
   bin = newBuiltin(FROM_OBJECT(p_to_str), &tostr, 1);
   INSERT_DYNAMIC_ARRAY(Value, bin->argt, NULL_VAL);
-  tableSet(&template->fieldTypes, p_to_str, FROM_OBJECT(bin));
+  ref = newReference(FROM_OBJECT(bin));
+  tableSet(&template->fieldTypes, p_to_str, FROM_OBJECT(ref));
   return newStruct(template);
 }
 

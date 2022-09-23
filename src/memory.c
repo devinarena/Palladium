@@ -79,6 +79,12 @@ void freeObject(Object* object) {
       FREE(ObjectReference, object);
       break;
     }
+    case ObjectModule: {
+      PdModule* module = (PdModule*)object;
+      freeTable(&module->globals);
+      FREE(ObjectModule, object);
+      break;
+    }
   }
 }
 

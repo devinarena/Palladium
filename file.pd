@@ -1,4 +1,9 @@
 
-imp "external.pd";
+nspace Test {
+    void printZero() {
+        print 0;
+    }
+}
 
-test();
+Test.printZero~();
+printZero();

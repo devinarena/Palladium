@@ -1,4 +1,11 @@
 
-void test() {
+void _external_test() {
     print "Hello, world!";
 }
+
+struct external_template {
+    void* test;
+}
+
+inst external_template external;
+external.test = &_external_test;

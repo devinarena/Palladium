@@ -58,6 +58,7 @@ typedef enum {
   TOKEN_IMP,
   TOKEN_INST,
   TOKEN_INT,
+  TOKEN_NSPACE,
   TOKEN_NULL,
   TOKEN_OR,
   TOKEN_PRINT,

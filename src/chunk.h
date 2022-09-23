@@ -87,6 +87,8 @@ typedef enum {
   OP_STRUCT_INSTANCE,
   OP_STRUCT_GET,
   OP_STRUCT_SET,
+  OP_MODULE_GET,
+  OP_MODULE_SET,
   OP_ASSIGN,
   OP_PRINT,
   // Functions

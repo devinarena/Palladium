@@ -401,6 +401,26 @@ static InterpretResult run() {
         traveled++;
         break;
       }
+      case OP_MODULE_GET: {
+        PdString* name = READ_STRING();
+        PdModule* instance = TO_MODULE(pop());
+        Value value;
+        if (!tableGet(&instance->globals, name, &value)) {
+          runtimeError("Undefined field '%s'.", name->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        push(value);
+        traveled++;
+        break;
+      }
+      case OP_MODULE_SET: {
+        PdString* name = READ_STRING();
+        Value value = pop();
+        PdStruct* instance = TO_STRUCT(pop());
+        tableSet(&instance->fields, name, value);
+        traveled++;
+        break;
+      }
       case OP_ASSIGN: {
         Value value = pop();
         Value reference = pop();

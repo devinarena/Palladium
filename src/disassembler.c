@@ -209,6 +209,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_STRUCT_GET", chunk, offset);
     case OP_STRUCT_SET:
       return constantInstruction("OP_STRUCT_SET", chunk, offset);
+    case OP_MODULE_GET:
+      return constantInstruction("OP_MODULE_GET", chunk, offset);
+    case OP_MODULE_SET:
+      return constantInstruction("OP_MODULE_SET", chunk, offset);
     case OP_ASSIGN:
       return simpleInstruction("OP_ASSIGN", offset);
     case OP_NOP:
