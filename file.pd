@@ -1,9 +1,11 @@
 
 nspace Test {
+    int x = 0;
+
     void printZero() {
         print 0;
     }
 }
 
 Test.printZero~();
-printZero();
+stl.write~(stl.tostr~(x));

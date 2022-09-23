@@ -1164,7 +1164,7 @@ static void dot(bool canAssign) {
     return;
   }
   Object* obj = TO_OBJECT(namespace);
-  if (obj->type == ObjectStruct) {
+  if (obj->type == ObjectStructTemplate) {
     PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(namespace);
     uint8_t name = parseVariable("Expect identifier after '.'.");
     if (canAssign && match(TOKEN_EQUAL)) {
@@ -1177,7 +1177,7 @@ static void dot(bool canAssign) {
         parseError("Cannot assign to undeclared field.");
         return;
       }
-      Value type = popType();
+      Value type = peekType(0);
       if (type.type != expected.type) {
         parseError("Type assignment mismatch.");
         return;
@@ -1207,7 +1207,7 @@ static void dot(bool canAssign) {
         parseError("Cannot assign to undeclared field.");
         return;
       }
-      Value type = popType();
+      Value type = peekType(0);
       if (type.type != expected.type) {
         parseError("Type assignment mismatch.");
         return;
@@ -1225,6 +1225,9 @@ static void dot(bool canAssign) {
       pushType(expected);
       emitBytes(OP_MODULE_GET, name);
     }
+  } else {
+    parseError("Cannot access fields of given object.");
+    return;
   }
 }
 
