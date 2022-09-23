@@ -7,6 +7,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 
 #include "scanner.h"
 
@@ -28,6 +29,25 @@ void initScanner(const char* source) {
   scanner.start = source;
   scanner.current = source;
   scanner.line = 1;
+}
+
+/**
+ * @brief Inserts source code before the current source (for importing modules).
+ * 
+ * @param source the new source to insert
+ */
+void insertSource(const char* source) {
+  // copy contents of source before current
+  int sourceLength = strlen(source);
+  int startLength = strlen(scanner.start);
+  char* newSource = malloc(sourceLength + startLength + 1);
+  memcpy(newSource, source, sourceLength);
+  newSource[sourceLength] = '\n';
+  memcpy(newSource + sourceLength + 1, scanner.start, startLength);
+  newSource[sourceLength + startLength + 1] = '\0';
+  // update scanner
+  scanner.start = newSource;
+  scanner.current = newSource;
 }
 
 /**

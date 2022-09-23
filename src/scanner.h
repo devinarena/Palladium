@@ -82,6 +82,7 @@ typedef struct {
 } Token;
 
 void initScanner(const char* source);
+void insertSource(const char* source);
 ValueType getValueTypeOfKeyword(TokenType type);
 Token scanToken();
 

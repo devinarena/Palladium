@@ -89,7 +89,7 @@ void freeObject(Object* object) {
  * @param path const char* The path to the file to read.
  * @return char* The contents of the file.
  */
-static char* readFile(const char* path) {
+char* readFile(const char* path) {
   FILE* file = fopen(path, "rb");
   // file may not exist or be readable
   if (!file) {

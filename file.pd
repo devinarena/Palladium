@@ -1,2 +1,4 @@
 
-imp "external.pd"
+imp "external.pd";
+
+test();

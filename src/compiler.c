@@ -1522,11 +1522,10 @@ static void returnStatement() {
  */
 static void importStatement() {
   consume(TOKEN_STRING, "Expected import path after import keyword.");
-  PdString* path = copyString(parser.previous.start, parser.previous.length);
-  Value value = FROM_OBJECT(path);
-  uint8_t reference = addConstant(&compiler->current->chunk, value);
-  PdFunction* script = compile()
-  emitBytes(OP_IMPORT, reference);
+  PdString* path = copyString(parser.previous.start + 1, parser.previous.length - 2);
+  consume(TOKEN_SEMICOLON, "Expected ';' after import statement.");
+  insertSource(readFile(path->chars));
+  advance();
 }
 
 /**

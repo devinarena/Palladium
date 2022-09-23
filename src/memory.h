@@ -33,5 +33,6 @@
 
 void* reallocate(void* pointer, size_t oldSize, size_t newSize);
 void freeObject(Object* obj);
+char* readFile(const char* path);
 
 #endif
