@@ -7,5 +7,4 @@ nspace Test {
     }
 }
 
-print stl.tostr;
 print stl.tostr~(Test.x);
