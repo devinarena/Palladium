@@ -416,8 +416,8 @@ static InterpretResult run() {
       case OP_MODULE_SET: {
         PdString* name = READ_STRING();
         Value value = pop();
-        PdStruct* instance = TO_STRUCT(pop());
-        tableSet(&instance->fields, name, value);
+        PdModule* instance = TO_MODULE(pop());
+        tableSet(&instance->globals, name, value);
         traveled++;
         break;
       }

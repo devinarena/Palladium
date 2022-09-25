@@ -5,8 +5,24 @@ nspace Test {
     int getX() {
         ret Test.x;
     }
+
+    struct Inner {
+        int iX;
+    }
 }
 
-int* t = Test.getX;
+struct Outer {
+    int oX;
+}
 
-print t~;
+inst Outer out;
+
+out.oX = 5;
+
+print out.oX;
+
+inst Test.Inner inner;
+
+inner.iX = 10;
+
+print inner.iX;
