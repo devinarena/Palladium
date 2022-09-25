@@ -7,4 +7,6 @@ nspace Test {
     }
 }
 
-print stl.tostr~(Test.x);
+int* t = Test.getX;
+
+print t~;

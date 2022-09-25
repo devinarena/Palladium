@@ -1632,8 +1632,8 @@ static void statement() {
     if (compiler->scopeDepth == 0) {                                           \
       Table* target = &parser.globals;                                         \
       if (parser.namespace != NULL)                                            \
-        target = &parser.namespace->globals;                                    \
-      if (!tableSet(target,                                           \
+        target = &parser.namespace->globals;                                   \
+      if (!tableSet(target,                                                    \
                     TO_STRING(compiler->current->chunk.constants.data[index]), \
                     peekType(0))) {                                            \
         parseError("Cannot redefine variable.");                               \
@@ -1761,45 +1761,41 @@ DECLARATION(String, VALUE_OBJECT);
  * unless they are a pointer.
  */
 static void declarationVoid() {
+  uint8_t op = OP_GLOBAL_DEFINE;
+  bool pointer = false;
   if (match(TOKEN_STAR)) {
-    uint8_t index = parseVariable("Expected variable name.");
-    uint8_t op = OP_GLOBAL_DEFINE;
-    Token name = parser.previous;
-    if (match(TOKEN_EQUAL)) {
-      if (match(TOKEN_NULL)) {
-        emitByte(OP_NULL_POINTER);
-        popType();
-      } else {
-        expression();
-        if (popType().type != VALUE_POINTER) {
-          parseError("Initializer does not match declared type.");
-        }
-        popType();
-      }
-    } else {
-      emitByte(OP_NULL_POINTER);
-    }
-    if (compiler->scopeDepth == 0) {
-      if (!tableSet(
-              &parser.globals,
-              (PdString*)TO_OBJECT(
-                  compiler->current->chunk.constants.data[index]),
-              (Value){.type = VALUE_POINTER, .pointerType = popType().type}))
-        parseError("Global variable already defined.");
-    } else {
-      addLocal(name, (Value){.type = VALUE_POINTER});
-      op = OP_LOCAL_SET;
-    }
-    consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
-    emitBytes(op, index);
-    if (op == OP_LOCAL_SET) {
-      compiler->locals.data[compiler->locals.count - 1].depth =
-          compiler->scopeDepth;
+    pointer = true;
+  }
+  uint8_t index = parseVariable("Expected variable name.");
+  Token name = parser.previous;
+  if (match(TOKEN_LEFT_PAREN)) {
+    function(VALUE_NULL, TYPE_FUNCTION, index);
+    return;
+  }
+  if (!match(TOKEN_EQUAL) || match(TOKEN_NULL)) {
+    emitByte(pointer ? OP_NULL_POINTER : OP_NULL);
+    pushType(pointer ? NULL_POINTER : NULL_VAL);
+  } else {
+    expression();
+  }
+  if (compiler->scopeDepth == 0) {
+    Table* target = &parser.globals;
+    if (parser.namespace != NULL)
+      target = &parser.namespace->globals;
+    if (!tableSet(target,
+                  TO_STRING(compiler->current->chunk.constants.data[index]),
+                  peekType(0))) {
+      parseError("Cannot redefine variable.");
     }
   } else {
-    uint8_t index = parseVariable("Expected function name.");
-    consume(TOKEN_LEFT_PAREN, "Expected '(' after function name.");
-    function(VALUE_NULL, TYPE_FUNCTION, index);
+    addLocal(name, peekType(0));
+    op = OP_LOCAL_SET;
+  }
+  consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
+  emitBytes(op, index);
+  if (op == OP_LOCAL_SET) {
+    compiler->locals.data[compiler->locals.count - 1].depth =
+        compiler->scopeDepth;
   }
 }
 
