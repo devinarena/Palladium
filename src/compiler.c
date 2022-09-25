@@ -1717,17 +1717,16 @@ static void declarationVoid() {
     function(VALUE_NULL, TYPE_FUNCTION, index);
     return;
   }
-  if (!match(TOKEN_EQUAL) || match(TOKEN_NULL)) {
-    emitByte(pointer ? OP_NULL_POINTER : OP_NULL);
-    pushType(pointer ? NULL_POINTER : NULL_VAL);
-  } else {
-    expression();
-    printf("%d", peekType(0).type);
-    if ((pointer && peekType(0).type != VALUE_POINTER &&
-         peekType(0).type != VALUE_OBJECT) ||
-        (!pointer && peekType(0).type != VALUE_NULL)) {
-      parseError("Mismatched types in declaration.");
+  if (match(TOKEN_EQUAL)) {
+    if (!pointer) {
+      parseError("Cannot assign to void variable.");
       return;
+    }
+    if (match(TOKEN_NULL)) {
+      emitByte(OP_NULL_POINTER);
+      pushType(NULL_POINTER);
+    } else {
+      expression();
     }
   }
   if (compiler->scopeDepth == 0) {

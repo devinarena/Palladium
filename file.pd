@@ -1,4 +1,4 @@
 
-imp "external.pd" as test;
+imp "external.pd" as External;
 
-test.test();
+External.test();
