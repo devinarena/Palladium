@@ -1,28 +1,4 @@
 
-nspace Test {
-    int x = 0;
+imp "external.pd";
 
-    int getX() {
-        ret Test.x;
-    }
-
-    struct Inner {
-        int iX;
-    }
-}
-
-struct Outer {
-    int oX;
-}
-
-inst Outer out;
-
-out.oX = 5;
-
-print out.oX;
-
-inst Test.Inner inner;
-
-inner.iX = 10;
-
-print inner.iX;
+External.test();

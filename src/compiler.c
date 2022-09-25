@@ -1871,6 +1871,7 @@ static void declarationStructInstance() {
     }
     consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
     emitBytes(op, index);
+    emitByte(OP_POP);
     if (op == OP_LOCAL_SET) {
       compiler->locals.data[compiler->locals.count - 1].depth =
           compiler->scopeDepth;
