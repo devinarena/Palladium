@@ -1579,9 +1579,20 @@ static void importStatement() {
   consume(TOKEN_STRING, "Expected import path after import keyword.");
   PdString* path =
       copyString(parser.previous.start + 1, parser.previous.length - 2);
+  char* source = readFile(path->chars);
+  PdString* as = NULL;
+  if (match(TOKEN_AS)) {
+    uint8_t name = parseVariable("Expected module name.");
+    as = TO_STRING(compiler->current->chunk.constants.data[name]);
+  }
   consume(TOKEN_SEMICOLON, "Expected ';' after import statement.");
-  // create a struct to hold newly imported code functions and variables
-  insertSource(readFile(path->chars));
+  if (as != NULL) {
+    insertSource("\n}\n");
+    insertSource(source);
+    char nspaceDeclare[10 + as->length];
+    sprintf(nspaceDeclare, "nspace %s {\n", as->chars);
+    insertSource(nspaceDeclare);
+  }
   advance();
 }
 

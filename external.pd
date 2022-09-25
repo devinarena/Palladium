@@ -1,6 +1,4 @@
 
-nspace External {
-    void test() {
-        print "Hello, world!";
-    }
+void test() {
+    print "Hello, world!";
 }

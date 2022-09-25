@@ -51,6 +51,25 @@ void insertSource(const char* source) {
 }
 
 /**
+ * @brief Appends source code after the current source (for importing modules).
+ * 
+ * @param source the new source to append
+ */
+void appendSource(const char* source) {
+  // copy contents of source after current
+  int sourceLength = strlen(source);
+  int startLength = strlen(scanner.start);
+  char* newSource = malloc(sourceLength + startLength + 2);
+  memcpy(newSource, scanner.start, startLength);
+  newSource[startLength] = '\n';
+  memcpy(newSource + startLength + 1, source, sourceLength);
+  newSource[startLength + sourceLength + 1] = '\0';
+  // update scanner
+  scanner.start = newSource;
+  scanner.current = newSource;
+}
+
+/**
  * @brief Helper method for determining if a character is a digit.
  *
  * @param c char the character to analyze
@@ -220,6 +239,8 @@ static TokenType checkKeyword(int start,
  */
 static TokenType identifierType() {
   switch (scanner.start[0]) {
+    case 'a':
+      return checkKeyword(1, 1, "s", TOKEN_AS);
     case 'b':
       return checkKeyword(1, 3, "ool", TOKEN_BOOL);
     case 'c':

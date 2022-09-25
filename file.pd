@@ -1,23 +1,4 @@
 
-nspace Container {
-    double d = 2.0;
-    int i = 3;
-    str s = "hello";
-    bool b = true;
+imp "external.pd" as test;
 
-    struct Inner {
-        int x;
-    }
-}
-
-inst Container.Inner inner;
-
-inner.x = Container.i;
-
-inner.x = inner.x + 5;
-
-stl.write~(stl.tostr~(Container.d));
-stl.write~(stl.tostr~(Container.i));
-stl.write~(Container.s);
-stl.write~(stl.tostr~(Container.b));
-stl.write~(stl.tostr~(inner.x));
+test.test();

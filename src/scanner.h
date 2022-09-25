@@ -39,6 +39,8 @@ typedef enum {
   TOKEN_MINUS_EQUAL,
   TOKEN_STAR_EQUAL,
   TOKEN_SLASH_EQUAL,
+  TOKEN_AND,
+  TOKEN_OR,
   // Literals
   TOKEN_CHARACTER,
   TOKEN_IDENTIFIER,
@@ -47,7 +49,7 @@ typedef enum {
   TOKEN_REFERENCE,
   TOKEN_STRING,
   // Keywords
-  TOKEN_AND,
+  TOKEN_AS,
   TOKEN_BOOL,
   TOKEN_CHAR,
   TOKEN_DOUBLE,
@@ -60,7 +62,6 @@ typedef enum {
   TOKEN_INT,
   TOKEN_NSPACE,
   TOKEN_NULL,
-  TOKEN_OR,
   TOKEN_PRINT,
   TOKEN_RETURN,
   TOKEN_STR,
@@ -84,6 +85,7 @@ typedef struct {
 
 void initScanner(const char* source);
 void insertSource(const char* source);
+void appendSource(const char* source);
 ValueType getValueTypeOfKeyword(TokenType type);
 Token scanToken();
 
