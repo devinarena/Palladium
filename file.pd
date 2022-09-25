@@ -2,3 +2,5 @@
 imp "external.pd";
 
 External.test();
+
+stl.write~(stl.tostr~(stl.square~(5)));

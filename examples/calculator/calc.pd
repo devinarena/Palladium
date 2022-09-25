@@ -1,0 +1,29 @@
+
+// Calculator app source code in Palladium
+// By Devin on 9/25/2022
+
+int main() {
+
+    stl.write~("Enter the first number: ");
+    int first = stl.iinput~();
+    stl.write~("Enter the second operation: (1 for plus, 2 for minus, 3 for multiply, 4 for divide) ");
+    int operation = stl.iinput~();
+    stl.write~("Enter the second number: ");
+    int second = stl.iinput~();
+
+    if (operation == 1) {
+        stl.write~(stl.tostr~(first + second));
+    } else if (operation == 2) {
+        stl.write~(stl.tostr~(first - second));
+    } else if (operation == 3) {
+        stl.write~(stl.tostr~(first * second));
+    } else if (operation == 4) {
+        stl.write~(stl.tostr~(first / second));
+    } else {
+        stl.write~("Invalid operation");
+    }
+
+    ret 0;
+}
+
+main();

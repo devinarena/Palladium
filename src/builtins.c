@@ -42,6 +42,12 @@ static Value tostr(int argCount, Value* args) {
   return FROM_OBJECT(toString(&args[0]));
 }
 
+static Value intInput(int argCount, Value* args) {
+  int i;
+  scanf("%d", &i);
+  return FROM_INTEGER(i);
+}
+
 static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   PdStructTemplate* template = newStructTemplate();
   pargv = ALLOCATE(Value, argc);
@@ -69,6 +75,22 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   INSERT_DYNAMIC_ARRAY(Value, bin->argt, NULL_VAL);
   ref = newReference(FROM_OBJECT(bin));
   tableSet(&template->fieldTypes, p_to_str, FROM_OBJECT(ref));
+
+  bin = newBuiltin(FROM_INTEGER(0), &p_square, 1);
+  INSERT_DYNAMIC_ARRAY(Value, bin->argt, FROM_INTEGER(0));
+  ref = newReference(FROM_OBJECT(bin));
+  tableSet(&template->fieldTypes, copyString("square", 6), FROM_OBJECT(ref));
+
+  PdString* pdstr_patoi = copyString("atoi", 4);
+  bin = newBuiltin(FROM_INTEGER(0), &p_atoi, 1);
+  ref = newReference(FROM_OBJECT(bin));
+  INSERT_DYNAMIC_ARRAY(Value, bin->argt, FROM_OBJECT(pdstr_patoi));
+  tableSet(&template->fieldTypes, pdstr_patoi, FROM_OBJECT(ref));
+
+  bin = newBuiltin(FROM_INTEGER(0), &intInput, 0);
+  ref = newReference(FROM_OBJECT(bin));
+  tableSet(&template->fieldTypes, copyString("iinput", 6), FROM_OBJECT(ref));
+
   return newStruct(template);
 }
 
@@ -77,15 +99,6 @@ void initBuiltins(Table* globals, int argc, const char* argv[]) {
 
   tableSet(globals, copyString("clock", 5),
            FROM_OBJECT(newBuiltin(FROM_INTEGER(0), &p_clock, 0)));
-
-  PdBuiltin* bin_psquare = newBuiltin(FROM_INTEGER(0), &p_square, 1);
-  INSERT_DYNAMIC_ARRAY(Value, bin_psquare->argt, FROM_INTEGER(0));
-  tableSet(globals, copyString("p_square", 8), FROM_OBJECT(bin_psquare));
-
-  PdString* pdstr_patoi = copyString("p_atoi", 6);
-  PdBuiltin* bin_patoi = newBuiltin(FROM_INTEGER(0), &p_atoi, 1);
-  INSERT_DYNAMIC_ARRAY(Value, bin_patoi->argt, FROM_OBJECT(pdstr_patoi));
-  tableSet(globals, pdstr_patoi, FROM_OBJECT(bin_patoi));
 
   tableSet(globals, copyString("stl", 3), FROM_OBJECT(stl));
 }
