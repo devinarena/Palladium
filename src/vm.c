@@ -375,7 +375,7 @@ static InterpretResult run() {
         break;
       }
       case OP_STRUCT_INSTANCE: {
-        PdStructTemplate* ctemplate = TO_STRUCT_TEMPLATE(READ_CONSTANT());
+        PdStructTemplate* ctemplate = TO_STRUCT_TEMPLATE(pop());
         PdStruct* instance = newStruct(ctemplate);
         push(FROM_OBJECT(instance));
         traveled++;

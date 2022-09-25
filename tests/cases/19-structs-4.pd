@@ -7,7 +7,7 @@ struct Circle {
 inst Circle c;
 
 c.radius = 5;
-c.area = PI * p_square(c.radius);
+c.area = stl.pi * stl.square~(c.radius);
 
 print c.radius;
 print c.area;

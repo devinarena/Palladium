@@ -1848,8 +1848,7 @@ static void declarationStructInstance() {
       }
     } else {
       // not a pointer
-      uint8_t ctemplateIdx = addConstant(&compiler->current->chunk, pstructv);
-      emitBytes(OP_STRUCT_INSTANCE, ctemplateIdx);
+      emitByte(OP_STRUCT_INSTANCE);
       name = parser.previous;
     }
     if (compiler->scopeDepth == 0) {
@@ -1871,7 +1870,6 @@ static void declarationStructInstance() {
     }
     consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
     emitBytes(op, index);
-    emitByte(OP_POP);
     if (op == OP_LOCAL_SET) {
       compiler->locals.data[compiler->locals.count - 1].depth =
           compiler->scopeDepth;

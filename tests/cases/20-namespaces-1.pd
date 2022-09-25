@@ -1,0 +1,8 @@
+
+nspace Test {
+    int x = 0;
+}
+
+stl.write~(stl.tostr~(Test.x));
+Test.x = 20;
+stl.write~(stl.tostr~(Test.x));

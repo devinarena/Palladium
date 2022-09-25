@@ -1,0 +1,12 @@
+
+nspace Namespace {
+    int x = 0;
+
+    int getXSquared() {
+        ret Namespace.x * Namespace.x;
+    }
+}
+
+Namespace.x = 5;
+
+stl.write~(stl.tostr~(Namespace.getXSquared()));

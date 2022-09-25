@@ -204,7 +204,7 @@ int disassembleInstruction(Chunk* chunk, int offset) {
     case OP_LOCAL_SET:
       return byteInstruction("OP_LOCAL_SET", chunk, offset);
     case OP_STRUCT_INSTANCE:
-      return constantInstruction("OP_STRUCT_INSTANCE", chunk, offset);
+      return simpleInstruction("OP_STRUCT_INSTANCE", offset);
     case OP_STRUCT_GET:
       return constantInstruction("OP_STRUCT_GET", chunk, offset);
     case OP_STRUCT_SET:

@@ -66,9 +66,9 @@ PdString* toString(Value* value) {
       return copyString(str, enough);
     }
     case VALUE_DOUBLE: {
-      int enough = ceil(log10(1 + abs(value->data.double_))) + 1;
+      int enough = (int) ceil(log10(1 + abs(value->data.double_))) + 8;
       char* str = malloc(sizeof(char) * enough);
-      sprintf(str, "%f", value->data.double_);
+      sprintf(str, "%f", TO_DOUBLE((*value)));
       return copyString(str, enough);
     }
     case VALUE_BOOL:
