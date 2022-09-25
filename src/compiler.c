@@ -1819,68 +1819,65 @@ static void declarationStructTemplate() {
  * @brief Descent case for parsing struct instantiation.
  */
 static void declarationStructInstance() {
-  consume(TOKEN_IDENTIFIER, "Expected struct type.");
-  PdString* type = copyString(parser.previous.start, parser.previous.length);
-  Value pstructv;
-  if (tableGet(&parser.globals, type, &pstructv)) {
-    if (pstructv.type == VALUE_OBJECT &&
-        TO_OBJECT(pstructv)->type == ObjectStructTemplate) {
-      PdStructTemplate* pstruct = (PdStructTemplate*)TO_OBJECT(pstructv);
-      // can either be a struct instance or a pointer
-      uint8_t op = OP_GLOBAL_DEFINE;
-      bool pointer = false;
-      if (match(TOKEN_STAR)) {
-        pointer = true;
-      }
-      uint8_t index = parseVariable("Expected variable name.");
-      Token name = parser.previous;
-      if (pointer) {
-        if (match(TOKEN_EQUAL)) {
-          if (match(TOKEN_NULL)) {
-            emitByte(pointer ? OP_NULL_POINTER : OP_NULL);
-            pushType(pointer ? NULL_POINTER : NULL_VAL);
-          } else {
-            expression();
-            if ((pointer && peekType(0).type != VALUE_POINTER &&
-                 peekType(0).type != VALUE_OBJECT)) {
-              parseError("Mismatched types in declaration.");
-              return;
-            }
+  expression();
+  Value pstructv = popType();
+  if (pstructv.type == VALUE_OBJECT &&
+      TO_OBJECT(pstructv)->type == ObjectStructTemplate) {
+    PdStructTemplate* pstruct = (PdStructTemplate*)TO_OBJECT(pstructv);
+    // can either be a struct instance or a pointer
+    uint8_t op = OP_GLOBAL_DEFINE;
+    bool pointer = false;
+    if (match(TOKEN_STAR)) {
+      pointer = true;
+    }
+    uint8_t index = parseVariable("Expected variable name.");
+    Token name = parser.previous;
+    if (pointer) {
+      if (match(TOKEN_EQUAL)) {
+        if (match(TOKEN_NULL)) {
+          emitByte(pointer ? OP_NULL_POINTER : OP_NULL);
+          pushType(pointer ? NULL_POINTER : NULL_VAL);
+        } else {
+          expression();
+          if ((pointer && peekType(0).type != VALUE_POINTER &&
+               peekType(0).type != VALUE_OBJECT)) {
+            parseError("Mismatched types in declaration.");
+            return;
           }
         }
-      } else {
-        // not a pointer
-        uint8_t ctemplateIdx = addConstant(&compiler->current->chunk, pstructv);
-        emitBytes(OP_STRUCT_INSTANCE, ctemplateIdx);
-        name = parser.previous;
-      }
-      if (compiler->scopeDepth == 0) {
-        Table* target = &parser.globals;
-        if (parser.namespace != NULL) {
-          target = &parser.namespace->globals;
-          emitBytes(OP_GLOBAL_GET, parser.namespace->nameIndex);
-          emitByte(OP_SWAP);
-          op = OP_MODULE_SET;
-        }
-        if (!tableSet(target,
-                      TO_STRING(compiler->current->chunk.constants.data[index]),
-                      FROM_OBJECT(pstruct))) {
-          parseError("Cannot redefine variable.");
-        }
-      } else {
-        addLocal(name, FROM_OBJECT(pstruct));
-        op = OP_LOCAL_SET;
-      }
-      consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
-      emitBytes(op, index);
-      if (op == OP_LOCAL_SET) {
-        compiler->locals.data[compiler->locals.count - 1].depth =
-            compiler->scopeDepth;
       }
     } else {
-      parseError("Cannot declare a structure instance of given type.");
-      return;
+      // not a pointer
+      uint8_t ctemplateIdx = addConstant(&compiler->current->chunk, pstructv);
+      emitBytes(OP_STRUCT_INSTANCE, ctemplateIdx);
+      name = parser.previous;
     }
+    if (compiler->scopeDepth == 0) {
+      Table* target = &parser.globals;
+      if (parser.namespace != NULL) {
+        target = &parser.namespace->globals;
+        emitBytes(OP_GLOBAL_GET, parser.namespace->nameIndex);
+        emitByte(OP_SWAP);
+        op = OP_MODULE_SET;
+      }
+      if (!tableSet(target,
+                    TO_STRING(compiler->current->chunk.constants.data[index]),
+                    FROM_OBJECT(pstruct))) {
+        parseError("Cannot redefine variable.");
+      }
+    } else {
+      addLocal(name, FROM_OBJECT(pstruct));
+      op = OP_LOCAL_SET;
+    }
+    consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
+    emitBytes(op, index);
+    if (op == OP_LOCAL_SET) {
+      compiler->locals.data[compiler->locals.count - 1].depth =
+          compiler->scopeDepth;
+    }
+  } else {
+    parseError("Cannot declare a structure instance of given type.");
+    return;
   }
 }
 
