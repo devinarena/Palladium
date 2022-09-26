@@ -1,0 +1,11 @@
+
+struct Coin {
+    int* value;
+}
+
+inst Coin coin;
+
+coin.value = &10;
+coin::value = 5;
+
+stl::write(stl::tostr(coin::value));

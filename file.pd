@@ -1,4 +1,15 @@
 
-imp "external.pd" as External;
+struct Coin {
+    int value;
+}
 
-External.test();
+struct Coin2 {
+    int value;
+}
+
+inst Coin coin;
+coin.value = 5;
+
+inst Coin* cp = &coin;
+
+stl::write(stl::tostr(cp~));

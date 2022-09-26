@@ -1231,6 +1231,43 @@ static void dot(bool canAssign) {
   }
 }
 
+/**
+ * @brief Descent case for dot operator but dereferences the accessed field (if
+ * it's a pointer). Only for structs. Uses this token ::, I don't know what to
+ * call it yet.
+ */
+static void derefDot(bool canAssign) {
+  Value pstructv = popType();
+  if (pstructv.type != VALUE_OBJECT ||
+      TO_OBJECT(pstructv)->type != ObjectStructTemplate) {
+    parseError("Cannot access field of given value.");
+    return;
+  }
+  PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(pstructv);
+  uint8_t name = parseVariable("Expect identifier after '::'.");
+  Value expected;
+  if (!tableGet(&structTemplate->fieldTypes,
+                TO_STRING(compiler->current->chunk.constants.data[name]),
+                &expected)) {
+    parseError("Cannot access undeclared field.");
+    return;
+  }
+  if (expected.type != VALUE_POINTER && expected.type != VALUE_OBJECT) {
+    parseError("Cannot dereference non-pointer field.");
+    return;
+  }
+  if (expected.type == VALUE_OBJECT) {
+    pushType(TO_REFERENCE(expected)->value);
+  } else if (expected.pointerType == VALUE_OBJECT) {
+    pushType(FROM_OBJECT(TO_OBJECT(expected)));
+  } else if (expected.pointerType == VALUE_POINTER) {
+    pushType(*(Value*)expected.data.pointer);
+  } else
+    pushType((Value){.type = expected.pointerType});
+  emitBytes(OP_STRUCT_GET, name);
+  emitByte(OP_DEREFERENCE);
+}
+
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
@@ -1248,6 +1285,7 @@ ParseRule rules[] = {
     [TOKEN_GREATER_EQUAL] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS] = {NULL, binary, PREC_COMPARISON},
     [TOKEN_LESS_EQUAL] = {NULL, binary, PREC_COMPARISON},
+    [TOKEN_DOUBLE_COLON] = {NULL, derefDot, PREC_CALL},
     [TOKEN_IDENTIFIER] = {variable, NULL, PREC_NONE},
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER_INTEGER] = {integer, NULL, PREC_NONE},
@@ -1829,8 +1867,40 @@ static void declarationStructTemplate() {
  * @brief Descent case for parsing struct instantiation.
  */
 static void declarationStructInstance() {
-  expression();
+  uint8_t type = parseVariable("Expected struct template name.");
   Value pstructv = popType();
+  // can also be a namespace
+  if (match(TOKEN_DOT)) {
+    uint8_t field = parseVariable("Expected field name.");
+    Value namespace;
+    if (!tableGet(&parser.globals,
+                  TO_STRING(compiler->current->chunk.constants.data[type]),
+                  &namespace)) {
+      parseError("Undefined namespace.");
+      return;
+    }
+    if (namespace.type != VALUE_OBJECT ||
+        TO_OBJECT(namespace)->type != ObjectModule) {
+      parseError("Expected namespace.");
+      return;
+    }
+    PdModule* module = TO_MODULE(namespace);
+    Value fieldv;
+    if (!tableGet(&module->globals,
+                  TO_STRING(compiler->current->chunk.constants.data[field]),
+                  &fieldv)) {
+      parseError("Struct template does not exist inside given namespace.");
+      return;
+    }
+    pstructv = fieldv;
+  } else {
+    if (!tableGet(&parser.globals,
+                  TO_STRING(compiler->current->chunk.constants.data[type]),
+                  &pstructv)) {
+      parseError("Struct template does not exist.");
+      return;
+    }
+  }
   if (pstructv.type == VALUE_OBJECT &&
       TO_OBJECT(pstructv)->type == ObjectStructTemplate) {
     PdStructTemplate* pstruct = (PdStructTemplate*)TO_OBJECT(pstructv);
@@ -1845,16 +1915,19 @@ static void declarationStructInstance() {
     if (pointer) {
       if (match(TOKEN_EQUAL)) {
         if (match(TOKEN_NULL)) {
-          emitByte(pointer ? OP_NULL_POINTER : OP_NULL);
-          pushType(pointer ? NULL_POINTER : NULL_VAL);
+          emitByte(OP_NULL_POINTER);
+          pushType(NULL_POINTER);
         } else {
           expression();
-          if ((pointer && peekType(0).type != VALUE_POINTER &&
-               peekType(0).type != VALUE_OBJECT)) {
+          if (peekType(0).type != VALUE_POINTER &&
+              peekType(0).type != VALUE_OBJECT) {
             parseError("Mismatched types in declaration.");
             return;
           }
         }
+      } else {
+        emitByte(OP_NULL_POINTER);
+        pushType(NULL_POINTER);
       }
     } else {
       // not a pointer
@@ -1871,7 +1944,8 @@ static void declarationStructInstance() {
       }
       if (!tableSet(target,
                     TO_STRING(compiler->current->chunk.constants.data[index]),
-                    FROM_OBJECT(pstruct))) {
+                    pointer ? FROM_POINTER(&FROM_OBJECT(pstruct))
+                            : FROM_OBJECT(pstruct))) {
         parseError("Cannot redefine variable.");
       }
     } else {

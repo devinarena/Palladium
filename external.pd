@@ -2,3 +2,7 @@
 void test() {
     print "Hello, world!";
 }
+
+struct Coin {
+    int* value;
+}

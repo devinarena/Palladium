@@ -52,7 +52,7 @@ void insertSource(const char* source) {
 
 /**
  * @brief Appends source code after the current source (for importing modules).
- * 
+ *
  * @param source the new source to append
  */
 void appendSource(const char* source) {
@@ -408,6 +408,9 @@ Token scanToken() {
       return makeToken(TOKEN_RIGHT_BRACE);
     case ';':
       return makeToken(TOKEN_SEMICOLON);
+    case ':':
+      if (match(':'))
+        return makeToken(TOKEN_DOUBLE_COLON);
     case ',':
       return makeToken(TOKEN_COMMA);
     case '.':

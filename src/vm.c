@@ -434,6 +434,10 @@ static InterpretResult run() {
         break;
       }
       case OP_PRINT: {
+        if (vm.stackTop - vm.stack == 0) {
+          runtimeError("Nothing to print.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
         Value value = pop();
         printValue(value);
         printf("\n");
