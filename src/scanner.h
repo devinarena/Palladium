@@ -26,6 +26,7 @@ typedef enum {
   TOKEN_SLASH,
   TOKEN_STAR,
   TOKEN_TILDE,
+  TOKEN_TILDE_ARROW,
   // One or two character tokens
   TOKEN_BANG,
   TOKEN_BANG_EQUAL,
@@ -63,6 +64,7 @@ typedef enum {
   TOKEN_INT,
   TOKEN_NSPACE,
   TOKEN_NULL,
+  TOKEN_OBJ_CAST,
   TOKEN_PRINT,
   TOKEN_RETURN,
   TOKEN_STR,

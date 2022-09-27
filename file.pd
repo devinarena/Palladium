@@ -4,7 +4,7 @@ struct Coin {
 }
 
 struct Coin2 {
-    int value;
+    int value2;
 }
 
 inst Coin coin;
@@ -12,4 +12,6 @@ coin.value = 5;
 
 inst Coin* cp = &coin;
 
-stl::write(stl::tostr(cp~));
+(cp~).value = 10;
+
+stl::write(stl::tostr((obj_cast(Coin2*)cp)~>value2));

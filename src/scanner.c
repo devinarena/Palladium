@@ -299,6 +299,8 @@ static TokenType identifierType() {
         return TOKEN_IDENTIFIER;
       } else
         return TOKEN_IDENTIFIER;
+    case 'o':
+      return checkKeyword(1, 7, "bj_cast", TOKEN_OBJ_CAST);
     case 'p':
       return checkKeyword(1, 4, "rint", TOKEN_PRINT);
     case 'r':
@@ -452,7 +454,7 @@ Token scanToken() {
     case '>':
       return makeToken(match('=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
     case '~':
-      return makeToken(TOKEN_TILDE);
+      return makeToken(match('>') ? TOKEN_TILDE_ARROW : TOKEN_TILDE);
     case '\'': {
       advance();
       Token tchar = makeToken(TOKEN_CHARACTER);

@@ -656,15 +656,16 @@ static void unary(bool canAssign) {
         parseError("Cannot create reference to null.");
         return;
       }
-      emitByte(OP_REFERENCE);
       if (current.type == VALUE_OBJECT) {
         pushType((Value){.type = VALUE_POINTER,
                          .data.object = TO_OBJECT(current),
                          .pointerType = VALUE_OBJECT});
+        emitByte(OP_HEAP_REFERENCE);
       } else {
         pushType((Value){.type = VALUE_POINTER,
                          .data.pointer = (struct Value*)&current,
                          .pointerType = current.type});
+        emitByte(OP_STACK_REFERENCE);
       }
       break;
     default:
@@ -1033,6 +1034,53 @@ static void or (bool canAssign) {
 }
 
 /**
+ * @brief Descent case for object casts.
+ */
+static void objCast(bool canAssign) {
+  if (!match(TOKEN_LEFT_PAREN)) {
+    parseError("Expected '(' after 'obj_cast' keyword.");
+    return;
+  }
+  uint8_t namespace = parseVariable("Expected variable name.");
+  Value expected;
+  bool pointer = false;
+  if (!tableGet(&parser.globals,
+                TO_STRING(compiler->current->chunk.constants.data[namespace]),
+                &expected)) {
+    parseError("Cannot cast to undeclared type.");
+    return;
+  }
+  if (match(TOKEN_DOT)) {
+    if (expected.type != VALUE_OBJECT ||
+        TO_OBJECT(expected)->type != ObjectModule) {
+      parseError("Cannot grab from non-module type.");
+      return;
+    }
+    uint8_t name = parseVariable("Expected variable name.");
+    if (!tableGet(&TO_MODULE(expected)->globals,
+                  TO_STRING(compiler->current->chunk.constants.data[name]),
+                  &expected)) {
+      parseError("Cannot cast to undeclared type.");
+      return;
+    }
+  }
+  pointer = match(TOKEN_STAR);
+  if (!match(TOKEN_RIGHT_PAREN)) {
+    parseError("Expected ')' after 'obj_cast' keyword.");
+    return;
+  }
+  expression();
+  Value top = popType();
+  if (pointer) {
+    pushType((Value){.type = VALUE_POINTER,
+                     .data.pointer = (struct Value*)&TO_REFERENCE(top)->value,
+                     .pointerType = expected.type});
+  } else {
+    pushType(top);
+  }
+}
+
+/**
  * @brief Descent case for object calls (); mainly for functions.
  *
  * @param canAssign bool whether or not the expression can be assigned to
@@ -1268,6 +1316,39 @@ static void derefDot(bool canAssign) {
   emitByte(OP_DEREFERENCE);
 }
 
+/**
+ * @brief Descent case for dereferencing a pointer and grabbing a field from it.
+ * Same as C++ arrow -> operator.
+ */
+static void derefArrow(bool canAssign) {
+  Value pstructv = popType();
+  if (pstructv.type == VALUE_OBJECT &&
+      TO_OBJECT(pstructv)->type == ObjectReference) {
+    pushType(TO_REFERENCE(pstructv)->value);
+  } else if (pstructv.type == VALUE_POINTER &&
+             pstructv.pointerType == VALUE_OBJECT) {
+    pushType(*TO_POINTER(pstructv));
+  } else {
+    parseError("Cannot access field of given value.");
+    return;
+  }
+  PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(popType());
+  uint8_t name = parseVariable("Expect identifier after '~>'.");
+  Value expected;
+  if (!tableGet(&structTemplate->fieldTypes,
+                TO_STRING(compiler->current->chunk.constants.data[name]),
+                &expected)) {
+    parseError("Cannot access undeclared field.");
+    return;
+  }
+  pushType(expected);
+  emitByte(OP_DEREFERENCE);
+  emitBytes(OP_STRUCT_GET, name);
+  if (match(TOKEN_EQUAL)) {
+    parseError("Left hand side of assignment must be assignable lvalue.");
+  }
+}
+
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
@@ -1301,11 +1382,13 @@ ParseRule rules[] = {
     [TOKEN_SLASH] = {NULL, binary, PREC_FACTOR},
     [TOKEN_STAR] = {unary, binary, PREC_FACTOR},
     [TOKEN_TILDE] = {NULL, dereference, PREC_POSTFIX},
+    [TOKEN_TILDE_ARROW] = {NULL, derefArrow, PREC_CALL},
     [TOKEN_IF] = {NULL, NULL, PREC_NONE},
     [TOKEN_ELSE] = {NULL, NULL, PREC_NONE},
     [TOKEN_AND] = {NULL, and, PREC_AND},
     [TOKEN_OR] = {NULL, or, PREC_OR},
     [TOKEN_NULL] = {literal, NULL, PREC_NONE},
+    [TOKEN_OBJ_CAST] = {objCast, NULL, PREC_PREFIX},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_INT] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOUBLE] = {NULL, NULL, PREC_NONE},
@@ -1931,6 +2014,8 @@ static void declarationStructInstance() {
       }
     } else {
       // not a pointer
+      emitBytes(OP_CONSTANT_POINTER,
+                addConstant(&compiler->current->chunk, FROM_OBJECT(pstruct)));
       emitByte(OP_STRUCT_INSTANCE);
       name = parser.previous;
     }
@@ -1942,14 +2027,17 @@ static void declarationStructInstance() {
         emitByte(OP_SWAP);
         op = OP_MODULE_SET;
       }
+
       if (!tableSet(target,
                     TO_STRING(compiler->current->chunk.constants.data[index]),
-                    pointer ? FROM_POINTER(&FROM_OBJECT(pstruct))
+                    pointer ? FROM_OBJECT(newReference(FROM_OBJECT(pstruct)))
                             : FROM_OBJECT(pstruct))) {
         parseError("Cannot redefine variable.");
+        return;
       }
     } else {
-      addLocal(name, FROM_OBJECT(pstruct));
+      addLocal(name, pointer ? FROM_OBJECT(newReference(FROM_OBJECT(pstruct)))
+                             : FROM_OBJECT(pstruct));
       op = OP_LOCAL_SET;
     }
     consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");

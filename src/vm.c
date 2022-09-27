@@ -228,10 +228,15 @@ static InterpretResult run() {
         push(FROM_BOOL(!TO_BOOL(pop())));
         break;
       }
-      case OP_REFERENCE: {
+      case OP_HEAP_REFERENCE: {
         Value value = pop();
         PdReference* reference = newReference(value);
         push(FROM_OBJECT(reference));
+        break;
+      }
+      case OP_STACK_REFERENCE: {
+        Value value = pop();
+        push(FROM_POINTER(&value));
         break;
       }
       case OP_DEREFERENCE: {

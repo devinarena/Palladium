@@ -129,8 +129,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_NEGATE_INT", offset);
     case OP_NEGATE_DOUBLE:
       return simpleInstruction("OP_NEGATE_DOUBLE", offset);
-    case OP_REFERENCE:
-      return simpleInstruction("OP_REFERENCE", offset);
+    case OP_HEAP_REFERENCE:
+      return simpleInstruction("OP_HEAP_REFERENCE", offset);
+    case OP_STACK_REFERENCE:
+      return simpleInstruction("OP_STACK_REFERENCE", offset);
     case OP_DEREFERENCE:
       return simpleInstruction("OP_DEREFERENCE", offset);
     case OP_ARITHMETIC_CAST_INT_DOUBLE:
