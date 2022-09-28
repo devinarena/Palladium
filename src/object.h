@@ -71,12 +71,14 @@ typedef struct {
 typedef struct {
   Object object;
   Table fieldTypes;
+  Table fieldIndices;
 } PdStructTemplate;
 
 typedef struct {
   Object object;
   PdStructTemplate* template;
-  Table fields;
+  Value* fields;
+  int fieldCount;
 } PdStruct;
 
 typedef struct {

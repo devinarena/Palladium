@@ -14,4 +14,4 @@ inst Coin* cp = &coin;
 
 (cp~).value = 10;
 
-stl::write(stl::tostr((obj_cast(Coin2*)cp)~>value2));
+stl::write(stl::tostr(((obj_cast(Coin2*)cp)~>value2));

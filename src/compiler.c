@@ -1072,10 +1072,14 @@ static void objCast(bool canAssign) {
   expression();
   Value top = popType();
   if (pointer) {
+    Value pstruct = TO_REFERENCE(top)->value;
+    TO_STRUCT(pstruct)->template = TO_STRUCT_TEMPLATE(expected);
     pushType((Value){.type = VALUE_POINTER,
-                     .data.pointer = (struct Value*)&TO_REFERENCE(top)->value,
+                     .data.pointer = (struct Value*)&pstruct,
                      .pointerType = expected.type});
   } else {
+    Value pstruct = TO_REFERENCE(top)->value;
+    TO_STRUCT(pstruct)->template = TO_STRUCT_TEMPLATE(expected);
     pushType(top);
   }
 }
@@ -1919,6 +1923,10 @@ static void declarationStructTemplate() {
       tableSet(&pstruct->fieldTypes,
                TO_STRING(compiler->current->chunk.constants.data[vIndex]),
                (Value){.type = type});
+      tableSet(&pstruct->fieldIndices,
+               TO_STRING(compiler->current->chunk.constants.data[vIndex]),
+               (Value){.type = VALUE_INTEGER,
+                       .data.integer = pstruct->fieldTypes.count - 1});
       consume(TOKEN_SEMICOLON, "Expected ';' after field declaration.");
     }
   }

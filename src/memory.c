@@ -65,12 +65,13 @@ void freeObject(Object* object) {
     case ObjectStructTemplate: {
       PdStructTemplate* pstruct = (PdStructTemplate*)object;
       freeTable(&pstruct->fieldTypes);
-      FREE(ObjectStruct, object);
+      freeTable(&pstruct->fieldIndices);
+      FREE(ObjectStructTemplate, object);
       break;
     }
     case ObjectStruct: {
       PdStruct* pstruct = (PdStruct*)object;
-      freeTable(&pstruct->fields);
+      FREE_ARRAY(Value, pstruct->fields, pstruct->fieldCount);
       FREE(ObjectStruct, object);
       break;
     }

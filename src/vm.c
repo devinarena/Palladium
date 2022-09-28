@@ -389,12 +389,12 @@ static InterpretResult run() {
       case OP_STRUCT_GET: {
         PdString* name = READ_STRING();
         PdStruct* instance = TO_STRUCT(pop());
-        Value value;
-        if (!tableGet(&instance->fields, name, &value)) {
+        Value index;
+        if (!tableGet(&instance->template->fieldIndices, name, &index)) {
           runtimeError("Undefined field '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
-        push(value);
+        push(instance->fields[TO_INTEGER(index)]);
         traveled++;
         break;
       }
@@ -402,7 +402,12 @@ static InterpretResult run() {
         PdString* name = READ_STRING();
         Value value = pop();
         PdStruct* instance = TO_STRUCT(pop());
-        tableSet(&instance->fields, name, value);
+        Value index;
+        if (!tableGet(&instance->template->fieldIndices, name, &index)) {
+          runtimeError("Undefined field '%s'.", name->chars);
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        instance->fields[TO_INTEGER(index)] = value;
         traveled++;
         break;
       }

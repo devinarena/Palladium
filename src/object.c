@@ -136,14 +136,15 @@ PdStructTemplate* newStructTemplate() {
   PdStructTemplate* pstruct =
       ALLOCATE_OBJ(PdStructTemplate, ObjectStructTemplate);
   initTable(&pstruct->fieldTypes);
+  initTable(&pstruct->fieldIndices);
   return pstruct;
 }
 
 PdStruct* newStruct(PdStructTemplate* pstruct) {
   PdStruct* instance = ALLOCATE_OBJ(PdStruct, ObjectStruct);
   instance->template = pstruct;
-  initTable(&instance->fields);
-  tableAddAll(&pstruct->fieldTypes, &instance->fields);
+  instance->fieldCount = pstruct->fieldIndices.count;
+  instance->fields = ALLOCATE(Value, instance->fieldCount);
   return instance;
 }
 
