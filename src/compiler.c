@@ -663,9 +663,9 @@ static void unary(bool canAssign) {
         emitByte(OP_HEAP_REFERENCE);
       } else {
         pushType((Value){.type = VALUE_POINTER,
-                         .data.pointer = (struct Value*)&current,
+                         .data.object = TO_OBJECT(current),
                          .pointerType = current.type});
-        emitByte(OP_STACK_REFERENCE);
+        emitByte(OP_HEAP_REFERENCE);
       }
       break;
     default:
@@ -1041,11 +1041,11 @@ static void objCast(bool canAssign) {
     parseError("Expected '(' after 'obj_cast' keyword.");
     return;
   }
-  uint8_t namespace = parseVariable("Expected variable name.");
+  uint8_t name = parseVariable("Expected variable name.");
   Value expected;
   bool pointer = false;
   if (!tableGet(&parser.globals,
-                TO_STRING(compiler->current->chunk.constants.data[namespace]),
+                TO_STRING(compiler->current->chunk.constants.data[name]),
                 &expected)) {
     parseError("Cannot cast to undeclared type.");
     return;
@@ -1056,7 +1056,7 @@ static void objCast(bool canAssign) {
       parseError("Cannot grab from non-module type.");
       return;
     }
-    uint8_t name = parseVariable("Expected variable name.");
+    name = parseVariable("Expected variable name.");
     if (!tableGet(&TO_MODULE(expected)->globals,
                   TO_STRING(compiler->current->chunk.constants.data[name]),
                   &expected)) {
@@ -1072,15 +1072,12 @@ static void objCast(bool canAssign) {
   expression();
   Value top = popType();
   if (pointer) {
-    Value pstruct = TO_REFERENCE(top)->value;
-    TO_STRUCT(pstruct)->template = TO_STRUCT_TEMPLATE(expected);
-    pushType((Value){.type = VALUE_POINTER,
-                     .data.pointer = (struct Value*)&pstruct,
-                     .pointerType = expected.type});
+    emitBytes(OP_OBJECT_CAST_PTR,
+              addConstant(&compiler->current->chunk, expected));
+    pushType(FROM_OBJECT(newReference(expected)));
   } else {
-    Value pstruct = TO_REFERENCE(top)->value;
-    TO_STRUCT(pstruct)->template = TO_STRUCT_TEMPLATE(expected);
-    pushType(top);
+    emitByte(OP_OBJECT_CAST);
+    pushType(expected);
   }
 }
 
@@ -1331,7 +1328,7 @@ static void derefArrow(bool canAssign) {
     pushType(TO_REFERENCE(pstructv)->value);
   } else if (pstructv.type == VALUE_POINTER &&
              pstructv.pointerType == VALUE_OBJECT) {
-    pushType(*TO_POINTER(pstructv));
+    pushType(*(Value*)TO_POINTER(pstructv));
   } else {
     parseError("Cannot access field of given value.");
     return;
@@ -1911,13 +1908,12 @@ static void declarationStructTemplate() {
     }
     if (match(TOKEN_STAR)) {
       uint8_t vIndex = parseVariable("Expected variable name.");
-      if (!tableSet(&pstruct->fieldTypes,
-                    TO_STRING(compiler->current->chunk.constants.data[vIndex]),
-                    (Value){.type = VALUE_POINTER, .pointerType = type})) {
-        parseError("Duplicate field name.");
-        return;
-      }
-      consume(TOKEN_SEMICOLON, "Expected ';' after field declaration.");
+      tableSet(&pstruct->fieldTypes,
+               TO_STRING(compiler->current->chunk.constants.data[vIndex]),
+               (Value){.type = VALUE_POINTER, .pointerType = type});
+      tableSet(&pstruct->fieldIndices,
+               TO_STRING(compiler->current->chunk.constants.data[vIndex]),
+               FROM_INTEGER(pstruct->fieldTypes.count - 1));
     } else {
       uint8_t vIndex = parseVariable("Expected variable name.");
       tableSet(&pstruct->fieldTypes,
@@ -1925,10 +1921,9 @@ static void declarationStructTemplate() {
                (Value){.type = type});
       tableSet(&pstruct->fieldIndices,
                TO_STRING(compiler->current->chunk.constants.data[vIndex]),
-               (Value){.type = VALUE_INTEGER,
-                       .data.integer = pstruct->fieldTypes.count - 1});
-      consume(TOKEN_SEMICOLON, "Expected ';' after field declaration.");
+               FROM_INTEGER(pstruct->fieldTypes.count - 1));
     }
+    consume(TOKEN_SEMICOLON, "Expected ';' after field declaration.");
   }
 
   consume(TOKEN_RIGHT_BRACE, "Expected '}' after struct body.");

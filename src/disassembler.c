@@ -195,6 +195,10 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_CONSTANT_STRING", chunk, offset);
     case OP_CONSTANT_POINTER:
       return constantInstruction("OP_CONSTANT_POINTER", chunk, offset);
+    case OP_OBJECT_CAST:
+      return simpleInstruction("OP_OBJECT_CAST", offset);
+    case OP_OBJECT_CAST_PTR:
+      return simpleInstruction("OP_OBJECT_CAST_PTR", offset);
     case OP_GLOBAL_GET:
       return constantInstruction("OP_GLOBAL_GET", chunk, offset);
     case OP_GLOBAL_SET:

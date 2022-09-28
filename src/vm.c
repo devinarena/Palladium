@@ -230,8 +230,7 @@ static InterpretResult run() {
       }
       case OP_HEAP_REFERENCE: {
         Value value = pop();
-        PdReference* reference = newReference(value);
-        push(FROM_OBJECT(reference));
+        push(FROM_OBJECT(newReference(value)));
         break;
       }
       case OP_STACK_REFERENCE: {
@@ -451,6 +450,17 @@ static InterpretResult run() {
         Value value = pop();
         printValue(value);
         printf("\n");
+        break;
+      }
+      case OP_OBJECT_CAST: {
+        break;
+      }
+      case OP_OBJECT_CAST_PTR: {
+        Value template = READ_CONSTANT();
+        Value ref = peek(0);
+        Value pstruct = TO_REFERENCE(ref)->value;
+        TO_STRUCT(pstruct)->template = TO_STRUCT_TEMPLATE(template);
+        traveled++;
         break;
       }
       // Function calls

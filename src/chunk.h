@@ -92,7 +92,8 @@ typedef enum {
   OP_MODULE_SET,
   OP_ASSIGN,
   OP_PRINT,
-  OP_OBJ_CAST,
+  OP_OBJECT_CAST_PTR,
+  OP_OBJECT_CAST,
   // Functions
   OP_CALL,
   OP_IMPORT
