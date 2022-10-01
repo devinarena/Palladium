@@ -1,0 +1,25 @@
+{
+  "name": "palladium",
+  "displayName": "Palladium",
+  "description": "Syntax highlighting for Palladium.",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.71.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [{
+      "id": "palladium",
+      "aliases": ["Palladium", "palladium"],
+      "extensions": [".pd"],
+      "configuration": "./language-configuration.json"
+    }],
+    "grammars": [{
+      "language": "palladium",
+      "scopeName": "source.palladium",
+      "path": "./syntaxes/palladium.tmLanguage.json"
+    }]
+  }
+}

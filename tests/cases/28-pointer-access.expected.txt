@@ -1,0 +1,2 @@
+..\bin\palladium.exe
+cases\28-pointer-access.pd

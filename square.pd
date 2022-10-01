@@ -4,6 +4,8 @@ int main() {
         stl.write("Usage: pal file.pd [int] - Squares the number");
         ret 1;
     }
+    
+    // hello there
 
     int num = p_atoi((stl.argv + 2)~);
     int result = num * num;

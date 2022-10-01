@@ -1,0 +1,49 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Palladium",
+  "patterns": [
+    {
+      "include": "#keywords"
+    },
+    {
+      "include": "#strings"
+    },
+    {
+      "include": "#numbers"
+    },
+    {
+      "include": "#comments"
+    }
+  ],
+  "repository": {
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.palladium",
+          "match": "\\b(if|while|for|ret|inst|struct|true|false|print|int|double|bool|str|void|nspace|import|null|cast)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "name": "string.quoted.double.palladium",
+      "begin": "\"",
+      "end": "\"",
+      "patterns": [
+        {
+          "name": "constant.character.escape.palladium",
+          "match": "\\\\."
+        }
+      ]
+    },
+    "numbers": {
+      "name": "constant.numeric",
+      "match": "\\b\\d\\b"
+    },
+    "comments": {
+      "name": "comment.line.double-slash.palladium",
+      "begin": "//",
+      "end": "$"
+    }
+  },
+  "scopeName": "source.palladium"
+}
