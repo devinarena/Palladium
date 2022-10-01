@@ -1,0 +1,17 @@
+
+double d = 20.5;
+
+stl::write(stl::tostr(cast(double)d));
+stl::write(stl::tostr(cast(int)d));
+
+int i = 75;
+
+stl::write(stl::tostr(cast(int)i));
+stl::write(stl::tostr(cast(double)i));
+stl::write(stl::tostr(cast(char)i));
+
+char c = 'f';
+
+stl::write(stl::tostr(cast(char)c));
+stl::write(stl::tostr(cast(int)c));
+stl::write(stl::tostr(cast(double)c));

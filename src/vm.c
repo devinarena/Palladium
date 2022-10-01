@@ -256,11 +256,6 @@ static InterpretResult run() {
         push(reference->value);
         break;
       }
-      case OP_ARITHMETIC_CAST_INT_DOUBLE: {
-        Value int_ = pop();
-        push(FROM_DOUBLE((double)TO_INTEGER(int_)));
-        break;
-      }
       case OP_JUMP_IF_FALSE: {
 #ifdef DEBUG_TRACE_EXEC
         disassembleInstruction(
@@ -452,7 +447,36 @@ static InterpretResult run() {
         printf("\n");
         break;
       }
+      case OP_ARITHMETIC_CAST_INT_DOUBLE: {
+        Value int_ = pop();
+        push(FROM_DOUBLE((double)TO_INTEGER(int_)));
+        break;
+      }
+      case OP_ARITHMETIC_CAST_DOUBLE_INT: {
+        Value double_ = pop();
+        push(FROM_INTEGER((int)TO_DOUBLE(double_)));
+        break;
+      }
+      case OP_ARITHMETIC_CAST_CHAR_INT: {
+        Value char_ = pop();
+        push(FROM_INTEGER((int)TO_CHARACTER(char_)));
+        break;
+      }
+      case OP_ARITHMETIC_CAST_CHAR_DOUBLE: {
+        Value char_ = pop();
+        push(FROM_DOUBLE((double)TO_CHARACTER(char_)));
+        break;
+      }
+      case OP_ARITHMETIC_CAST_INT_CHAR: {
+        Value int_ = pop();
+        push(FROM_CHARACTER((char)TO_INTEGER(int_)));
+        break;
+      }
       case OP_OBJECT_CAST: {
+        Value template = READ_CONSTANT();
+        Value pstruct = peek(0);
+        TO_STRUCT(pstruct)->template = TO_STRUCT_TEMPLATE(template);
+        traveled++;
         break;
       }
       case OP_OBJECT_CAST_PTR: {
@@ -460,6 +484,16 @@ static InterpretResult run() {
         Value ref = peek(0);
         Value pstruct = TO_REFERENCE(ref)->value;
         TO_STRUCT(pstruct)->template = TO_STRUCT_TEMPLATE(template);
+        traveled++;
+        break;
+      }
+      case OP_POINTER_CAST: {
+        ValueType type = READ_BYTE();
+        Value pointer = peek(0);
+        if (IS_OBJECT(pointer) && TO_OBJECT(pointer)->type == ObjectReference) {
+          TO_REFERENCE(pointer)->value.type = type;
+        } else
+          ((Value*)pointer.data.pointer)->type = type;
         traveled++;
         break;
       }

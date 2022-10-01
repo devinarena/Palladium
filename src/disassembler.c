@@ -135,8 +135,6 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_STACK_REFERENCE", offset);
     case OP_DEREFERENCE:
       return simpleInstruction("OP_DEREFERENCE", offset);
-    case OP_ARITHMETIC_CAST_INT_DOUBLE:
-      return simpleInstruction("OP_ARITHMETIC_CAST_INT_DOUBLE", offset);
     case OP_JUMP_IF_FALSE:
       return shortInstruction("OP_JUMP_IF_FALSE", chunk, offset);
     case OP_JUMP_IF_TRUE:
@@ -195,6 +193,18 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return constantInstruction("OP_CONSTANT_STRING", chunk, offset);
     case OP_CONSTANT_POINTER:
       return constantInstruction("OP_CONSTANT_POINTER", chunk, offset);
+    case OP_ARITHMETIC_CAST_CHAR_INT:
+      return simpleInstruction("OP_ARITHMETIC_CAST_CHAR_INT", offset);
+    case OP_ARITHMETIC_CAST_CHAR_DOUBLE:
+      return simpleInstruction("OP_ARITHMETIC_CAST_CHAR_DOUBLE", offset);
+    case OP_ARITHMETIC_CAST_INT_DOUBLE:
+      return simpleInstruction("OP_ARITHMETIC_CAST_INT_DOUBLE", offset);
+    case OP_ARITHMETIC_CAST_INT_CHAR:
+      return simpleInstruction("OP_ARITHMETIC_CAST_INT_CHAR", offset);
+    case OP_ARITHMETIC_CAST_DOUBLE_INT:
+      return simpleInstruction("OP_ARITHMETIC_CAST_DOUBLE_INT", offset);
+    case OP_POINTER_CAST:
+      return constantInstruction("OP_POINTER_CAST", chunk, offset);
     case OP_OBJECT_CAST:
       return simpleInstruction("OP_OBJECT_CAST", offset);
     case OP_OBJECT_CAST_PTR:

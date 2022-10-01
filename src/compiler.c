@@ -1036,48 +1036,147 @@ static void or (bool canAssign) {
 /**
  * @brief Descent case for object casts.
  */
-static void objCast(bool canAssign) {
+static void cast(bool canAssign) {
   if (!match(TOKEN_LEFT_PAREN)) {
-    parseError("Expected '(' after 'obj_cast' keyword.");
+    parseError("Expected '(' after 'cast' keyword.");
     return;
   }
-  uint8_t name = parseVariable("Expected variable name.");
-  Value expected;
+  Token type = parser.current;
   bool pointer = false;
-  if (!tableGet(&parser.globals,
-                TO_STRING(compiler->current->chunk.constants.data[name]),
-                &expected)) {
-    parseError("Cannot cast to undeclared type.");
-    return;
-  }
-  if (match(TOKEN_DOT)) {
-    if (expected.type != VALUE_OBJECT ||
-        TO_OBJECT(expected)->type != ObjectModule) {
-      parseError("Cannot grab from non-module type.");
+  Value expected;
+  if (type.type == TOKEN_INT || type.type == TOKEN_DOUBLE ||
+      type.type == TOKEN_CHAR) {
+    advance();
+    pointer = match(TOKEN_STAR);
+    if (!match(TOKEN_RIGHT_PAREN)) {
+      parseError("Expected ')' after 'cast' keyword.");
       return;
     }
-    name = parseVariable("Expected variable name.");
-    if (!tableGet(&TO_MODULE(expected)->globals,
+    expression();
+    Value top = popType();
+    if (pointer) {
+      if (top.type != VALUE_POINTER) {
+        parseError("Cannot cast non-pointer to pointer.");
+        return;
+      }
+      top.pointerType = getValueTypeOfKeyword(type.type);
+      pushType(top);
+      emitBytes(OP_POINTER_CAST, top.pointerType);
+    } else {
+      switch (type.type) {
+        case TOKEN_INT: {
+          switch (top.type) {
+            case VALUE_INTEGER: {
+              pushType(top);
+              break;
+            }
+            case VALUE_DOUBLE: {
+              emitByte(OP_ARITHMETIC_CAST_DOUBLE_INT);
+              top.type = VALUE_DOUBLE;
+              pushType(top);
+              break;
+            }
+            case VALUE_CHARACTER: {
+              emitByte(OP_ARITHMETIC_CAST_CHAR_INT);
+              top.type = VALUE_CHARACTER;
+              pushType(top);
+              break;
+            }
+            default: {
+              parseError("Invalid type conversion.");
+              return;
+            }
+          }
+          break;
+        }
+        case TOKEN_DOUBLE: {
+          switch (top.type) {
+            case VALUE_DOUBLE: {
+              pushType(top);
+              break;
+            }
+            case VALUE_INTEGER: {
+              emitByte(OP_ARITHMETIC_CAST_INT_DOUBLE);
+              top.type = VALUE_INTEGER;
+              pushType(top);
+              break;
+            }
+            case VALUE_CHARACTER: {
+              emitByte(OP_ARITHMETIC_CAST_CHAR_DOUBLE);
+              top.type = VALUE_DOUBLE;
+              pushType(top);
+              break;
+            }
+            default: {
+              parseError("Invalid type conversion.");
+              return;
+            }
+          }
+          break;
+        }
+        case TOKEN_CHAR: {
+          switch (top.type) {
+            case VALUE_CHARACTER: {
+              pushType(top);
+              break;
+            }
+            case VALUE_INTEGER: {
+              emitByte(OP_ARITHMETIC_CAST_INT_CHAR);
+              top.type = VALUE_INTEGER;
+              pushType(top);
+              break;
+            }
+            default: {
+              parseError("Invalid type conversion.");
+              return;
+            }
+          }
+          break;
+        }
+        default: {
+          parseError("Invalid type conversion.");
+          return;
+        }
+      }
+    }
+  } else {
+    uint8_t name = parseVariable("Expected type name.");
+    if (!tableGet(&parser.globals,
                   TO_STRING(compiler->current->chunk.constants.data[name]),
                   &expected)) {
       parseError("Cannot cast to undeclared type.");
       return;
     }
-  }
-  pointer = match(TOKEN_STAR);
-  if (!match(TOKEN_RIGHT_PAREN)) {
-    parseError("Expected ')' after 'obj_cast' keyword.");
-    return;
-  }
-  expression();
-  Value top = popType();
-  if (pointer) {
-    emitBytes(OP_OBJECT_CAST_PTR,
-              addConstant(&compiler->current->chunk, expected));
-    pushType(FROM_OBJECT(newReference(expected)));
-  } else {
-    emitByte(OP_OBJECT_CAST);
-    pushType(expected);
+    if (match(TOKEN_DOT)) {
+      if (expected.type != VALUE_OBJECT ||
+          TO_OBJECT(expected)->type != ObjectModule) {
+        parseError("Cannot grab from non-module type.");
+        return;
+      }
+      name = parseVariable("Expected variable name.");
+      if (!tableGet(&TO_MODULE(expected)->globals,
+                    TO_STRING(compiler->current->chunk.constants.data[name]),
+                    &expected)) {
+        parseError("Cannot cast to undeclared type.");
+        return;
+      }
+    }
+    pointer = match(TOKEN_STAR);
+    if (!match(TOKEN_RIGHT_PAREN)) {
+      parseError("Expected ')' after 'cast' keyword.");
+      return;
+    }
+    expression();
+    Value top = popType();
+    if (pointer) {
+      emitBytes(OP_OBJECT_CAST_PTR,
+                addConstant(&compiler->current->chunk, expected));
+      pushType(FROM_OBJECT(newReference(expected)));
+    } else {
+      emitBytes(OP_OBJECT_CAST,
+                addConstant(&compiler->current->chunk, expected));
+      pushType(expected);
+    }
   }
 }
 
@@ -1281,9 +1380,9 @@ static void dot(bool canAssign) {
 }
 
 /**
- * @brief Descent case for dot operator but dereferences the accessed field (if
- * it's a pointer). Only for structs. Uses this token ::, I don't know what to
- * call it yet.
+ * @brief Descent case for dot operator but dereferences the accessed field
+ * (if it's a pointer). Only for structs. Uses this token ::, I don't know
+ * what to call it yet.
  */
 static void derefDot(bool canAssign) {
   Value pstructv = popType();
@@ -1318,8 +1417,8 @@ static void derefDot(bool canAssign) {
 }
 
 /**
- * @brief Descent case for dereferencing a pointer and grabbing a field from it.
- * Same as C++ arrow -> operator.
+ * @brief Descent case for dereferencing a pointer and grabbing a field from
+ * it. Same as C++ arrow -> operator.
  */
 static void derefArrow(bool canAssign) {
   Value pstructv = popType();
@@ -1389,7 +1488,7 @@ ParseRule rules[] = {
     [TOKEN_AND] = {NULL, and, PREC_AND},
     [TOKEN_OR] = {NULL, or, PREC_OR},
     [TOKEN_NULL] = {literal, NULL, PREC_NONE},
-    [TOKEN_OBJ_CAST] = {objCast, NULL, PREC_PREFIX},
+    [TOKEN_CAST] = {cast, NULL, PREC_PREFIX},
     [TOKEN_PRINT] = {NULL, NULL, PREC_NONE},
     [TOKEN_INT] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOUBLE] = {NULL, NULL, PREC_NONE},
@@ -1479,8 +1578,9 @@ static void block() {
 
 /**
  * @brief Descent case for functions. Creates a new compiler for the function,
- * a new function object, and parses the body. VM handles functions by defining
- * globals as pointers a value struct with a value of the function pointer.
+ * a new function object, and parses the body. VM handles functions by
+ * defining globals as pointers a value struct with a value of the function
+ * pointer.
  *
  * @param returnType ValueType the return type of the function
  * @param type FunctionType The type of the function

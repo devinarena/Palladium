@@ -10,4 +10,8 @@ struct Coin2 {
 inst Coin coin;
 coin.value = 5;
 
-stl::write(stl::tostr((cast(Coin2)coin).value2));
+inst Coin* cp = &coin;
+
+(cp~).value = 10;
+
+stl::write(stl::tostr((cast(Coin2*)cp)~>value2));
