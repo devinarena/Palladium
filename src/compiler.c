@@ -1891,7 +1891,13 @@ static void statement() {
       Table* target = &parser.globals;                                         \
       if (parser.namespace != NULL) {                                          \
         target = &parser.namespace->globals;                                   \
-        emitBytes(OP_GLOBAL_GET, parser.namespace->nameIndex);                 \
+        if (parser.namespace->parent != NULL) {                                \
+          emitBytes(OP_CONSTANT_POINTER,                                       \
+                    ((PdModule*)parser.namespace->parent)->index);             \
+          emitBytes(OP_MODULE_GET, parser.namespace->nameIndex);               \
+        } else {                                                               \
+          emitBytes(OP_CONSTANT_POINTER, parser.namespace->index);             \
+        }                                                                      \
         emitByte(OP_SWAP);                                                     \
         op = OP_MODULE_SET;                                                    \
       }                                                                        \
@@ -2180,29 +2186,44 @@ static void declarationStructInstance() {
 static void declarationNamespace() {
   uint8_t index = parseVariable("Expected namespace name.");
   consume(TOKEN_LEFT_BRACE, "Expected '{' before namespace body.");
-  if (parser.namespace != NULL) {
-    parseError("Cannot nest namespaces.");
-    return;
-  }
   if (compiler->scopeDepth != 0) {
     parseError("Cannot declare a namespace inside a function.");
     return;
   }
+  PdModule* oldNamespace = parser.namespace;
   PdModule* module = newModule();
   module->nameIndex = index;
-  if (!tableSet(&parser.globals,
-                TO_STRING(compiler->current->chunk.constants.data[index]),
-                FROM_OBJECT(module))) {
-    parseError("Namespace already defined.");
-    return;
+  if (oldNamespace == NULL) {
+    if (!tableSet(&parser.globals,
+                  TO_STRING(compiler->current->chunk.constants.data[index]),
+                  FROM_OBJECT(module))) {
+      parseError("Namespace already defined.");
+      return;
+    }
+  } else {
+    if (!tableSet(&oldNamespace->globals,
+                  TO_STRING(compiler->current->chunk.constants.data[index]),
+                  FROM_OBJECT(module))) {
+      parseError("Namespace already defined.");
+      return;
+    }
   }
   uint8_t modIndex =
       addConstant(&compiler->current->chunk, FROM_OBJECT(module));
+  module->parent = (struct PdModule*)oldNamespace;
+  module->index = modIndex;
   parser.namespace = module;
-  emitBytes(OP_CONSTANT_POINTER, modIndex);
-  emitBytes(OP_GLOBAL_DEFINE, index);
+  if (oldNamespace == NULL) {
+    emitBytes(OP_CONSTANT_POINTER, modIndex);
+    emitByte(OP_GLOBAL_DEFINE);
+  } else {
+    emitBytes(OP_CONSTANT_POINTER, oldNamespace->index);
+    emitBytes(OP_CONSTANT_POINTER, modIndex);
+    emitByte(OP_MODULE_SET);
+  }
+  emitByte(index);
   block();
-  parser.namespace = NULL;
+  parser.namespace = oldNamespace;
 }
 
 /**

@@ -90,6 +90,8 @@ typedef struct {
   Object object;
   Table globals;
   uint8_t nameIndex;
+  uint8_t index;
+  struct PdModule* parent;
 } PdModule;
 
 PdString* newString(char* chars, int length);

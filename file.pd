@@ -1,2 +1,16 @@
-stl::write(stl.argv[0]);
-stl::write(stl.argv[1]);
+
+
+nspace Outer {
+    nspace Inner {
+        nspace EvenMore {
+            int x = 0;
+        }
+    }
+}
+
+int main() {
+    print Outer.Inner.EvenMore.x;
+    ret 0;
+}
+
+main();

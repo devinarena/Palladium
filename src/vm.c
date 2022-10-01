@@ -148,7 +148,6 @@ static InterpretResult run() {
   }
 
   while (true) {
-    bool hitReturn = false;
     uint8_t traveled = 1;
     uint8_t instruction;
     switch ((instruction = READ_BYTE())) {

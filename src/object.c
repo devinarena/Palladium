@@ -158,6 +158,8 @@ PdModule* newModule() {
   PdModule* module = ALLOCATE_OBJ(PdModule, ObjectModule);
   initTable(&module->globals);
   module->nameIndex = 0;
+  module->index = 0;
+  module->parent = NULL;
   return module;
 }
 
