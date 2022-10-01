@@ -497,6 +497,21 @@ static InterpretResult run() {
         traveled++;
         break;
       }
+      case OP_INDEX: {
+        Value index = pop();
+        Value array = pop();
+        if (!IS_POINTER(array)) {
+          runtimeError("Can't index non-pointer.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        if (!IS_INTEGER(index)) {
+          runtimeError("Can't index with non-integer.");
+          return INTERPRET_RUNTIME_ERROR;
+        }
+        Value* array_ = (Value*)array.data.pointer;
+        push(array_[TO_INTEGER(index)]);
+        break;
+      }
       // Function calls
       case OP_CALL: {
 #ifdef DEBUG_TRACE_EXEC

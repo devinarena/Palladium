@@ -1,5 +1,2 @@
 
-double d = 20.5;
-void* p = &d;
-
-stl::write(stl::tostr((cast(double*)p)~));
+stl::write(stl.argv[1]);

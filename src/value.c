@@ -6,9 +6,9 @@
  * @since 6/24/2022
  **/
 
+#include <math.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 
 #include "object.h"
 #include "value.h"
@@ -60,13 +60,16 @@ PdString* toString(Value* value) {
     case VALUE_NULL:
       return copyString("null", 4);
     case VALUE_INTEGER: {
-      int enough = ceil(log10(1 + abs(value->data.integer))) + 1;
+      long enough = ceil(log10(1 + abs(value->data.integer))) + 1;
       char* str = malloc(sizeof(char) * enough);
       sprintf(str, "%d", TO_INTEGER((*value)));
       return copyString(str, enough);
     }
     case VALUE_DOUBLE: {
-      int enough = (int) ceil(log10(1 + abs(value->data.double_))) + 8;
+      double d = TO_DOUBLE((*value));
+      if (d < 0)
+        d = -d;
+      long enough = (long)ceil(log10(1 + d)) + 8;
       char* str = malloc(sizeof(char) * enough);
       sprintf(str, "%f", TO_DOUBLE((*value)));
       return copyString(str, enough);

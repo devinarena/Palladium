@@ -209,6 +209,8 @@ int disassembleInstruction(Chunk* chunk, int offset) {
       return simpleInstruction("OP_OBJECT_CAST", offset);
     case OP_OBJECT_CAST_PTR:
       return simpleInstruction("OP_OBJECT_CAST_PTR", offset);
+    case OP_INDEX:
+      return simpleInstruction("OP_INDEX", offset);
     case OP_GLOBAL_GET:
       return constantInstruction("OP_GLOBAL_GET", chunk, offset);
     case OP_GLOBAL_SET:

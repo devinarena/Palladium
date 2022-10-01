@@ -1449,11 +1449,30 @@ static void derefArrow(bool canAssign) {
   }
 }
 
+static void index_(bool canAssign) {
+  expression();
+  consume(TOKEN_RIGHT_BRACKET, "Expect ']' after index.");
+  Value indexType = popType();
+  if (indexType.type != VALUE_INTEGER) {
+    parseError("Index must be an integer.");
+    return;
+  }
+  Value arrayType = popType();
+  if (arrayType.type != VALUE_POINTER) {
+    parseError("Cannot index non-array type.");
+    return;
+  }
+  pushType(*(TO_POINTER(arrayType) + TO_INTEGER(indexType)));
+  emitByte(OP_INDEX);
+}
+
 ParseRule rules[] = {
     [TOKEN_LEFT_PAREN] = {grouping, call, PREC_CALL},
     [TOKEN_RIGHT_PAREN] = {NULL, NULL, PREC_NONE},
     [TOKEN_LEFT_BRACE] = {NULL, NULL, PREC_NONE},
     [TOKEN_RIGHT_BRACE] = {NULL, NULL, PREC_NONE},
+    [TOKEN_LEFT_BRACKET] = {NULL, index_, PREC_POSTFIX},
+    [TOKEN_RIGHT_BRACKET] = {NULL, NULL, PREC_NONE},
     [TOKEN_COMMA] = {NULL, NULL, PREC_NONE},
     [TOKEN_DOT] = {NULL, dot, PREC_CALL},
     [TOKEN_SEMICOLON] = {NULL, NULL, PREC_NONE},
@@ -1471,7 +1490,7 @@ ParseRule rules[] = {
     [TOKEN_STRING] = {string, NULL, PREC_NONE},
     [TOKEN_NUMBER_INTEGER] = {integer, NULL, PREC_NONE},
     [TOKEN_NUMBER_FLOATING] = {double_, NULL, PREC_NONE},
-    // char is the keyword, characterNULL,he   literal
+    // char is the keyword, character is the literal
     [TOKEN_CHARACTER] = {char_, NULL, PREC_NONE},
     [TOKEN_TRUE] = {literal, NULL, PREC_NONE},
     [TOKEN_FALSE] = {literal, NULL, PREC_NONE},
