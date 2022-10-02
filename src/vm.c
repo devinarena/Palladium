@@ -419,7 +419,7 @@ static InterpretResult run() {
       case OP_MODULE_SET: {
         PdString* name = READ_STRING();
         Value value = pop();
-        PdModule* instance = TO_MODULE(pop());
+        PdModule* instance = TO_MODULE(peek(0));
         tableSet(&instance->globals, name, value);
         traveled++;
         break;

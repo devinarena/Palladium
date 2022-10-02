@@ -2010,10 +2010,12 @@ static void declarationStructTemplate() {
     parseError("Structs cannot be declared inside functions.");
     return;
   }
+  Table* target =
+      parser.namespace != NULL ? &parser.namespace->globals : &parser.globals;
   uint8_t index = parseVariable("Expected variable name.");
   Value chk;
   if (tableGet(
-          &parser.globals,
+          target,
           (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[index]),
           &chk)) {
     parseError("Struct already defined.");
@@ -2058,9 +2060,7 @@ static void declarationStructTemplate() {
   uint8_t ref = addConstant(&compiler->current->chunk, FROM_OBJECT(pstruct));
   emitBytes(OP_CONSTANT_POINTER, ref);
 
-  Table* target = &parser.globals;
   if (parser.namespace != NULL) {
-    target = &parser.namespace->globals;
     emitBytes(OP_GLOBAL_GET, parser.namespace->nameIndex);
     emitByte(OP_SWAP);
     op = OP_MODULE_SET;
@@ -2079,31 +2079,45 @@ static void declarationStructTemplate() {
  */
 static void declarationStructInstance() {
   uint8_t type = parseVariable("Expected struct template name.");
-  Value pstructv = popType();
+  Table* target = &parser.globals;
+  if (parser.namespace != NULL) {
+    target = &parser.namespace->globals;
+    emitBytes(OP_GLOBAL_GET, parser.namespace->nameIndex);
+    emitByte(OP_SWAP);
+  }
+  Value pstructv;
+  if (!tableGet(
+          target,
+          (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[type]),
+          &pstructv)) {
+    parseError("Field not defined for given namespace.");
+    return;
+  }
+
   // can also be a namespace
   if (match(TOKEN_DOT)) {
-    uint8_t field = parseVariable("Expected field name.");
-    Value namespace;
-    if (!tableGet(&parser.globals,
-                  TO_STRING(compiler->current->chunk.constants.data[type]),
-                  &namespace)) {
-      parseError("Undefined namespace.");
+    if (pstructv.type != VALUE_OBJECT || TO_OBJECT(pstructv)->type != ObjectModule) {
+      parseError("Cannot access member of non-namespace.");
       return;
     }
-    if (namespace.type != VALUE_OBJECT ||
-        TO_OBJECT(namespace)->type != ObjectModule) {
-      parseError("Expected namespace.");
-      return;
-    }
-    PdModule* module = TO_MODULE(namespace);
-    Value fieldv;
-    if (!tableGet(&module->globals,
-                  TO_STRING(compiler->current->chunk.constants.data[field]),
-                  &fieldv)) {
-      parseError("Struct template does not exist inside given namespace.");
-      return;
-    }
-    pstructv = fieldv;
+    uint8_t index = addConstant(&compiler->current->chunk, pstructv);
+    do {
+      if (pstructv.type != VALUE_OBJECT &&
+          TO_OBJECT(pstructv)->type != ObjectModule) {
+        parseError("Cannot access member of non-namespace.");
+        return;
+      }
+      emitBytes(OP_CONSTANT_POINTER, index);
+      uint8_t field = parseVariable("Expected field name.");
+      emitBytes(OP_MODULE_GET, field);
+      if (!tableGet(&TO_MODULE(pstructv)->globals,
+                    TO_STRING(compiler->current->chunk.constants.data[field]),
+                    &pstructv)) {
+        parseError("Field not found.");
+        return;
+      }
+
+    } while (match(TOKEN_DOT));
   } else {
     if (!tableGet(&parser.globals,
                   TO_STRING(compiler->current->chunk.constants.data[type]),

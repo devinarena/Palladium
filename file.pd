@@ -4,12 +4,20 @@ nspace Outer {
     nspace Inner {
         nspace EvenMore {
             int x = 0;
+            struct Test {
+                int y;
+            }
         }
     }
 }
 
 int main() {
     print Outer.Inner.EvenMore.x;
+
+    inst Outer.Inner.EvenMore.Test t;
+    t.y = 1;
+    print t.y;
+
     ret 0;
 }
 
