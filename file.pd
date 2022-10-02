@@ -12,10 +12,12 @@ nspace Outer {
 }
 
 int main() {
+    Outer.Inner.EvenMore.x = 5;
+
     print Outer.Inner.EvenMore.x;
 
     inst Outer.Inner.EvenMore.Test t;
-    t.y = 1;
+    t.y = 10;
     print t.y;
 
     ret 0;

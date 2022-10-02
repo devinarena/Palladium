@@ -2061,7 +2061,13 @@ static void declarationStructTemplate() {
   emitBytes(OP_CONSTANT_POINTER, ref);
 
   if (parser.namespace != NULL) {
-    emitBytes(OP_GLOBAL_GET, parser.namespace->nameIndex);
+    if (parser.namespace->parent != NULL) {
+      emitBytes(OP_CONSTANT_POINTER,
+                ((PdModule*)parser.namespace->parent)->index);
+      emitBytes(OP_MODULE_GET, parser.namespace->nameIndex);
+    } else {
+      emitBytes(OP_GLOBAL_GET, parser.namespace->nameIndex);
+    }
     emitByte(OP_SWAP);
     op = OP_MODULE_SET;
   }
@@ -2080,36 +2086,42 @@ static void declarationStructTemplate() {
 static void declarationStructInstance() {
   uint8_t type = parseVariable("Expected struct template name.");
   Table* target = &parser.globals;
+
   if (parser.namespace != NULL) {
     target = &parser.namespace->globals;
     emitBytes(OP_GLOBAL_GET, parser.namespace->nameIndex);
     emitByte(OP_SWAP);
   }
+
   Value pstructv;
-  if (!tableGet(
-          target,
-          (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[type]),
-          &pstructv)) {
+  if (!tableGet(target,
+                TO_STRING(compiler->current->chunk.constants.data[type]),
+                &pstructv)) {
     parseError("Field not defined for given namespace.");
     return;
   }
-
+  
   // can also be a namespace
   if (match(TOKEN_DOT)) {
-    if (pstructv.type != VALUE_OBJECT || TO_OBJECT(pstructv)->type != ObjectModule) {
+    if (pstructv.type != VALUE_OBJECT ||
+        TO_OBJECT(pstructv)->type != ObjectModule) {
       parseError("Cannot access member of non-namespace.");
       return;
     }
+
     uint8_t index = addConstant(&compiler->current->chunk, pstructv);
+    emitBytes(OP_CONSTANT_POINTER, index);
+
     do {
       if (pstructv.type != VALUE_OBJECT &&
           TO_OBJECT(pstructv)->type != ObjectModule) {
         parseError("Cannot access member of non-namespace.");
         return;
       }
-      emitBytes(OP_CONSTANT_POINTER, index);
+
       uint8_t field = parseVariable("Expected field name.");
       emitBytes(OP_MODULE_GET, field);
+
       if (!tableGet(&TO_MODULE(pstructv)->globals,
                     TO_STRING(compiler->current->chunk.constants.data[field]),
                     &pstructv)) {
@@ -2125,6 +2137,7 @@ static void declarationStructInstance() {
       parseError("Struct template does not exist.");
       return;
     }
+    emitBytes(OP_GLOBAL_GET, type);
   }
   if (pstructv.type == VALUE_OBJECT &&
       TO_OBJECT(pstructv)->type == ObjectStructTemplate) {
@@ -2132,11 +2145,14 @@ static void declarationStructInstance() {
     // can either be a struct instance or a pointer
     uint8_t op = OP_GLOBAL_DEFINE;
     bool pointer = false;
+
     if (match(TOKEN_STAR)) {
       pointer = true;
     }
+
     uint8_t index = parseVariable("Expected variable name.");
     Token name = parser.previous;
+
     if (pointer) {
       if (match(TOKEN_EQUAL)) {
         if (match(TOKEN_NULL)) {
@@ -2156,8 +2172,6 @@ static void declarationStructInstance() {
       }
     } else {
       // not a pointer
-      emitBytes(OP_CONSTANT_POINTER,
-                addConstant(&compiler->current->chunk, FROM_OBJECT(pstruct)));
       emitByte(OP_STRUCT_INSTANCE);
       name = parser.previous;
     }
@@ -2177,17 +2191,22 @@ static void declarationStructInstance() {
         parseError("Cannot redefine variable.");
         return;
       }
+
     } else {
       addLocal(name, pointer ? FROM_OBJECT(newReference(FROM_OBJECT(pstruct)))
                              : FROM_OBJECT(pstruct));
       op = OP_LOCAL_SET;
     }
+
     consume(TOKEN_SEMICOLON, "Expected ';' after variable declaration.");
+
     emitBytes(op, index);
+
     if (op == OP_LOCAL_SET) {
       compiler->locals.data[compiler->locals.count - 1].depth =
           compiler->scopeDepth;
     }
+
   } else {
     parseError("Cannot declare a structure instance of given type.");
     return;
