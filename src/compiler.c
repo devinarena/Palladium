@@ -399,6 +399,12 @@ bool typesEqual(ValueType a, ValueType b, bool useNum) {
   return a == b;
 }
 
+bool isPointer(Value* value) {
+  return value->type == VALUE_POINTER ||
+         (value->type == VALUE_OBJECT &&
+          value->data.object->type == ObjectReference);
+}
+
 /**
  * @brief Adds an identifiers name to the list of constants.
  *
@@ -657,15 +663,17 @@ static void unary(bool canAssign) {
         return;
       }
       if (current.type == VALUE_OBJECT) {
-        pushType((Value){.type = VALUE_POINTER,
-                         .data.object = TO_OBJECT(current),
-                         .pointerType = VALUE_OBJECT});
-        emitByte(OP_HEAP_REFERENCE);
+        PdReference* ref = newReference(current);
+        emitByte(OP_POP);
+        emitBytes(OP_CONSTANT_POINTER,
+                  addConstant(&compiler->current->chunk, FROM_OBJECT(ref)));
+        pushType(FROM_OBJECT(ref));
       } else {
-        pushType((Value){.type = VALUE_POINTER,
-                         .data.object = TO_OBJECT(current),
-                         .pointerType = current.type});
-        emitByte(OP_HEAP_REFERENCE);
+        PdReference* ref = newReference(current);
+        emitByte(OP_POP);
+        emitBytes(OP_CONSTANT_POINTER,
+                  addConstant(&compiler->current->chunk, FROM_OBJECT(ref)));
+        pushType(FROM_OBJECT(ref));
       }
       break;
     default:
@@ -681,9 +689,7 @@ static void unary(bool canAssign) {
  */
 static void dereference(bool canAssign) {
   Value current = popType();
-  if (current.type != VALUE_POINTER &&
-      (current.type != VALUE_OBJECT ||
-       TO_OBJECT(current)->type != ObjectReference)) {
+  if (!isPointer(&current)) {
     parseError("Cannot dereference non-pointer value.");
     return;
   }
@@ -1140,43 +1146,53 @@ static void cast(bool canAssign) {
       }
     }
   } else {
-    uint8_t name = parseVariable("Expected type name.");
-    if (!tableGet(&parser.globals,
-                  TO_STRING(compiler->current->chunk.constants.data[name]),
-                  &expected)) {
-      parseError("Cannot cast to undeclared type.");
-      return;
-    }
-    if (match(TOKEN_DOT)) {
-      if (expected.type != VALUE_OBJECT ||
-          TO_OBJECT(expected)->type != ObjectModule) {
-        parseError("Cannot grab from non-module type.");
-        return;
-      }
-      name = parseVariable("Expected variable name.");
-      if (!tableGet(&TO_MODULE(expected)->globals,
-                    TO_STRING(compiler->current->chunk.constants.data[name]),
-                    &expected)) {
-        parseError("Cannot cast to undeclared type.");
-        return;
-      }
-    }
-    pointer = match(TOKEN_STAR);
-    if (!match(TOKEN_RIGHT_PAREN)) {
-      parseError("Expected ')' after 'cast' keyword.");
-      return;
-    }
-    expression();
-    Value top = popType();
-    if (pointer) {
-      emitBytes(OP_OBJECT_CAST_PTR,
-                addConstant(&compiler->current->chunk, expected));
-      pushType(FROM_OBJECT(newReference(expected)));
-    } else {
-      emitBytes(OP_OBJECT_CAST,
-                addConstant(&compiler->current->chunk, expected));
-      pushType(expected);
-    }
+    // uint8_t name = parseVariable("Expected type name.");
+    // if (!tableGet(&parser.globals,
+    //               TO_STRING(compiler->current->chunk.constants.data[name]),
+    //               &expected)) {
+    //   parseError("Cannot cast to undeclared type.");
+    //   return;
+    // }
+    // if (match(TOKEN_DOT)) {
+    //   if (expected.type != VALUE_OBJECT ||
+    //       TO_OBJECT(expected)->type != ObjectModule) {
+    //     parseError("Cannot grab from non-module type.");
+    //     return;
+    //   }
+    //   name = parseVariable("Expected variable name.");
+    //   if (!tableGet(&TO_MODULE(expected)->globals,
+    //                 TO_STRING(compiler->current->chunk.constants.data[name]),
+    //                 &expected)) {
+    //     parseError("Cannot cast to undeclared type.");
+    //     return;
+    //   }
+    // }
+    // if (expected.type != VALUE_OBJECT ||
+    //     TO_OBJECT(expected)->type != ObjectStructTemplate) {
+    //   parseError("Cannot cast to non-object type.");
+    //   return;
+    // }
+    // pointer = match(TOKEN_STAR);
+    // if (!match(TOKEN_RIGHT_PAREN)) {
+    //   parseError("Expected ')' after 'cast' keyword.");
+    //   return;
+    // }
+    // expression();
+    // Value top = popType();
+    // if (pointer) {
+    //   emitBytes(OP_OBJECT_CAST_PTR,
+    //             addConstant(&compiler->current->chunk, expected));
+    //   pushType(FROM_OBJECT(newReference(top)));
+    // } else {
+    //   if (top.type != VALUE_OBJECT || TO_OBJECT(top)->type != ObjectStruct) {
+    //     parseError("Cannot cast non-object to object.");
+    //     return;
+    //   }
+    //   PdObjectCast* cast = newObjectCast(TO_STRUCT(top), TO_STRUCT_TEMPLATE(expected));
+    //   emitBytes(OP_OBJECT_CAST, addConstant(&compiler->current->chunk, expected));
+    //   TO_STRUCT(top)->template = TO_STRUCT_TEMPLATE(expected);
+    //   pushType(top);
+    // }
   }
 }
 
@@ -1216,20 +1232,32 @@ static void call(bool canAssign) {
     for (int i = 0; i < argCount; i++) {
       Value provided = peekType(i);
       Value expected = fn->locals.data[argCount - i - 1];
-      if (provided.type != expected.type) {
-        parseErrorf("Argument type mismatch.",
-                    "Expected %s but received %s for argument %d.",
-                    getValueTypeName(expected.type),
-                    getValueTypeName(provided.type), i);
-        return;
-      }
-      if (provided.type == VALUE_POINTER && expected.type == VALUE_POINTER) {
-        if (provided.pointerType != expected.pointerType) {
-          parseErrorf(
-              "Argument type mismatch.",
-              "Expected %s pointer but received %s pointer for argument %d.",
-              getValueTypeName(expected.pointerType),
-              getValueTypeName(provided.pointerType), i);
+      if (expected.type == VALUE_POINTER) {
+        if (provided.type == VALUE_POINTER) {
+          if (provided.pointerType != expected.pointerType) {
+            parseErrorf(
+                "Argument type mismatch.",
+                "Expected %s pointer but received %s pointer for argument %d.",
+                getValueTypeName(expected.pointerType),
+                getValueTypeName(provided.pointerType), i);
+            return;
+          }
+        } else if (provided.type == VALUE_OBJECT) {
+          if (TO_OBJECT(provided)->type != ObjectReference ||
+              TO_REFERENCE(provided)->value.type != expected.pointerType) {
+            parseErrorf("Argument type mismatch.",
+                        "Expected %s pointer but received %s for argument %d.",
+                        getValueTypeName(expected.pointerType),
+                        getValueTypeName(provided.type), i);
+            return;
+          }
+        }
+      } else {
+        if (provided.type != expected.type) {
+          parseErrorf("Argument type mismatch.",
+                      "Expected %s but received %s for argument %d.",
+                      getValueTypeName(expected.type),
+                      getValueTypeName(provided.type), i);
           return;
         }
       }
@@ -1262,20 +1290,32 @@ static void call(bool canAssign) {
       Value expected = builtin->argt.data[argCount - i - 1];
       if (expected.type == VALUE_NULL)
         continue;
-      if (provided.type != expected.type) {
-        parseErrorf("Argument type mismatch.",
-                    "Expected %s but received %s for argument %d.",
-                    getValueTypeName(expected.type),
-                    getValueTypeName(provided.type), i);
-        return;
-      }
-      if (provided.type == VALUE_POINTER && expected.type == VALUE_POINTER) {
-        if (provided.pointerType != expected.pointerType) {
-          parseErrorf(
-              "Argument type mismatch.",
-              "Expected %s pointer but received %s pointer for argument %d.",
-              getValueTypeName(expected.pointerType),
-              getValueTypeName(provided.pointerType), i);
+      if (expected.type == VALUE_POINTER) {
+        if (provided.type == VALUE_POINTER) {
+          if (provided.pointerType != expected.pointerType) {
+            parseErrorf(
+                "Argument type mismatch.",
+                "Expected %s pointer but received %s pointer for argument %d.",
+                getValueTypeName(expected.pointerType),
+                getValueTypeName(provided.pointerType), i);
+            return;
+          }
+        } else if (provided.type == VALUE_OBJECT) {
+          if (TO_OBJECT(provided)->type != ObjectReference ||
+              TO_REFERENCE(provided)->value.type != expected.pointerType) {
+            parseErrorf("Argument type mismatch.",
+                        "Expected %s pointer but received %s for argument %d.",
+                        getValueTypeName(expected.pointerType),
+                        getValueTypeName(provided.type), i);
+            return;
+          }
+        }
+      } else {
+        if (provided.type != expected.type) {
+          parseErrorf("Argument type mismatch.",
+                      "Expected %s but received %s for argument %d.",
+                      getValueTypeName(expected.type),
+                      getValueTypeName(provided.type), i);
           return;
         }
       }
@@ -1312,35 +1352,49 @@ static void dot(bool canAssign) {
     return;
   }
   Object* obj = TO_OBJECT(namespace);
-  if (obj->type == ObjectStructTemplate) {
-    PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(namespace);
+  if (obj->type == ObjectStruct) {
+    PdStruct* pstruct = TO_STRUCT(namespace);
     uint8_t name = parseVariable("Expect identifier after '.'.");
     if (canAssign && match(TOKEN_EQUAL)) {
       expression();
       Value expected;
-      if (!tableGet(&structTemplate->fieldTypes,
-                    (PdString*)TO_OBJECT(
-                        compiler->current->chunk.constants.data[name]),
+      if (!tableGet(&pstruct->template->fieldTypes,
+                    TO_STRING(compiler->current->chunk.constants.data[name]),
                     &expected)) {
         parseError("Cannot assign to undeclared field.");
         return;
       }
-      Value type = peekType(0);
+      Value type = popType();
       if (type.type != expected.type) {
-        parseError("Type assignment mismatch.");
+        if (expected.type != VALUE_POINTER || !isPointer(&type)) {
+          parseError("Type assignment mismatch.");
+          return;
+        }
+      }
+      Value index;
+      if (!tableGet(&pstruct->template->fieldIndices,
+                    TO_STRING(compiler->current->chunk.constants.data[name]),
+                    &index)) {
+        parseError("Cannot assign to undeclared field.");
         return;
       }
-      tableSet(&structTemplate->fieldTypes,
-               TO_STRING(compiler->current->chunk.constants.data[name]), type);
+      pstruct->memory->data[TO_INTEGER(index)] = type;
       emitBytes(OP_STRUCT_SET, name);
     } else {
       Value expected;
-      if (!tableGet(&structTemplate->fieldTypes,
+      if (!tableGet(&pstruct->template->fieldTypes,
                     TO_STRING(compiler->current->chunk.constants.data[name]),
                     &expected)) {
         parseError("Cannot access undeclared field.");
       }
-      pushType(expected);
+      Value index;
+      if (!tableGet(&pstruct->template->fieldIndices,
+                    TO_STRING(compiler->current->chunk.constants.data[name]),
+                    &index)) {
+        parseError("Cannot assign to undeclared field.");
+        return;
+      }
+      pushType(pstruct->memory->data[TO_INTEGER(index)]);
       emitBytes(OP_STRUCT_GET, name);
     }
   } else if (obj->type == ObjectModule) {
@@ -1357,8 +1411,10 @@ static void dot(bool canAssign) {
       }
       Value type = peekType(0);
       if (type.type != expected.type) {
-        parseError("Type assignment mismatch.");
-        return;
+        if (expected.type != VALUE_POINTER || !isPointer(&type)) {
+          parseError("Type assignment mismatch.");
+          return;
+        }
       }
       tableSet(&module->globals,
                TO_STRING(compiler->current->chunk.constants.data[name]), type);
@@ -1386,20 +1442,25 @@ static void dot(bool canAssign) {
  */
 static void derefDot(bool canAssign) {
   Value pstructv = popType();
+
   if (pstructv.type != VALUE_OBJECT ||
-      TO_OBJECT(pstructv)->type != ObjectStructTemplate) {
+      TO_OBJECT(pstructv)->type != ObjectStruct) {
     parseError("Cannot access field of given value.");
     return;
   }
-  PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(pstructv);
+
+  PdStruct* pstruct = TO_STRUCT(pstructv);
   uint8_t name = parseVariable("Expect identifier after '::'.");
-  Value expected;
-  if (!tableGet(&structTemplate->fieldTypes,
+
+  Value index;
+  if (!tableGet(&pstruct->template->fieldIndices,
                 TO_STRING(compiler->current->chunk.constants.data[name]),
-                &expected)) {
+                &index)) {
     parseError("Cannot access undeclared field.");
     return;
   }
+  Value expected = pstruct->memory->data[TO_INTEGER(index)];
+
   if (expected.type != VALUE_POINTER && expected.type != VALUE_OBJECT) {
     parseError("Cannot dereference non-pointer field.");
     return;
@@ -1412,6 +1473,7 @@ static void derefDot(bool canAssign) {
     pushType(*(Value*)expected.data.pointer);
   } else
     pushType((Value){.type = expected.pointerType});
+
   emitBytes(OP_STRUCT_GET, name);
   emitByte(OP_DEREFERENCE);
 }
@@ -1432,16 +1494,16 @@ static void derefArrow(bool canAssign) {
     parseError("Cannot access field of given value.");
     return;
   }
-  PdStructTemplate* structTemplate = TO_STRUCT_TEMPLATE(popType());
+  PdStruct* pstruct = TO_STRUCT(popType());
   uint8_t name = parseVariable("Expect identifier after '~>'.");
-  Value expected;
-  if (!tableGet(&structTemplate->fieldTypes,
+  Value index;
+  if (!tableGet(&pstruct->template->fieldIndices,
                 TO_STRING(compiler->current->chunk.constants.data[name]),
-                &expected)) {
+                &index)) {
     parseError("Cannot access undeclared field.");
     return;
   }
-  pushType(expected);
+  pushType(pstruct->memory->data[TO_INTEGER(index)]);
   emitByte(OP_DEREFERENCE);
   emitBytes(OP_STRUCT_GET, name);
   if (match(TOKEN_EQUAL)) {
@@ -1880,9 +1942,12 @@ static void statement() {
       pushType(pointer ? NULL_POINTER : NULL_VAL);                             \
     } else {                                                                   \
       expression();                                                            \
-      if ((pointer && peekType(0).type != VALUE_POINTER &&                     \
-           peekType(0).type != VALUE_OBJECT) ||                                \
-          (!pointer && peekType(0).type != value)) {                           \
+      Value top = peekType(0);                                                 \
+      if (pointer && !isPointer(&top)) {                                       \
+        parseError("Mismatched types in declaration.");                        \
+        return;                                                                \
+      }                                                                        \
+      if (!pointer && top.type != value) {                                     \
         parseError("Mismatched types in declaration.");                        \
         return;                                                                \
       }                                                                        \
@@ -2014,10 +2079,9 @@ static void declarationStructTemplate() {
       parser.namespace != NULL ? &parser.namespace->globals : &parser.globals;
   uint8_t index = parseVariable("Expected variable name.");
   Value chk;
-  if (tableGet(
-          target,
-          (PdString*)TO_OBJECT(compiler->current->chunk.constants.data[index]),
-          &chk)) {
+  if (tableGet(target,
+               TO_STRING(compiler->current->chunk.constants.data[index]),
+               &chk)) {
     parseError("Struct already defined.");
     return;
   }
@@ -2089,7 +2153,7 @@ static void declarationStructInstance() {
 
   if (parser.namespace != NULL) {
     target = &parser.namespace->globals;
-    emitBytes(OP_GLOBAL_GET, parser.namespace->nameIndex);
+    emitBytes(OP_GLOBAL_GET, parser.namespace->index);
     emitByte(OP_SWAP);
   }
 
@@ -2100,7 +2164,9 @@ static void declarationStructInstance() {
     parseError("Field not defined for given namespace.");
     return;
   }
-  
+
+  bool global = false;
+
   // can also be a namespace
   if (match(TOKEN_DOT)) {
     if (pstructv.type != VALUE_OBJECT ||
@@ -2109,8 +2175,7 @@ static void declarationStructInstance() {
       return;
     }
 
-    uint8_t index = addConstant(&compiler->current->chunk, pstructv);
-    emitBytes(OP_CONSTANT_POINTER, index);
+    emitBytes(OP_GLOBAL_GET, type);
 
     do {
       if (pstructv.type != VALUE_OBJECT &&
@@ -2137,11 +2202,10 @@ static void declarationStructInstance() {
       parseError("Struct template does not exist.");
       return;
     }
-    emitBytes(OP_GLOBAL_GET, type);
   }
   if (pstructv.type == VALUE_OBJECT &&
       TO_OBJECT(pstructv)->type == ObjectStructTemplate) {
-    PdStructTemplate* pstruct = (PdStructTemplate*)TO_OBJECT(pstructv);
+    PdStructTemplate* pstructTemplate = (PdStructTemplate*)TO_OBJECT(pstructv);
     // can either be a struct instance or a pointer
     uint8_t op = OP_GLOBAL_DEFINE;
     bool pointer = false;
@@ -2152,6 +2216,7 @@ static void declarationStructInstance() {
 
     uint8_t index = parseVariable("Expected variable name.");
     Token name = parser.previous;
+    PdStruct* pstructInstance;
 
     if (pointer) {
       if (match(TOKEN_EQUAL)) {
@@ -2165,6 +2230,8 @@ static void declarationStructInstance() {
             parseError("Mismatched types in declaration.");
             return;
           }
+          pstructInstance =
+              (PdStruct*)TO_OBJECT((*(Value*)TO_POINTER(peekType(0))));
         }
       } else {
         emitByte(OP_NULL_POINTER);
@@ -2172,9 +2239,12 @@ static void declarationStructInstance() {
       }
     } else {
       // not a pointer
-      emitByte(OP_STRUCT_INSTANCE);
+      pstructInstance = newStruct(pstructTemplate);
+      emitBytes(OP_CONSTANT_POINTER, addConstant(&compiler->current->chunk,
+                                                 FROM_OBJECT(pstructInstance)));
       name = parser.previous;
     }
+    popType();
     if (compiler->scopeDepth == 0) {
       Table* target = &parser.globals;
       if (parser.namespace != NULL) {
@@ -2184,17 +2254,18 @@ static void declarationStructInstance() {
         op = OP_MODULE_SET;
       }
 
-      if (!tableSet(target,
-                    TO_STRING(compiler->current->chunk.constants.data[index]),
-                    pointer ? FROM_OBJECT(newReference(FROM_OBJECT(pstruct)))
-                            : FROM_OBJECT(pstruct))) {
+      if (!tableSet(
+              target, TO_STRING(compiler->current->chunk.constants.data[index]),
+              pointer ? FROM_OBJECT(newReference(FROM_OBJECT(pstructInstance)))
+                      : FROM_OBJECT(pstructInstance))) {
         parseError("Cannot redefine variable.");
         return;
       }
 
     } else {
-      addLocal(name, pointer ? FROM_OBJECT(newReference(FROM_OBJECT(pstruct)))
-                             : FROM_OBJECT(pstruct));
+      addLocal(name,
+               pointer ? FROM_OBJECT(newReference(FROM_OBJECT(pstructInstance)))
+                       : FROM_OBJECT(pstructInstance));
       op = OP_LOCAL_SET;
     }
 
@@ -2310,11 +2381,6 @@ PdFunction* compile(const char* source) {
   INIT_DYNAMIC_ARRAY(ValueType, parser.typeStack);
   initTable(&parser.globals);
   tableAddAll(&vm.globals, &parser.globals);
-  Value stl;
-  // for type checking we only need the template
-  tableGet(&parser.globals, copyString("stl", 3), &stl);
-  tableSet(&parser.globals, copyString("stl", 3),
-           FROM_OBJECT(TO_STRUCT(stl)->template));
 
   parser.hadError = false;
   parser.panicMode = false;

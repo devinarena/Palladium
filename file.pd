@@ -1,26 +1,12 @@
 
-
-nspace Outer {
-    nspace Inner {
-        nspace EvenMore {
-            int x = 0;
-            struct Test {
-                int y;
-            }
-        }
-    }
+struct Other {
+    int a;
 }
 
-int main() {
-    Outer.Inner.EvenMore.x = 5;
+inst Other other;
 
-    print Outer.Inner.EvenMore.x;
+other.a = 5;
 
-    inst Outer.Inner.EvenMore.Test t;
-    t.y = 10;
-    print t.y;
+print other.a;
 
-    ret 0;
-}
-
-main();
+stl::write(stl::tostr(other.a));

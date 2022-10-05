@@ -372,13 +372,6 @@ static InterpretResult run() {
         traveled++;
         break;
       }
-      case OP_STRUCT_INSTANCE: {
-        PdStructTemplate* ctemplate = TO_STRUCT_TEMPLATE(pop());
-        PdStruct* instance = newStruct(ctemplate);
-        push(FROM_OBJECT(instance));
-        traveled++;
-        break;
-      }
       case OP_STRUCT_GET: {
         PdString* name = READ_STRING();
         PdStruct* instance = TO_STRUCT(pop());
@@ -387,7 +380,7 @@ static InterpretResult run() {
           runtimeError("Undefined field '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
-        push(instance->fields[TO_INTEGER(index)]);
+        push(instance->memory->data[TO_INTEGER(index)]);
         traveled++;
         break;
       }
@@ -400,7 +393,7 @@ static InterpretResult run() {
           runtimeError("Undefined field '%s'.", name->chars);
           return INTERPRET_RUNTIME_ERROR;
         }
-        instance->fields[TO_INTEGER(index)] = value;
+        instance->memory->data[TO_INTEGER(index)] = value;
         traveled++;
         break;
       }

@@ -15,7 +15,6 @@
 #include "memory.h"
 #include "object.h"
 
-PdStruct* stl;
 Value* pargv;
 
 static Value p_clock(int argCount, Value* args) {
@@ -46,6 +45,20 @@ static Value intInput(int argCount, Value* args) {
   int i;
   scanf("%d", &i);
   return FROM_INTEGER(i);
+}
+
+static Value objCast(int argCount, Value* args) {
+  Value type = args[0];
+  Value obj = args[1];
+  if (type.type != VALUE_OBJECT || obj.type != VALUE_OBJECT ||
+      TO_OBJECT(type)->type != ObjectStructTemplate ||
+      TO_OBJECT(obj)->type != ObjectStruct) {
+    return NULL_VAL;
+  }
+  PdStructTemplate* template = TO_STRUCT_TEMPLATE(type);
+  PdStruct* casted = newStructSkeleton(template);
+  casted->memory = TO_STRUCT(obj)->memory;
+  return FROM_OBJECT(casted);
 }
 
 static PdStruct* createSTLStruct(int argc, const char* argv[]) {
@@ -118,25 +131,35 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   tableSet(&template->fieldIndices, iinput_str,
            FROM_INTEGER(template->fieldIndices.count));
 
+  PdString* objCast_str = copyString("objCast", 7);
+  PdBuiltin* objCast_bin = newBuiltin(FROM_INTEGER(0), &objCast, 2);
+  PdReference* objCast_ref = newReference(FROM_OBJECT(objCast_bin));
+  INSERT_DYNAMIC_ARRAY(Value, objCast_bin->argt, FROM_OBJECT(template));
+  INSERT_DYNAMIC_ARRAY(Value, objCast_bin->argt,
+                       FROM_OBJECT(newStructSkeleton(template)));
+  tableSet(&template->fieldTypes, objCast_str, FROM_OBJECT(objCast_ref));
+  tableSet(&template->fieldIndices, objCast_str,
+           FROM_INTEGER(template->fieldIndices.count));
+
   PdStruct* pstruct = newStruct(template);
-  pstruct->fieldCount = template->fieldIndices.count;
-  pstruct->fields[0] = FROM_INTEGER(argc);
-  pstruct->fields[1] = (Value){.type = VALUE_POINTER,
-                               .data.pointer = (struct Value*)pargv,
-                               .pointerType = VALUE_POINTER};
-  pstruct->fields[2] = FROM_DOUBLE(3.14159265358979323846);
-  pstruct->fields[3] = FROM_DOUBLE(2.718281828459);
-  pstruct->fields[4] = FROM_OBJECT(write_ref);
-  pstruct->fields[5] = FROM_OBJECT(to_str_ref);
-  pstruct->fields[6] = FROM_OBJECT(square_ref);
-  pstruct->fields[7] = FROM_OBJECT(atoi_ref);
-  pstruct->fields[8] = FROM_OBJECT(iinput_ref);
+  pstruct->memory->data[0] = FROM_INTEGER(argc);
+  pstruct->memory->data[1] = (Value){.type = VALUE_POINTER,
+                                     .data.pointer = (struct Value*)pargv,
+                                     .pointerType = VALUE_POINTER};
+  pstruct->memory->data[2] = FROM_DOUBLE(3.14159265358979323846);
+  pstruct->memory->data[3] = FROM_DOUBLE(2.718281828459);
+  pstruct->memory->data[4] = FROM_OBJECT(write_ref);
+  pstruct->memory->data[5] = FROM_OBJECT(to_str_ref);
+  pstruct->memory->data[6] = FROM_OBJECT(square_ref);
+  pstruct->memory->data[7] = FROM_OBJECT(atoi_ref);
+  pstruct->memory->data[8] = FROM_OBJECT(iinput_ref);
+  pstruct->memory->data[9] = FROM_OBJECT(objCast_ref);
 
   return pstruct;
 }
 
 void initBuiltins(Table* globals, int argc, const char* argv[]) {
-  stl = createSTLStruct(argc, argv);
+  PdStruct* stl = createSTLStruct(argc, argv);
 
   tableSet(globals, copyString("clock", 5),
            FROM_OBJECT(newBuiltin(FROM_INTEGER(0), &p_clock, 0)));

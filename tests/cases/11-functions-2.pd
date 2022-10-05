@@ -7,4 +7,4 @@ int test() {
 
 int* t = &test;
 
-print stl.square~((t~)());
+print stl.square~(t~());

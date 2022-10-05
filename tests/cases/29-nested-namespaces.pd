@@ -1,0 +1,26 @@
+
+
+nspace Outer {
+    nspace Inner {
+        nspace EvenMore {
+            int x = 0;
+            struct Test {
+                int y;
+            }
+        }
+    }
+}
+
+int main() {
+    Outer.Inner.EvenMore.x = 5;
+
+    print Outer.Inner.EvenMore.x;
+
+    inst Outer.Inner.EvenMore.Test t;
+    t.y = 10;
+    print t.y;
+
+    ret 0;
+}
+
+main();

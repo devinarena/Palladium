@@ -49,6 +49,12 @@ void freeObject(Object* object) {
       FREE(ObjectString, object);
       break;
     }
+    case ObjectMemory: {
+      PdMemory* memory = (PdMemory*)object;
+      FREE_ARRAY(Value, memory->data, memory->size);
+      FREE(ObjectMemory, object);
+      break;
+    }
     case ObjectFunction: {
       PdFunction* func = (PdFunction*)object;
       freeChunk(&func->chunk);
@@ -71,7 +77,6 @@ void freeObject(Object* object) {
     }
     case ObjectStruct: {
       PdStruct* pstruct = (PdStruct*)object;
-      FREE_ARRAY(Value, pstruct->fields, pstruct->fieldCount);
       FREE(ObjectStruct, object);
       break;
     }

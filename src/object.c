@@ -113,6 +113,13 @@ PdString* copyString(const char* chars, int length) {
   return allocateString(heapChars, length, hash);
 }
 
+PdMemory* newMemory(size_t size) {
+  PdMemory* memory = ALLOCATE_OBJ(PdMemory, ObjectMemory);
+  memory->size = size;
+  memory->data = ALLOCATE(Value, size);
+  return memory;
+}
+
 PdFunction* newFunction(ValueType returnType, PdString* name) {
   PdFunction* function = ALLOCATE_OBJ(PdFunction, ObjectFunction);
   initChunk(&function->chunk);
@@ -140,11 +147,27 @@ PdStructTemplate* newStructTemplate() {
   return pstruct;
 }
 
+/**
+ * @brief Creates a struct instance and allocates memory for its fields.
+ * 
+ * @param pstruct PdStructTemplate* the template to utilize
+ * @return PdStruct* the struct instance
+ */
 PdStruct* newStruct(PdStructTemplate* pstruct) {
+  PdStruct* instance = newStructSkeleton(pstruct);
+  instance->memory = newMemory(pstruct->fieldTypes.count);
+  return instance;
+}
+
+/**
+ * @brief Allocates a struct without allocating memory for its fields.
+ * 
+ * @param pstruct PdStructTemplate* the template to utilize
+ * @return PdStruct* the struct instance
+ */
+PdStruct* newStructSkeleton(PdStructTemplate* pstruct) {
   PdStruct* instance = ALLOCATE_OBJ(PdStruct, ObjectStruct);
   instance->template = pstruct;
-  instance->fieldCount = pstruct->fieldIndices.count;
-  instance->fields = ALLOCATE(Value, instance->fieldCount);
   return instance;
 }
 
@@ -233,6 +256,10 @@ void printObject(Value value) {
       printf("<module %p>", TO_MODULE(value));
       break;
     }
+    case ObjectMemory: {
+      printf("<memory %p>", TO_MEMORY(value));
+      break;
+    }
     default:
       printf("%p", TO_OBJECT(value));
       break;
@@ -261,6 +288,8 @@ const char* getObjectTypeName(ObjectType type) {
       return "reference";
     case ObjectModule:
       return "module";
+    case ObjectMemory:
+      return "memory";
     default:
       return "unknown";
   }
