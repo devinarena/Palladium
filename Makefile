@@ -2,6 +2,7 @@
 SRC = src
 BIN = bin
 CC = gcc
+CFLAGS=-lm -g
 output = palladium
 alias = pal
 debug_file = file.pd
@@ -13,7 +14,7 @@ all:
 	@echo "Creating bin directory..."
 	@mkdir -p $(target)
 	@echo "Creating build target for Palladium..."
-	$(CC) $(source) -g -o $(target)/$(output)
+	$(CC) $(source) -o $(target)/$(output) $(CFLAGS)
 	@echo "Creating alias for Palladium..."
 	cp $(target)/$(output) $(alias)
 	@echo "Build complete."

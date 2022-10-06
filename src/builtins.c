@@ -47,20 +47,6 @@ static Value intInput(int argCount, Value* args) {
   return FROM_INTEGER(i);
 }
 
-static Value objCast(int argCount, Value* args) {
-  Value type = args[0];
-  Value obj = args[1];
-  if (type.type != VALUE_OBJECT || obj.type != VALUE_OBJECT ||
-      TO_OBJECT(type)->type != ObjectStructTemplate ||
-      TO_OBJECT(obj)->type != ObjectStruct) {
-    return NULL_VAL;
-  }
-  PdStructTemplate* template = TO_STRUCT_TEMPLATE(type);
-  PdStruct* casted = newStructSkeleton(template);
-  casted->memory = TO_STRUCT(obj)->memory;
-  return FROM_OBJECT(casted);
-}
-
 static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   PdStructTemplate* template = newStructTemplate();
 
@@ -131,16 +117,6 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   tableSet(&template->fieldIndices, iinput_str,
            FROM_INTEGER(template->fieldIndices.count));
 
-  PdString* objCast_str = copyString("objCast", 7);
-  PdBuiltin* objCast_bin = newBuiltin(FROM_INTEGER(0), &objCast, 2);
-  PdReference* objCast_ref = newReference(FROM_OBJECT(objCast_bin));
-  INSERT_DYNAMIC_ARRAY(Value, objCast_bin->argt, FROM_OBJECT(template));
-  INSERT_DYNAMIC_ARRAY(Value, objCast_bin->argt,
-                       FROM_OBJECT(newStructSkeleton(template)));
-  tableSet(&template->fieldTypes, objCast_str, FROM_OBJECT(objCast_ref));
-  tableSet(&template->fieldIndices, objCast_str,
-           FROM_INTEGER(template->fieldIndices.count));
-
   PdStruct* pstruct = newStruct(template);
   pstruct->memory->data[0] = FROM_INTEGER(argc);
   pstruct->memory->data[1] = (Value){.type = VALUE_POINTER,
@@ -153,7 +129,6 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   pstruct->memory->data[6] = FROM_OBJECT(square_ref);
   pstruct->memory->data[7] = FROM_OBJECT(atoi_ref);
   pstruct->memory->data[8] = FROM_OBJECT(iinput_ref);
-  pstruct->memory->data[9] = FROM_OBJECT(objCast_ref);
 
   return pstruct;
 }

@@ -618,7 +618,7 @@ static void grouping(bool canAssign) {
  */
 static void unary(bool canAssign) {
   ValueType previous = parser.previous.type;
-
+  
   parsePrecedence(PREC_UNARY);
 
   Value current = popType();
@@ -1061,7 +1061,7 @@ static void cast(bool canAssign) {
     expression();
     Value top = popType();
     if (pointer) {
-      if (top.type != VALUE_POINTER) {
+      if (!isPointer(&top)) {
         parseError("Cannot cast non-pointer to pointer.");
         return;
       }
@@ -1146,53 +1146,61 @@ static void cast(bool canAssign) {
       }
     }
   } else {
-    // uint8_t name = parseVariable("Expected type name.");
-    // if (!tableGet(&parser.globals,
-    //               TO_STRING(compiler->current->chunk.constants.data[name]),
-    //               &expected)) {
-    //   parseError("Cannot cast to undeclared type.");
-    //   return;
-    // }
-    // if (match(TOKEN_DOT)) {
-    //   if (expected.type != VALUE_OBJECT ||
-    //       TO_OBJECT(expected)->type != ObjectModule) {
-    //     parseError("Cannot grab from non-module type.");
-    //     return;
-    //   }
-    //   name = parseVariable("Expected variable name.");
-    //   if (!tableGet(&TO_MODULE(expected)->globals,
-    //                 TO_STRING(compiler->current->chunk.constants.data[name]),
-    //                 &expected)) {
-    //     parseError("Cannot cast to undeclared type.");
-    //     return;
-    //   }
-    // }
-    // if (expected.type != VALUE_OBJECT ||
-    //     TO_OBJECT(expected)->type != ObjectStructTemplate) {
-    //   parseError("Cannot cast to non-object type.");
-    //   return;
-    // }
-    // pointer = match(TOKEN_STAR);
-    // if (!match(TOKEN_RIGHT_PAREN)) {
-    //   parseError("Expected ')' after 'cast' keyword.");
-    //   return;
-    // }
-    // expression();
-    // Value top = popType();
-    // if (pointer) {
-    //   emitBytes(OP_OBJECT_CAST_PTR,
-    //             addConstant(&compiler->current->chunk, expected));
-    //   pushType(FROM_OBJECT(newReference(top)));
-    // } else {
-    //   if (top.type != VALUE_OBJECT || TO_OBJECT(top)->type != ObjectStruct) {
-    //     parseError("Cannot cast non-object to object.");
-    //     return;
-    //   }
-    //   PdObjectCast* cast = newObjectCast(TO_STRUCT(top), TO_STRUCT_TEMPLATE(expected));
-    //   emitBytes(OP_OBJECT_CAST, addConstant(&compiler->current->chunk, expected));
-    //   TO_STRUCT(top)->template = TO_STRUCT_TEMPLATE(expected);
-    //   pushType(top);
-    // }
+    uint8_t name = parseVariable("Expected type name.");
+    if (!tableGet(&parser.globals,
+                  TO_STRING(compiler->current->chunk.constants.data[name]),
+                  &expected)) {
+      parseError("Cannot cast to undeclared type.");
+      return;
+    }
+    while (match(TOKEN_DOT)) {
+      if (expected.type != VALUE_OBJECT ||
+          TO_OBJECT(expected)->type != ObjectModule) {
+        parseError("Cannot grab from non-module type.");
+        return;
+      }
+      name = parseVariable("Expected variable name.");
+      if (!tableGet(&TO_MODULE(expected)->globals,
+                    TO_STRING(compiler->current->chunk.constants.data[name]),
+                    &expected)) {
+        parseError("Cannot cast to undeclared type.");
+        return;
+      }
+    }
+    if (expected.type != VALUE_OBJECT ||
+        TO_OBJECT(expected)->type != ObjectStructTemplate) {
+      parseError("Cannot cast to non-object type.");
+      return;
+    }
+    pointer = match(TOKEN_STAR);
+    if (!match(TOKEN_RIGHT_PAREN)) {
+      parseError("Expected ')' after 'cast' keyword.");
+      return;
+    }
+    expression();
+    Value top = popType();
+    if (pointer) {
+      PdStruct* casted = newStruct(TO_STRUCT_TEMPLATE(expected));
+      if (!isPointer(&top)) {
+        parseError("Cannot cast non-pointer to pointer.");
+        return;
+      }
+      casted->memory = TO_STRUCT(TO_REFERENCE(top)->value)->memory;
+      PdReference* ref = newReference(FROM_OBJECT(casted));
+      emitByte(OP_POP);
+      emitBytes(OP_CONSTANT_POINTER, addConstant(&compiler->current->chunk, FROM_OBJECT(ref)));
+      pushType(FROM_OBJECT(ref));
+    } else {
+      if (top.type != VALUE_OBJECT || TO_OBJECT(top)->type != ObjectStruct) {
+        parseError("Cannot cast non-object to object.");
+        return;
+      }
+      PdStruct* casted = newStructSkeleton(TO_STRUCT_TEMPLATE(expected));
+      casted->memory = TO_STRUCT(top)->memory;
+      emitByte(OP_POP);
+      emitBytes(OP_CONSTANT_POINTER, addConstant(&compiler->current->chunk, FROM_OBJECT(casted)));
+      pushType(FROM_OBJECT(casted));
+    }
   }
 }
 
@@ -2230,8 +2238,7 @@ static void declarationStructInstance() {
             parseError("Mismatched types in declaration.");
             return;
           }
-          pstructInstance =
-              (PdStruct*)TO_OBJECT((*(Value*)TO_POINTER(peekType(0))));
+          pstructInstance = TO_STRUCT(TO_REFERENCE(peekType(0))->value);
         }
       } else {
         emitByte(OP_NULL_POINTER);
