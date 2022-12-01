@@ -3,8 +3,8 @@ SRC = src
 BIN = bin
 CC = gcc
 CFLAGS=-lm -g
-output = palladium
-alias = pal
+output = palladium.exe
+alias = pal.exe
 debug_file = file.pd
 
 source := $(wildcard $(SRC)/*.c)

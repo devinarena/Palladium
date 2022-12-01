@@ -1,0 +1,53 @@
+
+
+// A basic little RPG game where you fight a monster
+
+struct Game {
+    int health;
+    int monsterHealth;
+    int turn;
+}
+
+void checkWinner(Game* game) {
+}
+
+void turn(Game* game) {
+    stl::write("What would you like to do?");
+    stl::write("1) Heavy Attack (3 damage)");
+    stl::write("2) Light Attack (1 damage)");
+    int choice = stl::readint();
+
+    if (choice == 1) {
+    } else if (choice == 2) {
+    } else {
+        stl::write("Invalid choice!");
+        turn(game);
+    }
+}
+
+int main() {
+    stl::write("RPG v1.0 by Devin Arena");
+    stl::write("A monster appears!");
+
+    inst Game game;
+    game.health = 20;
+    game.monsterHealth = 20;
+    game.turn = 0;
+
+    while (game.health > 0 || game.monsterHealth > 0) {
+        game.turn = game.turn + 1;
+        
+        stl::write("Turn: " + stl::tostr(game.turn));
+        stl::write("Your health: " + stl::tostr(game.health));
+        stl::write("Monster health: " + stl::tostr(game.monsterHealth));
+
+        stl::write("");
+        turn(&game);
+    }
+
+    checkWinner(&game);
+
+    ret 0;
+}
+
+main();

@@ -618,7 +618,7 @@ static void grouping(bool canAssign) {
  */
 static void unary(bool canAssign) {
   ValueType previous = parser.previous.type;
-  
+
   parsePrecedence(PREC_UNARY);
 
   Value current = popType();
@@ -793,7 +793,13 @@ static void binary(bool canAssign) {
         emitBytes(OP_SWAP, OP_ADD_POINTER);
         pushType(bef);
       } else if (before == VALUE_OBJECT && after == VALUE_OBJECT) {
-        emitByte(OP_ADD_OBJECT);
+          emitByte(OP_ADD_OBJECT);
+        if (TO_OBJECT(bef)->type == ObjectString &&
+            TO_OBJECT(aft)->type == ObjectString) {
+          pushType(bef);
+        } else {
+          parseError("Cannot add objects of different types.");
+        }
       } else {
         parseError("Addition invalid for given values.");
         return;
@@ -1188,7 +1194,8 @@ static void cast(bool canAssign) {
       casted->memory = TO_STRUCT(TO_REFERENCE(top)->value)->memory;
       PdReference* ref = newReference(FROM_OBJECT(casted));
       emitByte(OP_POP);
-      emitBytes(OP_CONSTANT_POINTER, addConstant(&compiler->current->chunk, FROM_OBJECT(ref)));
+      emitBytes(OP_CONSTANT_POINTER,
+                addConstant(&compiler->current->chunk, FROM_OBJECT(ref)));
       pushType(FROM_OBJECT(ref));
     } else {
       if (top.type != VALUE_OBJECT || TO_OBJECT(top)->type != ObjectStruct) {
@@ -1198,7 +1205,8 @@ static void cast(bool canAssign) {
       PdStruct* casted = newStructSkeleton(TO_STRUCT_TEMPLATE(expected));
       casted->memory = TO_STRUCT(top)->memory;
       emitByte(OP_POP);
-      emitBytes(OP_CONSTANT_POINTER, addConstant(&compiler->current->chunk, FROM_OBJECT(casted)));
+      emitBytes(OP_CONSTANT_POINTER,
+                addConstant(&compiler->current->chunk, FROM_OBJECT(casted)));
       pushType(FROM_OBJECT(casted));
     }
   }
@@ -1903,6 +1911,8 @@ static void importStatement() {
     char nspaceDeclare[10 + as->length];
     sprintf(nspaceDeclare, "nspace %s {\n", as->chars);
     insertSource(nspaceDeclare);
+  } else {
+    insertSource(source);
   }
   advance();
 }
@@ -2183,8 +2193,6 @@ static void declarationStructInstance() {
       return;
     }
 
-    emitBytes(OP_GLOBAL_GET, type);
-
     do {
       if (pstructv.type != VALUE_OBJECT &&
           TO_OBJECT(pstructv)->type != ObjectModule) {
@@ -2193,7 +2201,6 @@ static void declarationStructInstance() {
       }
 
       uint8_t field = parseVariable("Expected field name.");
-      emitBytes(OP_MODULE_GET, field);
 
       if (!tableGet(&TO_MODULE(pstructv)->globals,
                     TO_STRING(compiler->current->chunk.constants.data[field]),
@@ -2250,6 +2257,7 @@ static void declarationStructInstance() {
       emitBytes(OP_CONSTANT_POINTER, addConstant(&compiler->current->chunk,
                                                  FROM_OBJECT(pstructInstance)));
       name = parser.previous;
+      pushType(NULL_POINTER);  // do nothing with it
     }
     popType();
     if (compiler->scopeDepth == 0) {

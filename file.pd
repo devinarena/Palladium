@@ -1,12 +1,8 @@
 
-struct Other {
-    int a;
-}
+imp "./external.pd" as External;
 
-inst Other other;
+inst External.Internal.Coin coin;
 
-other.a = 5;
+coin.value = 10;
 
-print other.a;
-
-stl::write(stl::tostr(other.a));
+stl::write(stl::tostr(coin.value));

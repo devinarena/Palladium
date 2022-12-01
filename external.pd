@@ -1,4 +1,6 @@
 
-struct Coin {
-    int* value;
+nspace Internal {
+    struct Coin {
+        int value;
+    }
 }

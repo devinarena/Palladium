@@ -41,7 +41,7 @@ static Value tostr(int argCount, Value* args) {
   return FROM_OBJECT(toString(&args[0]));
 }
 
-static Value intInput(int argCount, Value* args) {
+static Value readInt(int argCount, Value* args) {
   int i;
   scanf("%d", &i);
   return FROM_INTEGER(i);
@@ -110,11 +110,11 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   tableSet(&template->fieldIndices, pdstr_patoi,
            FROM_INTEGER(template->fieldIndices.count));
 
-  PdString* iinput_str = copyString("iinput", 6);
-  PdBuiltin* iinput_bin = newBuiltin(FROM_INTEGER(0), &intInput, 0);
-  PdReference* iinput_ref = newReference(FROM_OBJECT(iinput_bin));
-  tableSet(&template->fieldTypes, iinput_str, FROM_OBJECT(iinput_ref));
-  tableSet(&template->fieldIndices, iinput_str,
+  PdString* readint_str = copyString("readint", 7);
+  PdBuiltin* readint_bin = newBuiltin(FROM_INTEGER(0), &readInt, 0);
+  PdReference* readint_ref = newReference(FROM_OBJECT(readint_bin));
+  tableSet(&template->fieldTypes, readint_str, FROM_OBJECT(readint_ref));
+  tableSet(&template->fieldIndices, readint_str,
            FROM_INTEGER(template->fieldIndices.count));
 
   PdStruct* pstruct = newStruct(template);
@@ -128,7 +128,7 @@ static PdStruct* createSTLStruct(int argc, const char* argv[]) {
   pstruct->memory->data[5] = FROM_OBJECT(to_str_ref);
   pstruct->memory->data[6] = FROM_OBJECT(square_ref);
   pstruct->memory->data[7] = FROM_OBJECT(atoi_ref);
-  pstruct->memory->data[8] = FROM_OBJECT(iinput_ref);
+  pstruct->memory->data[8] = FROM_OBJECT(readint_ref);
 
   return pstruct;
 }

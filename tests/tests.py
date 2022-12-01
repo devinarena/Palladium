@@ -20,7 +20,7 @@ import subprocess
 def run_test(case):
     # Run the test case.
     output = subprocess.check_output([
-        os.path.join("..", "bin", "palladium"),
+        os.path.join("..", "bin", "palladium.exe"),
         os.path.join("cases", case + ".pd")
     ])
     # Compare the output to the expected result.
@@ -66,7 +66,7 @@ def compile_all_tests():
         print("\nCompiling test case: " + case)
         with open(os.path.join("cases", case + ".expected.txt"), "w") as f:
             output = subprocess.check_output([
-                os.path.join("..", "bin", "palladium"),
+                os.path.join("..", "bin", "palladium.exe"),
                 os.path.join("cases", case + ".pd")
             ])
             f.write(output.decode("utf-8").replace("\r", ""))
