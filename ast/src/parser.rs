@@ -18,7 +18,11 @@ impl Parser {
     }
 
     fn previous(&self) -> Token {
-        self.tokens[self.position - 1].clone()
+        if self.position == 0 {
+            self.tokens[self.position].clone()
+        } else {
+            self.tokens[self.position - 1].clone()
+        }
     }
 
     fn peek(&self) -> &Token {
@@ -47,6 +51,8 @@ impl Parser {
     }
 
     pub fn expression(&mut self) -> Expression {
+        self.advance();
+
         self.literal()
     }
 }

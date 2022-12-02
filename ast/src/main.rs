@@ -7,7 +7,9 @@ mod expression {
     pub mod expression;
 }
 
-use std::env;
+use std::{env};
+
+use crate::token::Token;
 
 
 fn main() {
@@ -18,10 +20,12 @@ fn main() {
         return;
     }
 
-    let mut lexer = lexer::Lexer::new(args[1].clone());
-    lexer.tokenize();
+    let lexer: &mut lexer::Lexer = &mut lexer::Lexer::new(args[1].clone());
+    let tokens: Vec<Token> = lexer.tokenize();
     dbg!(lexer);
 
-    let mut parser = parser::Parser::new(lexer.tokens.clone());
+    let parser: &mut parser::Parser = &mut parser::Parser::new(tokens.clone());
     dbg!(parser.expression());
+
+    
 }

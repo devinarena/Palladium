@@ -7,12 +7,11 @@ use crate::token::{Token, TokenType};
 /// Author: Devin Arena
 /// Date: 12/1/2022
 /// Description: Lexer for the AST
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Lexer {
     input: String,
     position: usize,
     line: usize,
-    pub tokens: Vec<Token>
 }
 
 impl Lexer {
@@ -26,7 +25,6 @@ impl Lexer {
             input: Self::read_source(input),
             position: 0,
             line: 0,
-            tokens: Vec::new()
         }
     }
 
@@ -79,23 +77,26 @@ impl Lexer {
         Token::new(token_type, lexeme)
     }
 
-    pub fn tokenize(&mut self) {
+    pub fn tokenize(&mut self) -> Vec<Token> {
+        let mut tokens: Vec<Token> = Vec::new();
         while self.peek() != '\0' {
             match self.peek() {
                 '0'..='9' => {
                     let token: Token = self.number();
-                    self.tokens.push(token)
+                    tokens.push(token)
                 },
-                ';' => self.tokens.push(Token::new(TokenType::SEMICOLON, ";".to_string())),
-                '+' => self.tokens.push(Token::new(TokenType::PLUS, "+".to_string())),
-                '-' => self.tokens.push(Token::new(TokenType::MINUS, "-".to_string())),
+                ';' => tokens.push(Token::new(TokenType::SEMICOLON, ";".to_string())),
+                '+' => tokens.push(Token::new(TokenType::PLUS, "+".to_string())),
+                '-' => tokens.push(Token::new(TokenType::MINUS, "-".to_string())),
                 _ => self.skip_whitespace()
             }
 
             self.advance();
         }
 
-        self.tokens.push(Token::new(TokenType::EOF, String::from("EOF")));
+        tokens.push(Token::new(TokenType::EOF, String::from("EOF")));
+
+        tokens
     }
 }
 
