@@ -50,6 +50,14 @@ impl Lexer {
 
     fn skip_whitespace(&mut self) {
         while self.peek().is_whitespace() {
+            if self.peek() == '\0' {
+                break;
+            }
+
+            if self.peek() == '\n' {
+                self.line += 1;
+            }
+
             self.advance();
         }
     }
