@@ -1,0 +1,1 @@
+C:\Users\devin\Documents\GitHub\Palladium\ast\target\debug\ast.exe: C:\Users\devin\Documents\GitHub\Palladium\ast\src\expression\expression.rs C:\Users\devin\Documents\GitHub\Palladium\ast\src\lexer.rs C:\Users\devin\Documents\GitHub\Palladium\ast\src\main.rs C:\Users\devin\Documents\GitHub\Palladium\ast\src\token.rs C:\Users\devin\Documents\GitHub\Palladium\ast\src\value.rs
