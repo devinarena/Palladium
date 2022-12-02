@@ -1,3 +1,4 @@
+mod interpreter;
 mod lexer;
 mod parser;
 
@@ -7,10 +8,9 @@ mod expression {
     pub mod expression;
 }
 
-use std::{env};
+use std::env;
 
 use crate::token::Token;
-
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -20,12 +20,14 @@ fn main() {
         return;
     }
 
-    let lexer: &mut lexer::Lexer = &mut lexer::Lexer::new(args[1].clone());
+    let mut lexer: lexer::Lexer = lexer::Lexer::new(args[1].clone());
     let tokens: Vec<Token> = lexer.tokenize();
     dbg!(lexer);
 
-    let parser: &mut parser::Parser = &mut parser::Parser::new(tokens.clone());
-    dbg!(parser.expression());
+    let mut parser: parser::Parser = parser::Parser::new(tokens.clone());
+    let expr = parser.expression().clone();
+    dbg!(expr);
 
-    
+    let interpreter: interpreter::Interpreter = interpreter::Interpreter::new(expr);
+    let result = interpreter.interpret();
 }

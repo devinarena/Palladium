@@ -50,6 +50,10 @@ impl Lexer {
 
     fn skip_whitespace(&mut self) {
         while self.peek().is_whitespace() {
+            if self.peek() == '\n' {
+                self.line += 1;
+            }
+
             self.advance();
         }
     }
@@ -74,7 +78,7 @@ impl Lexer {
             }
         }
 
-        Token::new(token_type, lexeme)
+        Token::new(token_type, lexeme, self.line)
     }
 
     pub fn tokenize(&mut self) -> Vec<Token> {
@@ -85,16 +89,16 @@ impl Lexer {
                     let token: Token = self.number();
                     tokens.push(token)
                 },
-                ';' => tokens.push(Token::new(TokenType::SEMICOLON, ";".to_string())),
-                '+' => tokens.push(Token::new(TokenType::PLUS, "+".to_string())),
-                '-' => tokens.push(Token::new(TokenType::MINUS, "-".to_string())),
+                ';' => tokens.push(Token::new(TokenType::SEMICOLON, ";".to_string(), self.line)),
+                '+' => tokens.push(Token::new(TokenType::PLUS, "+".to_string(), self.line)),
+                '-' => tokens.push(Token::new(TokenType::MINUS, "-".to_string(), self.line)),
                 _ => self.skip_whitespace()
             }
 
             self.advance();
         }
 
-        tokens.push(Token::new(TokenType::EOF, String::from("EOF")));
+        tokens.push(Token::new(TokenType::EOF, String::from("EOF"), self.line));
 
         tokens
     }
