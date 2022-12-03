@@ -1,11 +1,12 @@
 use std::fmt::{Display, self};
 
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum Value {
     Null(),
     Integer(i32),
     Float(f32),
+    String(String),
 }
 
 impl Display for Value {
@@ -16,6 +17,9 @@ impl Display for Value {
                 write!(f, "{}", value)
             }
             Value::Float(value) => {
+                write!(f, "{}", value)
+            }
+            Value::String(value) => {
                 write!(f, "{}", value)
             }
         }

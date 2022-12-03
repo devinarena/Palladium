@@ -72,7 +72,6 @@ impl Parser {
             return Token::new(TokenType::ERROR, String::new(), 0);
         }
 
-        self.advance();
         self.previous()
     }
 
@@ -89,6 +88,14 @@ impl Parser {
             },
             TokenType::FLOAT => {
                 Expression::Literal(Value::Float(self.previous().lexeme.parse::<f32>().unwrap()))
+            },
+            TokenType::STRING => {
+                Expression::Literal(Value::String(self.previous().lexeme))
+            },
+            TokenType::LEFT_PAREN => {
+                let expr = self.expression();
+                self.consume(TokenType::RIGHT_PAREN, "Expected ')' after expression.");
+                return Expression::Grouping(Box::new(expr));
             },
             _ => panic!("Unexpected token type")
         }

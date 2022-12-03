@@ -1,7 +1,6 @@
-use std::{fs, fmt::Debug};
+use std::{fmt::Debug, fs};
 
 use crate::token::{Token, TokenType};
-
 
 /// File: lexer.rs
 /// Author: Devin Arena
@@ -48,6 +47,24 @@ impl Lexer {
         self.position += 1;
     }
 
+    fn match_char(&mut self, expected: char) -> bool {
+        if self.peek() == expected {
+            self.advance();
+            return true;
+        }
+
+        false
+    }
+
+    fn consume(&mut self, expected: char, message: &str) -> bool {
+        if self.peek() == expected {
+            self.advance();
+            return true;
+        }
+
+        panic!("[line {}] Error: {} at position {}", self.line, message, self.position);
+    }
+
     fn skip_whitespace(&mut self) {
         while self.peek().is_whitespace() {
             if self.peek() == '\0' {
@@ -85,6 +102,31 @@ impl Lexer {
         Token::new(token_type, lexeme, self.line)
     }
 
+    fn string(&mut self) -> Token {
+        let mut lexeme = String::new();
+        let line = self.line;
+        self.advance();
+
+        while self.peek() != '"' {
+
+            if self.peek() == '\0' {
+                panic!("Unterminated string");
+            }
+
+            if self.peek() == '\n' {
+                self.line += 1;
+            }
+
+            lexeme.push(self.peek());
+
+            self.advance();
+        }
+
+        self.consume('"', "Unterminated string");
+
+        Token::new(TokenType::STRING, lexeme, line)
+    }
+
     pub fn tokenize(&mut self) -> Vec<Token> {
         let mut tokens: Vec<Token> = Vec::new();
         while self.peek() != '\0' {
@@ -94,13 +136,28 @@ impl Lexer {
                     let token: Token = self.number();
                     advance = false;
                     tokens.push(token)
-                },
+                }
                 ';' => tokens.push(Token::new(TokenType::SEMICOLON, ";".to_string(), self.line)),
                 '+' => tokens.push(Token::new(TokenType::PLUS, "+".to_string(), self.line)),
                 '-' => tokens.push(Token::new(TokenType::MINUS, "-".to_string(), self.line)),
                 '*' => tokens.push(Token::new(TokenType::STAR, "*".to_string(), self.line)),
                 '/' => tokens.push(Token::new(TokenType::SLASH, "/".to_string(), self.line)),
-                _ => self.skip_whitespace()
+                '(' => tokens.push(Token::new(
+                    TokenType::LEFT_PAREN,
+                    "(".to_string(),
+                    self.line,
+                )),
+                ')' => tokens.push(Token::new(
+                    TokenType::RIGHT_PAREN,
+                    ")".to_string(),
+                    self.line,
+                )),
+                '"' => {
+                    let string: Token = self.string();
+                    advance = false;
+                    tokens.push(string)
+                }
+                _ => self.skip_whitespace(),
             }
             if advance {
                 self.advance();

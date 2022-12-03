@@ -1,5 +1,4 @@
-use std::fmt::{Debug, Display, Formatter, self};
-
+use std::fmt::{self, Debug, Display, Formatter};
 
 /// File: token.rs
 /// Author: Devin Arena
@@ -8,15 +7,20 @@ use std::fmt::{Debug, Display, Formatter, self};
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub enum TokenType {
-    INTEGER,
-    FLOAT,
     PLUS,
     MINUS,
     STAR,
     SLASH,
     SEMICOLON,
+    LEFT_PAREN,
+    RIGHT_PAREN,
+
+    INTEGER,
+    FLOAT,
+    STRING,
+
     ERROR,
-    EOF
+    EOF,
 }
 
 impl Display for TokenType {
@@ -37,7 +41,7 @@ impl Token {
         Token {
             token_type,
             lexeme,
-            line
+            line,
         }
     }
 }

@@ -23,9 +23,18 @@ impl Interpreter {
 impl Visitor for Interpreter {
     fn visit_literal(&mut self, literal: &Expression) -> Value {
         match literal {
-            Expression::Literal(value) => *value,
+            Expression::Literal(value) => value.clone(),
             _ => {
                 panic!("Expected literal");
+            }
+        }
+    }
+
+    fn visit_grouping(&mut self, grouping: &Expression) -> Value {
+        match grouping {
+            Expression::Grouping(expression) => expression.visit(self),
+            _ => {
+                panic!("Expected grouping");
             }
         }
     }
