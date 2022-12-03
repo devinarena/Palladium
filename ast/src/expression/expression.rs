@@ -1,24 +1,34 @@
-use crate::value::Value;
+use crate::{value::Value, token::{TokenType}};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub enum Expression {
     Literal(Value),
+    Unary(TokenType, Box<Expression>),
+    Binary(Box<Expression>, TokenType, Box<Expression>),
 }
 
 impl Visited for Expression {
-    fn visit(&mut self, visitor: &mut dyn Visitor) -> Value {
+    fn visit(&self, visitor: &mut dyn Visitor) -> Value {
         match self {
             Expression::Literal(_) => {
-                visitor.visit_literal(*self)
+                visitor.visit_literal(self)
+            },
+            Expression::Unary(_, _) => {
+                visitor.visit_unary(self)
+            }
+            Expression::Binary(_, _, _) => {
+                visitor.visit_binary(self)
             }
         }
     }
 }
 
 pub trait Visited {
-    fn visit(&mut self, visitor: &mut dyn Visitor) -> Value;
+    fn visit(&self, visitor: &mut dyn Visitor) -> Value;
 }
 
 pub trait Visitor {
-    fn visit_literal(&mut self, literal: Expression) -> Value;
+    fn visit_literal(&mut self, literal: &Expression) -> Value;
+    fn visit_unary(&mut self, unary: &Expression) -> Value;
+    fn visit_binary(&mut self, binary: &Expression) -> Value;
 }

@@ -82,27 +82,32 @@ impl Lexer {
             }
         }
 
-        Token::new(token_type, lexeme)
+        Token::new(token_type, lexeme, self.line)
     }
 
     pub fn tokenize(&mut self) -> Vec<Token> {
         let mut tokens: Vec<Token> = Vec::new();
         while self.peek() != '\0' {
+            let mut advance: bool = true;
             match self.peek() {
                 '0'..='9' => {
                     let token: Token = self.number();
+                    advance = false;
                     tokens.push(token)
                 },
-                ';' => tokens.push(Token::new(TokenType::SEMICOLON, ";".to_string())),
-                '+' => tokens.push(Token::new(TokenType::PLUS, "+".to_string())),
-                '-' => tokens.push(Token::new(TokenType::MINUS, "-".to_string())),
+                ';' => tokens.push(Token::new(TokenType::SEMICOLON, ";".to_string(), self.line)),
+                '+' => tokens.push(Token::new(TokenType::PLUS, "+".to_string(), self.line)),
+                '-' => tokens.push(Token::new(TokenType::MINUS, "-".to_string(), self.line)),
+                '*' => tokens.push(Token::new(TokenType::STAR, "*".to_string(), self.line)),
+                '/' => tokens.push(Token::new(TokenType::SLASH, "/".to_string(), self.line)),
                 _ => self.skip_whitespace()
             }
-
-            self.advance();
+            if advance {
+                self.advance();
+            }
         }
 
-        tokens.push(Token::new(TokenType::EOF, String::from("EOF")));
+        tokens.push(Token::new(TokenType::EOF, String::from("EOF"), self.line));
 
         tokens
     }
