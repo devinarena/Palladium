@@ -81,7 +81,7 @@ impl Lexer {
 
     fn number(&mut self) -> Token {
         let mut lexeme = String::new();
-        let mut token_type = TokenType::INTEGER;
+        let mut token_type = TokenType::LITERAL_INTEGER;
 
         while self.peek().is_digit(10) {
             lexeme.push(self.peek());
@@ -89,7 +89,7 @@ impl Lexer {
         }
 
         if self.peek() == '.' {
-            token_type = TokenType::FLOAT;
+            token_type = TokenType::LITERAL_FLOAT;
             lexeme.push(self.peek());
             self.advance();
 
@@ -124,7 +124,7 @@ impl Lexer {
 
         self.consume('"', "Unterminated string");
 
-        Token::new(TokenType::STRING, lexeme, line)
+        Token::new(TokenType::LITERAL_STRING, lexeme, line)
     }
 
     pub fn tokenize(&mut self) -> Vec<Token> {

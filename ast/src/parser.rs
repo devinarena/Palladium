@@ -141,4 +141,8 @@ impl Parser {
     pub fn expression(&mut self) -> Expression {
         return self.term();
     }
+
+    pub fn parse(&mut self) -> Vec<Statement> {
+
+    }
 }

@@ -15,9 +15,9 @@ pub enum TokenType {
     LEFT_PAREN,
     RIGHT_PAREN,
 
-    INTEGER,
-    FLOAT,
-    STRING,
+    LITERAL_INTEGER,
+    LITERAL_FLOAT,
+    LITERAL_STRING,
 
     ERROR,
     EOF,
