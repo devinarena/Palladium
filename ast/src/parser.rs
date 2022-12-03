@@ -105,12 +105,10 @@ impl Parser {
         self.literal()
     }
 
-    fn binary(&mut self) -> Expression {
+    fn factor(&mut self) -> Expression {
         let mut expression = self.unary();
 
-        println!("{}, {}", self.peek().token_type, self.peek_next().token_type);
-
-        while self.match_token(TokenType::PLUS) || self.match_token(TokenType::MINUS) {
+        while self.match_token(TokenType::STAR) || self.match_token(TokenType::SLASH) {
             let operator = self.previous().token_type;
             let right = self.unary();
 
@@ -120,7 +118,20 @@ impl Parser {
         expression
     }
 
+    fn term(&mut self) -> Expression {
+        let mut expression = self.factor();
+
+        while self.match_token(TokenType::PLUS) || self.match_token(TokenType::MINUS) {
+            let operator = self.previous().token_type;
+            let right = self.factor();
+
+            expression = Expression::Binary(Box::new(expression), operator, Box::new(right));
+        }
+
+        expression
+    }
+
     pub fn expression(&mut self) -> Expression {
-        return self.binary();
+        return self.term();
     }
 }

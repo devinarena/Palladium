@@ -1,6 +1,6 @@
+mod interpreter;
 mod lexer;
 mod parser;
-mod interpreter;
 
 mod token;
 mod value;
@@ -8,14 +8,13 @@ mod expression {
     pub mod expression;
 }
 
-use std::{env};
+use std::env;
 
 use crate::expression::expression::Expression;
-use crate::token::Token;
+use crate::interpreter::Interpreter;
 use crate::lexer::Lexer;
 use crate::parser::Parser;
-use crate::interpreter::Interpreter;
-
+use crate::token::Token;
 
 fn main() {
     let args: Vec<String> = env::args().collect();
