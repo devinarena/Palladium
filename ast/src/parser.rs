@@ -83,13 +83,13 @@ impl Parser {
         self.advance();
 
         match self.previous().token_type {
-            TokenType::INTEGER => {
+            TokenType::LITERAL_INTEGER => {
                 Expression::Literal(Value::Integer(self.previous().lexeme.parse::<i32>().unwrap()))
             },
-            TokenType::FLOAT => {
+            TokenType::LITERAL_FLOAT => {
                 Expression::Literal(Value::Float(self.previous().lexeme.parse::<f32>().unwrap()))
             },
-            TokenType::STRING => {
+            TokenType::LITERAL_STRING => {
                 Expression::Literal(Value::String(self.previous().lexeme))
             },
             TokenType::LEFT_PAREN => {
@@ -140,9 +140,5 @@ impl Parser {
 
     pub fn expression(&mut self) -> Expression {
         return self.term();
-    }
-
-    pub fn parse(&mut self) -> Vec<Statement> {
-
     }
 }
