@@ -6,6 +6,7 @@ mod token;
 mod value;
 mod expression {
     pub mod expression;
+    pub mod statement;
 }
 
 use std::{env};
@@ -27,13 +28,12 @@ fn main() {
 
     let mut lexer: Lexer = Lexer::new(args[1].clone());
     let tokens: Vec<Token> = lexer.tokenize();
-    dbg!(lexer);
+    dbg!(tokens.clone());
 
     let mut parser: Parser = Parser::new(tokens.clone());
-    let mut ast: Expression = parser.expression();
-    dbg!(ast);
+    let stmts = parser.parse();
+    dbg!(stmts.clone());
 
     let mut interpreter: Interpreter = Interpreter::new();
-    let value = interpreter.interpret(&mut ast);
-    dbg!(value);
+    interpreter.interpret(stmts);
 }

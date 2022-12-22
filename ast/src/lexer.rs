@@ -64,7 +64,7 @@ impl Lexer {
 
     fn number(&mut self) -> Token {
         let mut lexeme = String::new();
-        let mut token_type = TokenType::INTEGER;
+        let mut token_type = TokenType::INTEGER_LITERAL;
 
         while self.peek().is_digit(10) {
             lexeme.push(self.peek());
@@ -72,7 +72,7 @@ impl Lexer {
         }
 
         if self.peek() == '.' {
-            token_type = TokenType::FLOAT;
+            token_type = TokenType::FLOAT_LITERAL;
             lexeme.push(self.peek());
             self.advance();
 
@@ -82,27 +82,59 @@ impl Lexer {
             }
         }
 
-        Token::new(token_type, lexeme)
+        self.position -= 1;
+
+        Token::new(token_type, lexeme, self.line)
+    }
+
+    fn identifier(&mut self) -> Token {
+        let mut lexeme = String::new();
+
+        if !self.peek().is_alphabetic() {
+            panic!("Invalid identifier");
+        }
+
+        while self.peek().is_alphanumeric() {
+            lexeme.push(self.peek());
+            self.advance();
+        }
+
+        self.position -= 1;
+
+        match lexeme.as_str() {
+            "print" => Token::new(TokenType::PRINT, lexeme, self.line),
+            _ => Token::new(TokenType::IDENTIFIER, lexeme, self.line)
+        }
     }
 
     pub fn tokenize(&mut self) -> Vec<Token> {
         let mut tokens: Vec<Token> = Vec::new();
         while self.peek() != '\0' {
+            
+            self.skip_whitespace();
+
             match self.peek() {
                 '0'..='9' => {
                     let token: Token = self.number();
-                    tokens.push(token)
+                    tokens.push(token);
                 },
-                ';' => tokens.push(Token::new(TokenType::SEMICOLON, ";".to_string())),
-                '+' => tokens.push(Token::new(TokenType::PLUS, "+".to_string())),
-                '-' => tokens.push(Token::new(TokenType::MINUS, "-".to_string())),
-                _ => self.skip_whitespace()
+                ';' => tokens.push(Token::new(TokenType::SEMICOLON, ";".to_string(), self.line)),
+                '+' => tokens.push(Token::new(TokenType::PLUS, "+".to_string(), self.line)),
+                '-' => tokens.push(Token::new(TokenType::MINUS, "-".to_string(), self.line)),
+                '*' => tokens.push(Token::new(TokenType::STAR, "*".to_string(), self.line)),
+                '/' => tokens.push(Token::new(TokenType::SLASH, "/".to_string(), self.line)),
+                '(' => tokens.push(Token::new(TokenType::LEFT_PAREN, "(".to_string(), self.line)),
+                ')' => tokens.push(Token::new(TokenType::RIGHT_PAREN, ")".to_string(), self.line)),
+                _ => {
+                    let token: Token = self.identifier();
+                    tokens.push(token);
+                }
             }
 
             self.advance();
         }
 
-        tokens.push(Token::new(TokenType::EOF, String::from("EOF")));
+        tokens.push(Token::new(TokenType::EOF, String::from("EOF"), self.line));
 
         tokens
     }
