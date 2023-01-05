@@ -10,6 +10,7 @@ use std::fmt::Debug;
 pub enum TokenType {
     INTEGER_LITERAL,
     FLOAT_LITERAL,
+    STRING_LITERAL,
 
     PLUS,
     MINUS,

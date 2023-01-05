@@ -8,6 +8,7 @@ mod expression {
     pub mod expression;
     pub mod statement;
 }
+mod environment;
 
 use std::{env};
 

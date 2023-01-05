@@ -1,8 +1,7 @@
+use crate::expression::expression::Expression;
 use crate::expression::statement::Statement;
 use crate::token::{Token, TokenType};
-use crate::expression::expression::Expression;
 use crate::value::Value;
-
 
 #[derive(Debug)]
 pub struct Parser {
@@ -29,7 +28,7 @@ impl Parser {
     fn peek(&self) -> &Token {
         &self.tokens[self.position]
     }
-    
+
     fn peek_next(&self) -> &Token {
         &self.tokens[self.position + 1]
     }
@@ -67,15 +66,20 @@ impl Parser {
         self.advance();
 
         match self.previous().token_type {
-            TokenType::INTEGER_LITERAL => {
-                Expression::Literal(Value::Integer(self.previous().lexeme.parse::<i32>().unwrap()))
-            },
+            TokenType::INTEGER_LITERAL => Expression::Literal(Value::Integer(
+                self.previous().lexeme.parse::<i64>().unwrap(),
+            )),
+            TokenType::FLOAT_LITERAL => Expression::Literal(Value::Double(
+                self.previous().lexeme.parse::<f64>().unwrap(),
+            )),
+            TokenType::STRING_LITERAL => Expression::Literal(Value::String(self.previous().lexeme)),
+            TokenType::IDENTIFIER => Expression::Variable(self.previous().lexeme),
             TokenType::LEFT_PAREN => {
                 let expr = self.expression();
                 self.consume(TokenType::RIGHT_PAREN, "Expected ')' after expression");
                 expr
-            },
-            _ => panic!("Unexpected token type")
+            }
+            _ => panic!("Unexpected token type"),
         }
     }
 
@@ -141,6 +145,6 @@ impl Parser {
             statements.push(self.statement());
         }
 
-        statements   
+        statements
     }
 }

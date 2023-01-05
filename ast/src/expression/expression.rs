@@ -5,7 +5,8 @@ pub enum Expression {
     Literal(Value),
     Unary(TokenType, Box<Expression>),
     Binary(TokenType, Box<Expression>, Box<Expression>),
-    Grouping(Box<Expression>)
+    Grouping(Box<Expression>),
+    Variable(String),
 }
 
 impl VisitedExpression for Expression {
@@ -23,6 +24,9 @@ impl VisitedExpression for Expression {
             Expression::Grouping(_) => {
                 visitor.visit_grouping(self.to_owned())
             }
+            Expression::Variable(_) => {
+                visitor.visit_variable(self.to_owned())
+            }
         }
     }
 }
@@ -36,4 +40,5 @@ pub trait ExpressionVisitor {
     fn visit_unary(&mut self, unary: Expression) -> Value;
     fn visit_binary(&mut self, binary: Expression) -> Value;
     fn visit_grouping(&mut self, grouping: Expression) -> Value;
+    fn visit_variable(&mut self, variable: Expression) -> Value;
 }

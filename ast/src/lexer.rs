@@ -125,6 +125,17 @@ impl Lexer {
                 '/' => tokens.push(Token::new(TokenType::SLASH, "/".to_string(), self.line)),
                 '(' => tokens.push(Token::new(TokenType::LEFT_PAREN, "(".to_string(), self.line)),
                 ')' => tokens.push(Token::new(TokenType::RIGHT_PAREN, ")".to_string(), self.line)),
+                '\"' => {
+                    let mut lexeme = String::new();
+                    self.advance();
+
+                    while self.peek() != '\"' {
+                        lexeme.push(self.peek());
+                        self.advance();
+                    }
+
+                    tokens.push(Token::new(TokenType::STRING_LITERAL, lexeme, self.line));
+                },
                 _ => {
                     let token: Token = self.identifier();
                     tokens.push(token);
