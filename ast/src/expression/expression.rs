@@ -1,4 +1,4 @@
-use crate::{value::Value, token::{TokenType}};
+use crate::{token::TokenType, value::Value};
 
 #[derive(Debug, Clone)]
 pub enum Expression {
@@ -7,26 +7,18 @@ pub enum Expression {
     Binary(TokenType, Box<Expression>, Box<Expression>),
     Grouping(Box<Expression>),
     Variable(String),
+    Assignment(String, Box<Expression>),
 }
 
 impl VisitedExpression for Expression {
     fn visit(&mut self, visitor: &mut dyn ExpressionVisitor) -> Value {
         match self {
-            Expression::Literal(_) => {
-                visitor.visit_literal(self.to_owned())
-            }
-            Expression::Unary(_, _) => {
-                visitor.visit_unary(self.to_owned())
-            }
-            Expression::Binary(_, _, _) => {
-                visitor.visit_binary(self.to_owned())
-            }
-            Expression::Grouping(_) => {
-                visitor.visit_grouping(self.to_owned())
-            }
-            Expression::Variable(_) => {
-                visitor.visit_variable(self.to_owned())
-            }
+            Expression::Literal(_) => visitor.visit_literal(self.to_owned()),
+            Expression::Unary(_, _) => visitor.visit_unary(self.to_owned()),
+            Expression::Binary(_, _, _) => visitor.visit_binary(self.to_owned()),
+            Expression::Grouping(_) => visitor.visit_grouping(self.to_owned()),
+            Expression::Variable(_) => visitor.visit_variable(self.to_owned()),
+            Expression::Assignment(_, _) => visitor.visit_assignment(self.to_owned()),
         }
     }
 }
@@ -41,4 +33,5 @@ pub trait ExpressionVisitor {
     fn visit_binary(&mut self, binary: Expression) -> Value;
     fn visit_grouping(&mut self, grouping: Expression) -> Value;
     fn visit_variable(&mut self, variable: Expression) -> Value;
+    fn visit_assignment(&mut self, assignment: Expression) -> Value;
 }

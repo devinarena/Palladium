@@ -16,6 +16,7 @@ pub enum TokenType {
     MINUS,
     STAR,
     SLASH,
+    EQUAL,
 
     LEFT_PAREN,
     RIGHT_PAREN,
@@ -23,6 +24,7 @@ pub enum TokenType {
 
     IDENTIFIER,
     PRINT,
+    LET,
 
     EOF
 }

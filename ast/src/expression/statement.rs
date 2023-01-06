@@ -12,7 +12,7 @@ impl VisitedStatement for Statement {
         match self {
             Statement::ExpressionStatement(_) => {
                 visitor.visit_expression_statement(self.to_owned())
-            },
+            }
             Statement::PrintStatement(_) => visitor.visit_print_statement(self.to_owned()),
             Statement::LetStatement(_, _) => visitor.visit_let_statement(self.to_owned()),
         }

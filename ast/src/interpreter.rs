@@ -157,11 +157,32 @@ impl ExpressionVisitor for Interpreter {
             _ => panic!("Unexpected expression type"),
         }
     }
+
+    fn visit_assignment(&mut self, assignment: Expression) -> Value {
+        match assignment {
+            Expression::Assignment(name, mut expr) => {
+                let val = expr.visit(self);
+                self.environment.assign(&name, &val);
+                val
+            },
+            _ => panic!("Unexpected expression type"),
+        }
+    }
 }
 
 impl StatementVisitor for Interpreter {
     fn visit_expression_statement(&mut self, mut expr_statement: Statement) {
         expr_statement.visit(self);
+    }
+
+    fn visit_let_statement(&mut self, let_statement: Statement) {
+        match let_statement {
+            Statement::LetStatement(name, mut expr) => {
+                let val = expr.visit(self);
+                self.environment.assign(&name, &val);
+            }
+            _ => panic!("Unexpected statement type"),
+        }
     }
 
     fn visit_print_statement(&mut self, print: Statement) {

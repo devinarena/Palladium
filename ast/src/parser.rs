@@ -114,14 +114,38 @@ impl Parser {
         expr
     }
 
+    fn assignment(&mut self) -> Expression {
+        let expr = self.primary();
+
+        if self.match_token(TokenType::EQUAL) {
+            let value = self.assignment();
+
+            match expr {
+                Expression::Variable(name) => return Expression::Assignment(name, Box::new(value)),
+                _ => panic!("Invalid assignment target"),
+            }
+        }
+
+        expr
+    }
+
     pub fn expression(&mut self) -> Expression {
-        self.primary()
+        self.assignment()
     }
 
     pub fn print_statement(&mut self) -> Statement {
         let value = self.expression();
         self.consume(TokenType::SEMICOLON, "Expected ';' after value");
         Statement::PrintStatement(Box::new(value))
+    }
+
+    pub fn let_statement(&mut self) -> Statement {
+        self.consume(TokenType::IDENTIFIER, "Expected identifier after 'let'");
+        let identifier = self.previous().lexeme.clone();
+        self.consume(TokenType::EQUAL, "Expected '=' after identifier");
+        let value = self.expression();
+        self.consume(TokenType::SEMICOLON, "Expected ';' after value");
+        Statement::LetStatement(identifier, Box::new(value))
     }
 
     pub fn expression_statement(&mut self) -> Statement {
@@ -133,6 +157,8 @@ impl Parser {
     pub fn statement(&mut self) -> Statement {
         if self.match_token(TokenType::PRINT) {
             return self.print_statement();
+        } else if self.match_token(TokenType::LET) {
+            return self.let_statement();
         }
 
         self.expression_statement()

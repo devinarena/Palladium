@@ -90,7 +90,9 @@ impl Lexer {
     fn identifier(&mut self) -> Token {
         let mut lexeme = String::new();
 
-        if !self.peek().is_alphabetic() {
+        println!("{}", self.peek());
+
+        if !self.peek().is_alphanumeric() {
             panic!("Invalid identifier");
         }
 
@@ -103,6 +105,7 @@ impl Lexer {
 
         match lexeme.as_str() {
             "print" => Token::new(TokenType::PRINT, lexeme, self.line),
+            "let" => Token::new(TokenType::LET, lexeme, self.line),
             _ => Token::new(TokenType::IDENTIFIER, lexeme, self.line)
         }
     }
@@ -123,6 +126,7 @@ impl Lexer {
                 '-' => tokens.push(Token::new(TokenType::MINUS, "-".to_string(), self.line)),
                 '*' => tokens.push(Token::new(TokenType::STAR, "*".to_string(), self.line)),
                 '/' => tokens.push(Token::new(TokenType::SLASH, "/".to_string(), self.line)),
+                '=' => tokens.push(Token::new(TokenType::EQUAL, "=".to_string(), self.line)),
                 '(' => tokens.push(Token::new(TokenType::LEFT_PAREN, "(".to_string(), self.line)),
                 ')' => tokens.push(Token::new(TokenType::RIGHT_PAREN, ")".to_string(), self.line)),
                 '\"' => {
