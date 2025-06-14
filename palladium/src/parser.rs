@@ -11,14 +11,16 @@ macro_rules! parse_error {
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     index: usize,
+    pub file_name: String,
     pub parse_time: Duration,
 }
 
 impl Parser<'_> {
-    pub fn new(tokens: &Vec<Token>) -> Parser {
+    pub fn new(file_name: String, tokens: &Vec<Token>) -> Parser {
         Parser { 
             tokens, 
             index: 0 ,
+            file_name,
             parse_time: Duration::new(0, 0)
         }
     }
