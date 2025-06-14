@@ -1,15 +1,19 @@
-use std::{fs::File, io::Write, time::{Duration, Instant}};
+use std::{fs::File, io::Write, path::Path, time::{Duration, Instant}};
 
 use crate::{syntax_tree::{ExpressionNode, MainNode, StatementNode, Visit}, token::Token};
 
 
 pub struct Compiler {
+    pub main_file_name: String,
+    pub directory: String,
     pub compile_time: Duration
 }
 
 impl Compiler {
-    pub fn new() -> Compiler {
+    pub fn new(main_file_name: String, directory: String) -> Compiler {
         Compiler { 
+            main_file_name: main_file_name.replace(".java", ""),
+            directory,
             compile_time: Duration::new(0, 0)
         }
     }
@@ -17,10 +21,11 @@ impl Compiler {
     pub fn compile(&mut self, main: MainNode) {
         let start_time = Instant::now();
         let mut program: String = String::new();
-        program.push_str("public class Program {\n");
+        program.push_str(format!("public class {} {{\n", self.main_file_name).as_str());
         program.push_str(main.visit().join("\n").as_str());
         program.push_str("\n}");
-        let mut output = File::create("Program.java").expect("Failed to create output file");
+        let output_path = Path::new(&self.directory).join(format!("{}.java", self.main_file_name));
+        let mut output = File::create(output_path).expect("Failed to create output file");
         output.write_all(program.as_bytes()).expect("Failed to write to output file");
         self.compile_time = start_time.elapsed();
     }
