@@ -76,13 +76,15 @@ def run_test_cases(cases: dict) -> None:
 
                 tests_run += 1
 
-                if len(list(diff)) == 0:
+                lines = list(diff)
+
+                if len(lines) == 0:
                     print(f"SUCCESS: Test {test} passed")
                     continue
 
                 failures += 1
                 failure(f"Test {test} failed, diff below:")
-                for line in diff:
+                for line in lines:
                     print(line)
     
     print(f"[SUMMARY]:\n\tRan: {tests_run} tests, successes: {tests_run - failures}, failures: {failures}")

@@ -1,0 +1,7 @@
+
+
+let test :: str = "hello"
+
+output(test)
+
+output(test + " world")

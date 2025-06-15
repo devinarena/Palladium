@@ -19,10 +19,14 @@ fn main() {
     let input: String = std::fs::read_to_string(input_file).expect("Failed to read input file");
     let mut lexer = Lexer::new();
     lexer.lex(input);
-    println!("{:?}", lexer.get_tokens());
+    if args().any(|arg| arg == "--debug" || arg == "-d") {
+        println!("TOKENS: {:?}", lexer.get_tokens());
+    }
     let mut parser = Parser::new(output_file, lexer.get_tokens());
     let tree = parser.parse();
-    println!("{:?}", tree);
+    if args().any(|arg| arg == "--debug" || arg == "-d") {
+        println!("TREE: {:?}", tree);
+    }
     let mut compiler = Compiler::new(parser.file_name.clone(), output_path);
     compiler.compile(tree);
     println!("Compilation to java finished in {}ms", parser.parse_time.as_millis() + compiler.compile_time.as_millis());

@@ -1,4 +1,4 @@
-use crate::token::{Token};
+use crate::token::{Token, TokenType};
 
 pub struct Lexer {
     content: String,
@@ -20,6 +20,7 @@ impl Lexer {
         self.output = Vec::new();
         self.content = input;
         self.current = 0;
+        let mut line_number: u32 = 1;
         while self.peek() != '\0' {
             let mut current_char = self.peek();
             if current_char.is_numeric() {
@@ -37,7 +38,7 @@ impl Lexer {
                     }
                 }
                 let decimal_value: f64 = current.parse().unwrap();
-                self.output.push(Token::Decimal(decimal_value));
+                self.output.push(Token::new(TokenType::Decimal(decimal_value), line_number));
             } else if current_char.is_alphanumeric() || current_char == '_' {
                 let mut current= String::new();
                 while current_char.is_alphanumeric() || current_char == '_' {
@@ -45,10 +46,11 @@ impl Lexer {
                     current_char = self.next();
                 }
                 match current.as_str() {
-                    "output" => self.output.push(Token::Output),
-                    "let" => self.output.push(Token::Let),
-                    "f32" => self.output.push(Token::F32),
-                    _ => self.output.push(Token::Identifier(current)),
+                    "output" => self.output.push(Token::new(TokenType::Output, line_number)),
+                    "let" => self.output.push(Token::new(TokenType::Let, line_number)),
+                    "f32" => self.output.push(Token::new(TokenType::F32, line_number)),
+                    "str" => self.output.push(Token::new(TokenType::Str, line_number)),
+                    _ => self.output.push(Token::new(TokenType::Identifier(current), line_number)),
                 }
             } else if current_char == '\"' {
                 let mut current= String::new();
@@ -57,31 +59,34 @@ impl Lexer {
                     current.push(current_char);
                     current_char = self.next();
                 }
-                self.output.push(Token::StringLiteral(current));
+                self.output.push(Token::new(TokenType::StringLiteral(current), line_number));
                 self.next();
             } else if current_char == '(' {
-                self.output.push(Token::LeftParen);
+                self.output.push(Token::new(TokenType::LeftParen, line_number));
                 self.next();
             } else if current_char == ')' {
-                self.output.push(Token::RightParen);
+                self.output.push(Token::new(TokenType::RightParen, line_number));
                 self.next();
             } else if current_char == ':' {
-                self.output.push(Token::Colon);
+                self.output.push(Token::new(TokenType::Colon, line_number));
                 self.next();
             } else if current_char == '+' {
-                self.output.push(Token::Plus);
+                self.output.push(Token::new(TokenType::Plus, line_number));
                 self.next();
             } else if current_char == '-' {
-                self.output.push(Token::Minus);
+                self.output.push(Token::new(TokenType::Minus, line_number));
                 self.next();
             } else if current_char == '*' {
-                self.output.push(Token::Star);
+                self.output.push(Token::new(TokenType::Star, line_number));
                 self.next();
             } else if current_char == '/' {
-                self.output.push(Token::Slash);
+                self.output.push(Token::new(TokenType::Slash, line_number));
                 self.next();
             } else if current_char == '=' {
-                self.output.push(Token::Equals);
+                self.output.push(Token::new(TokenType::Equals, line_number));
+                self.next();
+            } else if current_char == '\n' {
+                line_number += 1;
                 self.next();
             } else if current_char.is_whitespace() {
                 self.next();
@@ -90,7 +95,7 @@ impl Lexer {
                 std::process::exit(1);
             }
         }
-        self.output.push(Token::EndOfFile);
+        self.output.push(Token::new(TokenType::EndOfFile, line_number));
     }
 
     pub fn get_tokens(&self) -> &Vec<Token> {

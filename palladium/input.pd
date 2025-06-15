@@ -1,3 +1,6 @@
 let x :: f32 = 5
 let y :: f32 = 10
-output(x * "hello")
+let z :: f32 = 4.5
+let test :: str = "test"
+
+output(x + test)

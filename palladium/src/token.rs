@@ -1,5 +1,19 @@
+use crate::syntax_tree::ValueType;
+
 #[derive(Debug, Clone)]
-pub enum Token {
+pub struct Token {
+    pub token_type: TokenType,
+    pub line_number: u32
+}
+
+impl Token {
+    pub fn new(token_type: TokenType, line_number: u32) -> Token {
+        Token { token_type, line_number }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum TokenType {
     EndOfFile,
     // Literals
     Identifier(String),
@@ -10,6 +24,7 @@ pub enum Token {
     Output,
     Let,
     F32,
+    Str,
     // Operators
     LeftParen,
     RightParen,
@@ -30,12 +45,20 @@ impl Token {
     //     }
     // }
     pub fn get_value(&self) -> String {
-        match self {
-            Token::Identifier(id) => id.clone(),
-            Token::Integer(num) => num.to_string(),
-            Token::Decimal(num) => num.to_string(),
-            Token::StringLiteral(lit) => format!("\"{}\"", lit),
+        match &self.token_type {
+            TokenType::Identifier(id) => id.clone(),
+            TokenType::Integer(num) => num.to_string(),
+            TokenType::Decimal(num) => num.to_string(),
+            TokenType::StringLiteral(lit) => format!("\"{}\"", lit),
             _ => panic!("Token does not have a value")
+        }
+    }
+
+    pub fn get_value_type_declaration(&self) -> ValueType {
+        match &self.token_type {
+            TokenType::F32 => ValueType::Float,
+            TokenType::Str => ValueType::String,
+            _ => panic!("Token does not have a value type declaration")
         }
     }
 }
