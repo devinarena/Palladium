@@ -10,29 +10,82 @@ pub mod compiler;
 pub mod token;
 pub mod syntax_tree;
 
+struct RunFlags {
+    debug: bool,
+    run: bool,
+    compile: bool,
+    format: bool
+}
+
+fn get_run_flags(args: Vec<String>) -> RunFlags {
+    let mut run_flags = RunFlags { debug: false, run: false, compile: false, format: false };
+    for arg in args {
+        if arg.starts_with("-") {
+            if arg.starts_with("--") {
+                if arg.contains("debug") {
+                    run_flags.debug = true;
+                }
+                if arg.contains("run") {
+                    run_flags.run = true;
+                }
+                if arg.contains("compile") {
+                    run_flags.compile = true;
+                }
+                if arg.contains("format") {
+                    run_flags.format = true;
+                }
+            } else {
+                if arg.contains("r") {
+                    run_flags.run = true;
+                }
+                if arg.contains("d") {
+                    run_flags.debug = true;
+                }
+                if arg.contains("c") {
+                    run_flags.compile = true;
+                }
+                if arg.contains("f") {
+                    run_flags.format = true;
+                }
+            }
+        }
+    }
+    return run_flags;
+}
+
+// Todo: clean this up
 fn main() {
     if args().len() < 2 {
         panic!("Usage: {} <input_file>", args().next().unwrap());
     }
+    // Run flags
+    let run_flags = get_run_flags(args().collect());
     let input_file: String = args().nth(1).unwrap();
     let (output_file, output_path) = get_output_file_name_and_path(&input_file);
     let input: String = std::fs::read_to_string(input_file).expect("Failed to read input file");
     let mut lexer = Lexer::new();
     lexer.lex(input);
-    if args().any(|arg| arg == "--debug" || arg == "-d") {
+    if run_flags.debug {
         println!("TOKENS: {:?}", lexer.get_tokens());
     }
     let mut parser = Parser::new(output_file, lexer.get_tokens());
     let tree = parser.parse();
-    if args().any(|arg| arg == "--debug" || arg == "-d") {
+    if run_flags.debug {
         println!("TREE: {:?}", tree);
     }
     let mut compiler = Compiler::new(parser.file_name.clone(), output_path);
     compiler.compile(tree);
+    let java_output_path = Path::new(&compiler.directory).join(format!("{}.java", compiler.main_file_name));
+    if run_flags.format {
+        if cfg!(target_os = "windows") {
+            println!("{}", String::from_utf8_lossy(&Command::new("cmd").args(["/C", "java", "-jar", ".\\lib\\google-java-format-1.27.0-all-deps.jar", "-r", java_output_path.to_str().unwrap()]).output().expect("Failed to run shell command").stderr));
+        } else {
+            Command::new("sh").args(["-c", "java", "-jar", "./lib/google-java-format-1.27.0-all-deps.jar", "-r", java_output_path.to_str().unwrap()]).output().expect("Failed to run shell command");
+        }
+    }
     println!("Compilation to java finished in {}ms", parser.parse_time.as_millis() + compiler.compile_time.as_millis());
     let java_compile_start = Instant::now();
-    if args().any(|arg| arg == "--run" || arg == "--compile") {
-    let java_output_path = Path::new(&compiler.directory).join(format!("{}.java", compiler.main_file_name));
+    if run_flags.run || run_flags.compile {
         let java_compilation_output = if cfg!(target_os = "windows") {
             Command::new("cmd").args(["/C", "javac", java_output_path.to_str().unwrap()]).output().expect("Failed to run shell command")
         } else {
@@ -46,7 +99,7 @@ fn main() {
             exit(1);
         } else {
             println!("Java compilation finished in {}ms", java_compile_start.elapsed().as_millis());
-            if args().any(|arg| arg == "--run") {
+            if run_flags.run {
                 let output = if cfg!(target_os = "windows") {
                     let mut args = vec!["/C", "java"];
                     if !compiler.directory.is_empty() {

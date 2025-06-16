@@ -25,6 +25,9 @@ pub enum TokenType {
     Let,
     F32,
     Str,
+    Bool,
+    True,
+    False,
     // Operators
     LeftParen,
     RightParen,
@@ -33,7 +36,9 @@ pub enum TokenType {
     Minus,
     Star,
     Slash,
-    Equals
+    Equals,
+    And,
+    Or
 }
 
 impl Token {
@@ -50,6 +55,8 @@ impl Token {
             TokenType::Integer(num) => num.to_string(),
             TokenType::Decimal(num) => num.to_string(),
             TokenType::StringLiteral(lit) => format!("\"{}\"", lit),
+            TokenType::True => "true".to_string(),
+            TokenType::False => "false".to_string(),
             _ => panic!("Token does not have a value")
         }
     }
@@ -58,6 +65,7 @@ impl Token {
         match &self.token_type {
             TokenType::F32 => ValueType::Float,
             TokenType::Str => ValueType::String,
+            TokenType::Bool => ValueType::Boolean,
             _ => panic!("Token does not have a value type declaration")
         }
     }

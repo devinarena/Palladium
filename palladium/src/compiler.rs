@@ -33,8 +33,10 @@ impl Compiler {
 
 fn operator_precedence(operator: &Token) -> u8 {
     match operator.token_type {
-        TokenType::Plus | TokenType::Minus => 1,
-        TokenType::Star | TokenType::Slash => 2,
+        TokenType::Or => 0,
+        TokenType::And => 1,
+        TokenType::Plus | TokenType::Minus => 2,
+        TokenType::Star | TokenType::Slash => 3,
         _ => panic!("Expected an operator"),
     }
 }
@@ -63,6 +65,8 @@ impl Visit for ExpressionNode {
             TokenType::Decimal(value) => {
                 output.push_str(format!("{}f", value).as_str());
             },
+            TokenType::True => output.push_str("true"),
+            TokenType::False => output.push_str("false"),
             _ => panic!("Expected a literal token"),
         }
         let mut v = Vec::new();
@@ -76,7 +80,7 @@ impl Visit for ExpressionNode {
             ExpressionNodeType::Variable { ref identifier } => {
                 output.push_str(identifier);
             },
-            _ => panic!("Expected a variable expression node"),
+            _ => panic!("(compiler) Expected a variable expression node"),
         }
         let mut v = Vec::new();
         v.push(output);
@@ -103,7 +107,9 @@ impl Visit for ExpressionNode {
             TokenType::Minus => "-",
             TokenType::Star => "*",
             TokenType::Slash => "/",
-            _ => panic!("Expected an operator"),
+            TokenType::And => "&&",
+            TokenType::Or => "||",
+            _ => panic!("(compiler) Expected an operator"),
         };
 
         if prec < parent_precedence {
@@ -141,7 +147,8 @@ impl Visit for StatementNode {
         match type_token.token_type {
             TokenType::F32 => output.push_str("float "),
             TokenType::Str => output.push_str("String "),
-            _ => panic!("Expected a type token for let statement"),
+            TokenType::Bool => output.push_str("boolean "),
+            _ => panic!("(compiler) Expected a type token for let statement"),
         }
         output.push_str(identifier);
         output.push_str(" = ");

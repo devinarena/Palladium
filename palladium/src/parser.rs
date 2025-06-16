@@ -58,6 +58,7 @@ impl Parser<'_> {
         let mut lhs = match self.peek().token_type {
             TokenType::StringLiteral(_)=> ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::String ),
             TokenType::Decimal(_) => ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::Float ),
+            TokenType::True | TokenType::False => ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::Boolean ),
             TokenType::Identifier(ref name) => ExpressionNode::new(ExpressionNodeType::Variable { identifier: self.peek().get_value() }, self.identifiers.get(name).unwrap().clone() ),
             TokenType::LeftParen => {
                 self.consume();
@@ -75,7 +76,7 @@ impl Parser<'_> {
         self.consume();
         loop {
             let op = self.peek().clone();
-            if !matches!(op.token_type, TokenType::Plus | TokenType::Minus | TokenType::Star | TokenType::Slash) {
+            if !matches!(op.token_type, TokenType::Plus | TokenType::Minus | TokenType::Star | TokenType::Slash | TokenType::And | TokenType::Or) {
                 break;
             }
 
@@ -98,6 +99,14 @@ impl Parser<'_> {
                     }
                     lhs = ExpressionNode::new(ExpressionNodeType::Binary { left: Box::new(lhs), operator: Box::new(op), right: Box::new(rhs), }, value_type );
                 }
+                TokenType::And | TokenType::Or => {
+                    if lhs.value_type != ValueType::Boolean {
+                        parse_error!(self.peek().line_number, "Expected boolean expression on left side of '&&' or '||'");
+                    } else if rhs.value_type != ValueType::Boolean {
+                        parse_error!(self.peek().line_number, "Expected boolean expression on right side of '&&' or '||'");
+                    }
+                    lhs = ExpressionNode::new(ExpressionNodeType::Binary { left: Box::new(lhs), operator: Box::new(op), right: Box::new(rhs), }, ValueType::Boolean );
+                }
                 _ => parse_error!(self.peek().line_number, format!("Unexpected operator: {:?}", op)),
             }
         }
@@ -106,8 +115,10 @@ impl Parser<'_> {
 
     fn infix_binding_power(&self, op: &Token) -> (u8, u8) {
         match op.token_type {
-            TokenType::Plus | TokenType::Minus => (1, 2),
-            TokenType::Star | TokenType::Slash => (3, 4),
+            TokenType::Or => (0, 1),
+            TokenType::And => (1, 2),
+            TokenType::Plus | TokenType::Minus => (3, 4),
+            TokenType::Star | TokenType::Slash => (5, 6),
             _ => panic!("bad op: {:?}", op),
         }
     }
@@ -141,10 +152,10 @@ impl Parser<'_> {
             }
         }
         let type_token = self.peek().clone();
-        if matches!(type_token.token_type, TokenType::F32 | TokenType::Str) {
+        if matches!(type_token.token_type, TokenType::F32 | TokenType::Str | TokenType::Bool) {
             self.consume();
         } else {
-            parse_error!(self.peek().line_number, "Expected type declaration (currently supported: f32, str)");
+            parse_error!(self.peek().line_number, "Expected type declaration (currently supported: f32, str, bool)");
         }
         if matches!(self.peek().token_type, TokenType::Equals) {
             self.consume(); // consume the equals sign
