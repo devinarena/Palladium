@@ -1,5 +1,3 @@
-use std::fmt;
-
 use crate::token::Token;
 
 
@@ -24,7 +22,8 @@ impl std::fmt::Debug for dyn Visit {
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueType {
     Float,
-    String
+    String,
+    Boolean
 }
 
 #[derive(Debug)]

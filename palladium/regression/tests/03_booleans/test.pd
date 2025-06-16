@@ -1,0 +1,11 @@
+output(true || true)
+output(true || false)
+output(true && true)
+output(true && false)
+output(false || true)
+output(false || false)
+output(false && true)
+output(false && false)
+
+output(true && (true || false))
+output(true || (true && false))

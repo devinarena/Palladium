@@ -50,6 +50,11 @@ impl Lexer {
                     "let" => self.output.push(Token::new(TokenType::Let, line_number)),
                     "f32" => self.output.push(Token::new(TokenType::F32, line_number)),
                     "str" => self.output.push(Token::new(TokenType::Str, line_number)),
+                    "bool" => self.output.push(Token::new(TokenType::Bool, line_number)),
+                    "true" => self.output.push(Token::new(TokenType::True, line_number)),
+                    "false" => self.output.push(Token::new(TokenType::False, line_number)),
+                    "and" => self.output.push(Token::new(TokenType::And, line_number)),
+                    "or" => self.output.push(Token::new(TokenType::Or, line_number)),
                     _ => self.output.push(Token::new(TokenType::Identifier(current), line_number)),
                 }
             } else if current_char == '\"' {
@@ -85,14 +90,29 @@ impl Lexer {
             } else if current_char == '=' {
                 self.output.push(Token::new(TokenType::Equals, line_number));
                 self.next();
+            } else if current_char == '&' {
+                current_char = self.next();
+                if current_char == '&' {
+                    self.output.push(Token::new(TokenType::And, line_number));
+                    self.next();
+                } else {
+                    panic!("Unexpected character: {}", current_char);
+                }
+            } else if current_char == '|' {
+                current_char = self.next();
+                if current_char == '|' {
+                    self.output.push(Token::new(TokenType::Or, line_number));
+                    self.next();
+                } else {
+                    panic!("Unexpected character: {}", current_char);
+                }
             } else if current_char == '\n' {
                 line_number += 1;
                 self.next();
             } else if current_char.is_whitespace() {
                 self.next();
             } else {
-                eprintln!("Unexpected character: {}", current_char);
-                std::process::exit(1);
+                panic!("Unexpected character: {}", current_char);
             }
         }
         self.output.push(Token::new(TokenType::EndOfFile, line_number));

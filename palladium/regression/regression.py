@@ -1,10 +1,9 @@
 
 import os
-import sys
 import difflib
 import subprocess
 
-DEFAULT_RUST_EXE_PATH = "..\\target\\debug\\palladium"
+DEFAULT_RUST_EXE_PATH = ".\\target\\debug\\palladium"
 
 def failure(error: str) -> None:
     print(f"! Regression failed [failure]: {error}")
@@ -46,6 +45,7 @@ def load_test_cases(directory: str) -> dict:
 
 
 def run_test_cases(cases: dict) -> None:
+    print()
     tests_run = 0
     failures = 0
 
@@ -56,7 +56,7 @@ def run_test_cases(cases: dict) -> None:
             output_file = expected_file.replace(".txt", "")
             if os.path.exists(output_file):
                 os.remove(output_file)
-            subprocess.run(f"cmd /C {DEFAULT_RUST_EXE_PATH} {input_file}", stdout=subprocess.PIPE)
+            subprocess.run(f"cmd /C {DEFAULT_RUST_EXE_PATH} regression\\{input_file}", stdout=subprocess.PIPE, cwd="..")
             if not os.path.exists(output_file):
                 failures += 1
                 error(f"Could not find output file {output_file} (Did palladium compile?)")
@@ -87,7 +87,8 @@ def run_test_cases(cases: dict) -> None:
                 for line in lines:
                     print(line)
     
-    print(f"[SUMMARY]:\n\tRan: {tests_run} tests, successes: {tests_run - failures}, failures: {failures}")
+    print(f"\n[SUMMARY]:\n\tRan: {tests_run} tests, successes: {max(0, tests_run - failures)}, failures: {failures}")
+    print(f"\t- Success rate: {max(0, tests_run - failures) / tests_run * 100}%")
 
 
 

@@ -1,5 +1,6 @@
 public class Test {
-public static void main(String[] args) {
+public static void main(String[] args)
+{
 System.out.println(1f + 1f);
 System.out.println(2f * 2f);
 System.out.println(2f + 2f * 3f);
