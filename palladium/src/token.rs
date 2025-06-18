@@ -30,6 +30,8 @@ pub enum TokenType {
     False,
     Loop,
     Break,
+    If,
+    Else,
     // Operators
     LeftParen,
     RightParen,

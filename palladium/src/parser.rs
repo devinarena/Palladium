@@ -181,17 +181,21 @@ impl Parser<'_> {
                 self.consume();
                 self.loop_statement(program);
             }
+            TokenType::If => {
+                self.consume();
+                self.if_statement(program);
+            }
+            TokenType::Identifier(_) => {
+                self.assignment_statement(program);
+            }
+            TokenType::Break => {
+                self.consume();
+                program.add_child(StatementNode::Break);
+            }
             _ => {
                 parse_error!(self.peek().line_number, "Expected statement");
             }
         }
-    }
-
-
-    fn loop_statement(&mut self, program: &mut StatementNode) {
-        let body = self.block();
-        let loop_node = StatementNode::Loop { body: Box::new(body) };
-        program.add_child(loop_node);
     }
 
 
@@ -245,5 +249,53 @@ impl Parser<'_> {
             parse_error!(self.peek().line_number, format!("Expected right parenthesis but got {:?}", self.peek()).as_str());
         }
         self.consume(); // consume the right parenthesis
+    }
+
+    fn loop_statement(&mut self, program: &mut StatementNode) {
+        let body = self.block();
+        let loop_node = StatementNode::Loop { body: Box::new(body) };
+        program.add_child(loop_node);
+    }
+
+    fn if_statement(&mut self, program: &mut StatementNode) {
+        if !matches!(self.peek().token_type, TokenType::LeftParen) {
+            parse_error!(self.peek().line_number, format!("Expected left parenthesis but got {:?}", self.peek()).as_str());
+        }
+        self.consume(); // consume the left parenthesis
+        let condition = self.expression(0);
+        if condition.value_type != ValueType::Boolean {
+            parse_error!(self.peek().line_number, "Expected boolean expression in if condition");
+        }
+        if !matches!(self.peek().token_type, TokenType::RightParen) {
+            parse_error!(self.peek().line_number, format!("Expected right parenthesis but got {:?}", self.peek()).as_str());
+        }
+        self.consume(); // consume the right parenthesis
+        let if_body = self.block();
+        let else_body = if matches!(self.peek().token_type, TokenType::Else) {
+            self.consume();
+            Some(Box::new(self.block()))
+        } else {
+            None
+        };
+        let if_node = StatementNode::If { condition, body: Box::new(if_body), else_body: else_body };
+        program.add_child(if_node);
+    }
+
+    fn assignment_statement(&mut self, program: &mut StatementNode) {
+        let identifier = self.peek().get_value();
+        self.consume();
+        if !matches!(self.peek().token_type, TokenType::Equals) {
+            parse_error!(self.peek().line_number, "Expected '=' after identifier");
+        }
+        self.consume(); // consume the equals sign
+        let expression_node = self.expression(0);
+        if !self.scope.identifiers.contains_key(&identifier) {
+            // todo: write lookup function
+            parse_error!(self.peek().line_number, format!("Unknown identifier: {}", identifier).as_str());
+        } else if &expression_node.value_type != self.scope.identifiers.get(&identifier).unwrap() {
+            parse_error!(self.peek().line_number, format!("Expected expression of type {:?} but got expression of type {:?}", self.scope.identifiers.get(&identifier).unwrap(), expression_node.value_type).as_str());
+        }
+        let assignment_node = StatementNode::Assignment { identifier: identifier.clone(), expression: expression_node };
+        program.add_child(assignment_node);
     }
 }

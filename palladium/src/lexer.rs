@@ -57,6 +57,8 @@ impl Lexer {
                     "or" => self.output.push(Token::new(TokenType::Or, line_number)),
                     "break" => self.output.push(Token::new(TokenType::Break, line_number)),
                     "loop" => self.output.push(Token::new(TokenType::Loop, line_number)),
+                    "if" => self.output.push(Token::new(TokenType::If, line_number)),
+                    "else" => self.output.push(Token::new(TokenType::Else, line_number)),
                     _ => self.output.push(Token::new(TokenType::Identifier(current), line_number)),
                 }
             } else if current_char == '\"' {

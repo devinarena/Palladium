@@ -141,6 +141,12 @@ impl Visit for StatementNode {
             return self.visit_block_statement(children);
         } else if let StatementNode::Loop { ref body } = *self {
             return self.visit_loop_statement(body);
+        } else if let StatementNode::If { ref condition, ref body, ref else_body } = *self {
+            return self.visit_if_statement(condition, body, else_body);
+        } else if let StatementNode::Assignment { ref identifier, ref expression } = *self {
+            return self.visit_assignment_statement(identifier, expression);
+        } else if let StatementNode::Break = *self {
+            return self.visit_break_statement();
         }
         panic!("Unexpected statement node {:?}", self);
     }
@@ -195,5 +201,35 @@ impl Visit for StatementNode {
         output.append(body.visit().as_mut());
         output.push("}".to_string());
         Box::new(output)
+    }
+
+    fn visit_break_statement(&self) -> Box<Vec<String>> {
+        let mut output = Vec::new();
+        output.push("break;".to_string());
+        Box::new(output)
+    }
+
+    fn visit_if_statement(&self, condition: &ExpressionNode, body: &StatementNode, else_body: &Option<Box<StatementNode>>) -> Box<Vec<String>> {
+        let mut output = Vec::new();
+        output.push("if (".to_string());
+        output.append(condition.visit().as_mut());
+        output.push(")".to_string());
+        output.append(body.visit().as_mut());
+        if let Some(else_body) = else_body {
+            output.push("else".to_string());
+            output.append(else_body.visit().as_mut());
+        }
+        Box::new(output)
+    }
+
+    fn visit_assignment_statement(&self, identifier: &String, expression: &ExpressionNode) -> Box<Vec<String>> {
+        let mut output = String::new();
+        output.push_str(identifier);
+        output.push_str(" = ");
+        output.push_str(&expression.visit().join(""));
+        output.push_str(";");
+        let mut v = Vec::new();
+        v.push(output);
+        return Box::new(v);
     }
 }

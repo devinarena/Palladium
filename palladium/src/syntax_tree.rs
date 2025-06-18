@@ -12,6 +12,9 @@ pub trait Visit {
     fn visit_output_statement(&self, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_block_statement(&self, _children: &Vec<StatementNode>) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_loop_statement(&self, _body: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_break_statement(&self) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_if_statement(&self, _condition: &ExpressionNode, _body: &StatementNode, _else_body: &Option<Box<StatementNode>>) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_assignment_statement(&self, _identifier: &String, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
 }
 
 impl std::fmt::Debug for dyn Visit {
@@ -69,6 +72,15 @@ pub enum StatementNode {
     },
     Loop {
         body: Box<StatementNode>
+    },
+    If {
+        condition: ExpressionNode,
+        body: Box<StatementNode>,
+        else_body: Option<Box<StatementNode>>
+    },
+    Assignment {
+        identifier: String,
+        expression: ExpressionNode
     },
     Break
 }
