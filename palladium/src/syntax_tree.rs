@@ -1,6 +1,5 @@
 use crate::token::Token;
 
-
 pub trait Visit {
     fn visit(&self) -> Box<Vec<String>>;
     fn visit_literal(&self, _value_token: &Box<Token>) -> Box<Vec<String>> { Box::new(Vec::new()) }
@@ -8,9 +7,11 @@ pub trait Visit {
     fn visit_binary(&self, _left: &Box<ExpressionNode>, _operator: &Box<Token>, _right: &Box<ExpressionNode> , _parent_precedence: u8) -> Box<Vec<String>> { Box::new(Vec::new()) }
 
     fn visit_statement(&self, _statement: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_main_statement(&self, _body: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_let_statement(&self, _identifier: &String, _type_token: &Token, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_output_statement(&self, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_block_statement(&self, _children: &Vec<StatementNode>) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_loop_statement(&self, _body: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
 }
 
 impl std::fmt::Debug for dyn Visit {
@@ -52,6 +53,9 @@ pub enum ExpressionNodeType {
 
 #[derive(Debug)]
 pub enum StatementNode {
+    Main {
+        body: Box<StatementNode>
+    },
     Output {
         expression: ExpressionNode
     },
@@ -62,7 +66,11 @@ pub enum StatementNode {
     },
     Block {
         children: Vec<StatementNode>
-    }
+    },
+    Loop {
+        body: Box<StatementNode>
+    },
+    Break
 }
 
 #[derive(Debug)]
@@ -88,20 +96,29 @@ impl ExpressionNodeType {
     }
 }
 
-impl StatementNode {}
-
-impl MainNode {
-    pub fn new(body: StatementNode) -> MainNode {
-        MainNode {
-            body
+impl StatementNode {
+    pub fn add_child(&mut self, child: StatementNode) {
+        if let StatementNode::Block { children } = self {
+            children.push(child);
+        } else if let StatementNode::Main { body } = self {
+            body.add_child(child);
+        } else {
+            panic!("Cannot add child to non-block statement node");
         }
     }
 
-    pub fn add_child(&mut self, child: StatementNode) {
-        if let StatementNode::Block { ref mut children } = self.body {
-            children.push(child);
-        } else {
-            panic!("Expected a block statement node");
+    pub fn is_main(&self) -> bool {
+        match *self {
+            StatementNode::Main { .. } => true,
+            _ => false
+        }
+    }
+
+    pub fn has_body(&self) -> bool {
+        match self {
+            StatementNode::Main { body, .. } => body.has_body(),
+            StatementNode::Block { .. } => true,
+            _ => false
         }
     }
 }

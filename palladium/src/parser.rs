@@ -8,12 +8,17 @@ macro_rules! parse_error {
     };
 }
 
+pub struct Scope {
+    identifiers: HashMap<String, ValueType>,
+    parent: Option<Box<Scope>>
+}
+
 pub struct Parser<'a> {
     tokens: &'a Vec<Token>,
     index: usize,
     pub file_name: String,
     pub parse_time: Duration,
-    pub identifiers: HashMap<String, ValueType>
+    scope: Scope
 }
 
 impl Parser<'_> {
@@ -22,14 +27,14 @@ impl Parser<'_> {
             tokens, 
             index: 0 ,
             file_name,
-            identifiers: HashMap::new(),
+            scope: Scope { parent: None, identifiers: HashMap::new() },
             parse_time: Duration::new(0, 0)
         }
     }
 
-    pub fn parse(&mut self) -> MainNode {
+    pub fn parse(&mut self) -> StatementNode {
         let start_time = Instant::now();
-        let mut program = MainNode::new(StatementNode::Block { children: Vec::new() });
+        let mut program = StatementNode::Main { body: Box::new(StatementNode::Block { children: Vec::new() }) };
         while !matches!(self.peek().token_type, TokenType::EndOfFile) {
             self.statement(&mut program);
         }
@@ -54,12 +59,37 @@ impl Parser<'_> {
         return token.unwrap();
     }
 
+    fn lookup_value(&self, name: &String, scope: &Scope) -> ValueType {
+        if let Some(value) = scope.identifiers.get(name) {
+            return value.clone();
+        }
+        if let Some(parent) = &scope.parent {
+            return self.lookup_value(name, parent);
+        }
+        panic!("Could not find variable {}", name);
+    }
+
+
+    fn block(&mut self) -> StatementNode {
+        let mut block = StatementNode::Block { children: Vec::new() };
+        self.consume(); // {
+        while !matches!(self.peek().token_type, TokenType::RightBrace) {
+            self.statement(&mut block);
+        }
+        self.consume(); // }
+        block
+    }
+
+
     fn expression(&mut self, min_bp: u8) -> ExpressionNode {
         let mut lhs = match self.peek().token_type {
             TokenType::StringLiteral(_)=> ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::String ),
             TokenType::Decimal(_) => ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::Float ),
             TokenType::True | TokenType::False => ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::Boolean ),
-            TokenType::Identifier(ref name) => ExpressionNode::new(ExpressionNodeType::Variable { identifier: self.peek().get_value() }, self.identifiers.get(name).unwrap().clone() ),
+            TokenType::Identifier(ref name) => ExpressionNode::new(ExpressionNodeType::Variable { 
+                identifier: self.peek().get_value() }, 
+                self.lookup_value(name, &self.scope)
+            ),
             TokenType::LeftParen => {
                 self.consume();
                 let expr = self.expression(0);
@@ -76,7 +106,8 @@ impl Parser<'_> {
         self.consume();
         loop {
             let op = self.peek().clone();
-            if !matches!(op.token_type, TokenType::Plus | TokenType::Minus | TokenType::Star | TokenType::Slash | TokenType::And | TokenType::Or) {
+            if !matches!(op.token_type, TokenType::Plus | TokenType::Minus | TokenType::Star | TokenType::Slash | TokenType::And
+                | TokenType::Or | TokenType::GreaterThan | TokenType::LessThan | TokenType::GreaterEqualTo | TokenType::LessEqualTo | TokenType::DoubleEquals) {
                 break;
             }
 
@@ -99,6 +130,18 @@ impl Parser<'_> {
                     }
                     lhs = ExpressionNode::new(ExpressionNodeType::Binary { left: Box::new(lhs), operator: Box::new(op), right: Box::new(rhs), }, value_type );
                 }
+                TokenType::GreaterThan | TokenType::LessThan | TokenType::GreaterEqualTo | TokenType::LessEqualTo => {
+                    if lhs.value_type != ValueType::Float {
+                        parse_error!(self.peek().line_number, "Expected float expression on left side of comparison");
+                    } else if rhs.value_type != ValueType::Float {
+                        parse_error!(self.peek().line_number, "Expected float expression on right side of comparison");
+                    }
+                    lhs = ExpressionNode::new(ExpressionNodeType::Binary { left: Box::new(lhs), operator: Box::new(op), right: Box::new(rhs), }, ValueType::Boolean );
+                }
+                TokenType::DoubleEquals => {
+                    // gonna have to figure out how to not break this in Java
+                    lhs = ExpressionNode::new(ExpressionNodeType::Binary { left: Box::new(lhs), operator: Box::new(op), right: Box::new(rhs), }, ValueType::Boolean );
+                }
                 TokenType::And | TokenType::Or => {
                     if lhs.value_type != ValueType::Boolean {
                         parse_error!(self.peek().line_number, "Expected boolean expression on left side of '&&' or '||'");
@@ -116,14 +159,15 @@ impl Parser<'_> {
     fn infix_binding_power(&self, op: &Token) -> (u8, u8) {
         match op.token_type {
             TokenType::Or => (0, 1),
-            TokenType::And => (1, 2),
-            TokenType::Plus | TokenType::Minus => (3, 4),
-            TokenType::Star | TokenType::Slash => (5, 6),
+            TokenType::And => (2, 3),
+            TokenType::GreaterThan | TokenType::LessThan | TokenType::GreaterEqualTo | TokenType::LessEqualTo | TokenType::DoubleEquals => (4, 5),
+            TokenType::Plus | TokenType::Minus => (6, 7),
+            TokenType::Star | TokenType::Slash => (8, 9),
             _ => panic!("bad op: {:?}", op),
         }
     }
 
-    fn statement(&mut self, program: &mut MainNode) {
+    fn statement(&mut self, program: &mut StatementNode) {
         match self.peek().token_type {
             TokenType::Output => {
                 self.consume();
@@ -133,13 +177,25 @@ impl Parser<'_> {
                 self.consume();
                 self.let_statement(program);
             }
+            TokenType::Loop => {
+                self.consume();
+                self.loop_statement(program);
+            }
             _ => {
                 parse_error!(self.peek().line_number, "Expected statement");
             }
         }
     }
 
-    fn let_statement(&mut self, program: &mut MainNode) {
+
+    fn loop_statement(&mut self, program: &mut StatementNode) {
+        let body = self.block();
+        let loop_node = StatementNode::Loop { body: Box::new(body) };
+        program.add_child(loop_node);
+    }
+
+
+    fn let_statement(&mut self, program: &mut StatementNode) {
         if !matches!(self.peek().token_type, TokenType::Identifier(_)) {
             parse_error!(self.peek().line_number, "Expected identifier after 'let'");
         }
@@ -173,10 +229,11 @@ impl Parser<'_> {
             expression: expression_node,
         };
         program.add_child(let_node);
-        self.identifiers.insert(identifier, declared_type);
+        self.scope.identifiers.insert(identifier, declared_type);
     }
 
-    fn output_statement(&mut self, program: &mut MainNode) {
+
+    fn output_statement(&mut self, program: &mut StatementNode) {
         if !matches!(self.peek().token_type, TokenType::LeftParen) {
             parse_error!(self.peek().line_number, format!("Expected left parenthesis but got {:?}", self.peek()).as_str());
         }

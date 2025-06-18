@@ -28,17 +28,28 @@ pub enum TokenType {
     Bool,
     True,
     False,
+    Loop,
+    Break,
     // Operators
     LeftParen,
     RightParen,
+    LeftBrace,
+    RightBrace,
     Colon,
     Plus,
     Minus,
     Star,
     Slash,
-    Equals,
     And,
-    Or
+    Or,
+    Equals,
+    DoubleEquals,
+    GreaterThan,
+    LessThan,
+    GreaterEqualTo,
+    LessEqualTo,
+    Not,
+    NotEqualTo
 }
 
 impl Token {
