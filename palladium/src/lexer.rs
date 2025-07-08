@@ -55,6 +55,10 @@ impl Lexer {
                     "false" => self.output.push(Token::new(TokenType::False, line_number)),
                     "and" => self.output.push(Token::new(TokenType::And, line_number)),
                     "or" => self.output.push(Token::new(TokenType::Or, line_number)),
+                    "break" => self.output.push(Token::new(TokenType::Break, line_number)),
+                    "loop" => self.output.push(Token::new(TokenType::Loop, line_number)),
+                    "if" => self.output.push(Token::new(TokenType::If, line_number)),
+                    "else" => self.output.push(Token::new(TokenType::Else, line_number)),
                     _ => self.output.push(Token::new(TokenType::Identifier(current), line_number)),
                 }
             } else if current_char == '\"' {
@@ -72,6 +76,12 @@ impl Lexer {
             } else if current_char == ')' {
                 self.output.push(Token::new(TokenType::RightParen, line_number));
                 self.next();
+            } else if current_char == '{' {
+                self.output.push(Token::new(TokenType::LeftBrace, line_number));
+                self.next();
+            } else if current_char == '}' {
+                self.output.push(Token::new(TokenType::RightBrace, line_number));
+                self.next();
             } else if current_char == ':' {
                 self.output.push(Token::new(TokenType::Colon, line_number));
                 self.next();
@@ -88,8 +98,29 @@ impl Lexer {
                 self.output.push(Token::new(TokenType::Slash, line_number));
                 self.next();
             } else if current_char == '=' {
-                self.output.push(Token::new(TokenType::Equals, line_number));
-                self.next();
+                current_char = self.next();
+                if current_char == '=' {
+                    self.output.push(Token::new(TokenType::DoubleEquals, line_number));
+                    self.next();
+                } else {
+                    self.output.push(Token::new(TokenType::Equals, line_number));
+                }
+            } else if current_char == '>' {
+                current_char = self.next();
+                if current_char == '=' {
+                    self.output.push(Token::new(TokenType::GreaterEqualTo, line_number));
+                    self.next();
+                } else {
+                    self.output.push(Token::new(TokenType::GreaterThan, line_number));
+                }
+            } else if current_char == '<' {
+                current_char = self.next();
+                if current_char == '=' {
+                    self.output.push(Token::new(TokenType::LessEqualTo, line_number));
+                    self.next();
+                } else {
+                    self.output.push(Token::new(TokenType::LessThan, line_number));
+                }
             } else if current_char == '&' {
                 current_char = self.next();
                 if current_char == '&' {

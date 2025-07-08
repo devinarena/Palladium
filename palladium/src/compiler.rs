@@ -1,6 +1,6 @@
 use std::{fs::File, io::Write, path::Path, time::{Duration, Instant}};
 
-use crate::{syntax_tree::{ExpressionNode, ExpressionNodeType, MainNode, StatementNode, Visit}, token::{Token, TokenType}};
+use crate::{syntax_tree::{ExpressionNode, ExpressionNodeType, StatementNode, Visit}, token::{Token, TokenType}};
 
 
 pub struct Compiler {
@@ -18,7 +18,10 @@ impl Compiler {
         }
     }
 
-    pub fn compile(&mut self, main: MainNode) {
+    pub fn compile(&mut self, main: StatementNode) {
+        if !main.has_body() {
+            panic!("Expected node with body");
+        }
         let start_time = Instant::now();
         let mut program: String = String::new();
         program.push_str(format!("public class {} {{\n", self.main_file_name).as_str());
@@ -34,9 +37,10 @@ impl Compiler {
 fn operator_precedence(operator: &Token) -> u8 {
     match operator.token_type {
         TokenType::Or => 0,
-        TokenType::And => 1,
-        TokenType::Plus | TokenType::Minus => 2,
-        TokenType::Star | TokenType::Slash => 3,
+        TokenType::And => 2,
+        TokenType::GreaterThan | TokenType::LessThan | TokenType::GreaterEqualTo | TokenType::LessEqualTo | TokenType::DoubleEquals => 4,
+        TokenType::Plus | TokenType::Minus => 6,
+        TokenType::Star | TokenType::Slash => 8,
         _ => panic!("Expected an operator"),
     }
 }
@@ -109,6 +113,11 @@ impl Visit for ExpressionNode {
             TokenType::Slash => "/",
             TokenType::And => "&&",
             TokenType::Or => "||",
+            TokenType::GreaterThan => ">",
+            TokenType::LessThan => "<",
+            TokenType::GreaterEqualTo => ">=",
+            TokenType::LessEqualTo => "<=",
+            TokenType::DoubleEquals => "==",
             _ => panic!("(compiler) Expected an operator"),
         };
 
@@ -122,14 +131,31 @@ impl Visit for ExpressionNode {
 
 impl Visit for StatementNode {
     fn visit(&self) -> Box<Vec<String>> {
-        if let StatementNode::Output { ref expression } = *self {
+        if let StatementNode::Main { body } = self {
+            return self.visit_main_statement(body);
+        } else if let StatementNode::Output { ref expression } = *self {
             return self.visit_output_statement(expression);
         } else if let StatementNode::Let { ref identifier, ref type_token, ref expression } = *self {
             return self.visit_let_statement(identifier, type_token, expression);
         } else if let StatementNode::Block { ref children } = *self {
             return self.visit_block_statement(children);
+        } else if let StatementNode::Loop { ref body } = *self {
+            return self.visit_loop_statement(body);
+        } else if let StatementNode::If { ref condition, ref body, ref else_body } = *self {
+            return self.visit_if_statement(condition, body, else_body);
+        } else if let StatementNode::Assignment { ref identifier, ref expression } = *self {
+            return self.visit_assignment_statement(identifier, expression);
+        } else if let StatementNode::Break = *self {
+            return self.visit_break_statement();
         }
         panic!("Unexpected statement node {:?}", self);
+    }
+
+    fn visit_main_statement(&self, body: &StatementNode) -> Box<Vec<String>> {
+        let mut output = Vec::new();
+        output.push("public static void main(String[] args)".to_string());
+        output.append(body.visit().as_mut());
+        Box::new(output)
     }
 
     fn visit_output_statement(&self, expression: &ExpressionNode) -> Box<Vec<String>> {
@@ -168,13 +194,42 @@ impl Visit for StatementNode {
         output.push("}".to_string());
         Box::new(output)
     }
-}
 
-impl Visit for MainNode {
-    fn visit(&self) -> Box<Vec<String>> {
+    fn visit_loop_statement(&self, body: &StatementNode) -> Box<Vec<String>> {
         let mut output = Vec::new();
-        output.push("public static void main(String[] args)".to_string());
-        output.append(self.body.visit().as_mut());
+        output.push("while (true) {".to_string());
+        output.append(body.visit().as_mut());
+        output.push("}".to_string());
         Box::new(output)
+    }
+
+    fn visit_break_statement(&self) -> Box<Vec<String>> {
+        let mut output = Vec::new();
+        output.push("break;".to_string());
+        Box::new(output)
+    }
+
+    fn visit_if_statement(&self, condition: &ExpressionNode, body: &StatementNode, else_body: &Option<Box<StatementNode>>) -> Box<Vec<String>> {
+        let mut output = Vec::new();
+        output.push("if (".to_string());
+        output.append(condition.visit().as_mut());
+        output.push(")".to_string());
+        output.append(body.visit().as_mut());
+        if let Some(else_body) = else_body {
+            output.push("else".to_string());
+            output.append(else_body.visit().as_mut());
+        }
+        Box::new(output)
+    }
+
+    fn visit_assignment_statement(&self, identifier: &String, expression: &ExpressionNode) -> Box<Vec<String>> {
+        let mut output = String::new();
+        output.push_str(identifier);
+        output.push_str(" = ");
+        output.push_str(&expression.visit().join(""));
+        output.push_str(";");
+        let mut v = Vec::new();
+        v.push(output);
+        return Box::new(v);
     }
 }

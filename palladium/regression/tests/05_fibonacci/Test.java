@@ -1,4 +1,4 @@
-public class Input {
+public class Test {
 public static void main(String[] args)
 {
 float x = 1f;
