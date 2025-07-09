@@ -11,7 +11,7 @@ pub trait Visit {
     fn visit_let_statement(&self, _identifier: &String, _type_token: &Token, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_output_statement(&self, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_block_statement(&self, _children: &Vec<StatementNode>) -> Box<Vec<String>> { Box::new(Vec::new()) }
-    fn visit_loop_statement(&self, _body: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_loop_statement(&self, _range: &Option<ExpressionNode>, _body: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_break_statement(&self) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_if_statement(&self, _condition: &ExpressionNode, _body: &StatementNode, _else_body: &Option<Box<StatementNode>>) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_assignment_statement(&self, _identifier: &String, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
@@ -25,6 +25,7 @@ impl std::fmt::Debug for dyn Visit {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueType {
+    Null,
     Float,
     String,
     Boolean
@@ -49,6 +50,12 @@ pub enum ExpressionNodeType {
         left: Box<ExpressionNode>,
         operator: Box<Token>,
         right: Box<ExpressionNode>
+    },
+    Range {
+        identifier: String,
+        range_type: ValueType,
+        start: Box<ExpressionNode>,
+        end: Box<ExpressionNode>
     }
 }
 
@@ -71,6 +78,7 @@ pub enum StatementNode {
         children: Vec<StatementNode>
     },
     Loop {
+        range: Option<ExpressionNode>,
         body: Box<StatementNode>
     },
     If {

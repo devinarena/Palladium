@@ -6,7 +6,7 @@ loop {
     let z :: f32 = x + y
     x = y
     y = z
-    output(x)
+    output(z)
 
     if (z >= 144) {
         break

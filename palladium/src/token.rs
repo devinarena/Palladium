@@ -38,6 +38,8 @@ pub enum TokenType {
     LeftBrace,
     RightBrace,
     Colon,
+    Dot,
+    DoubleDot,
     Plus,
     Minus,
     Star,

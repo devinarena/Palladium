@@ -29,7 +29,7 @@ impl Lexer {
                     current.push(current_char);
                     current_char = self.next();
                 }
-                if current_char == '.' {
+                if current_char == '.' && self.look_ahead(1).is_numeric() {
                     current.push(current_char);
                     current_char = self.next();
                     while current_char.is_numeric() {
@@ -85,6 +85,14 @@ impl Lexer {
             } else if current_char == ':' {
                 self.output.push(Token::new(TokenType::Colon, line_number));
                 self.next();
+            } else if current_char == '.' {
+                current_char = self.next();
+                if current_char == '.' {
+                    self.output.push(Token::new(TokenType::DoubleDot, line_number));
+                    self.next();
+                } else {
+                    self.output.push(Token::new(TokenType::Dot, line_number));
+                }
             } else if current_char == '+' {
                 self.output.push(Token::new(TokenType::Plus, line_number));
                 self.next();
@@ -158,6 +166,13 @@ impl Lexer {
             return '\0';
         }
         self.content.chars().nth(self.current).unwrap()
+    }
+
+    fn look_ahead(&self, offset: usize) -> char {
+        if self.current + offset >= self.content.len() {
+            return '\0';
+        }
+        self.content.chars().nth(self.current + offset).unwrap()
     }
 
     fn next(&mut self) -> char {

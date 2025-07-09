@@ -1,6 +1,6 @@
 use std::{fs::File, io::Write, path::Path, time::{Duration, Instant}};
 
-use crate::{syntax_tree::{ExpressionNode, ExpressionNodeType, StatementNode, Visit}, token::{Token, TokenType}};
+use crate::{syntax_tree::{ExpressionNode, ExpressionNodeType, StatementNode, ValueType, Visit}, token::{Token, TokenType}};
 
 
 pub struct Compiler {
@@ -139,8 +139,8 @@ impl Visit for StatementNode {
             return self.visit_let_statement(identifier, type_token, expression);
         } else if let StatementNode::Block { ref children } = *self {
             return self.visit_block_statement(children);
-        } else if let StatementNode::Loop { ref body } = *self {
-            return self.visit_loop_statement(body);
+        } else if let StatementNode::Loop { ref range,ref body } = *self {
+            return self.visit_loop_statement(range, body);
         } else if let StatementNode::If { ref condition, ref body, ref else_body } = *self {
             return self.visit_if_statement(condition, body, else_body);
         } else if let StatementNode::Assignment { ref identifier, ref expression } = *self {
@@ -195,9 +195,26 @@ impl Visit for StatementNode {
         Box::new(output)
     }
 
-    fn visit_loop_statement(&self, body: &StatementNode) -> Box<Vec<String>> {
+    fn visit_loop_statement(&self, range: &Option<ExpressionNode>, body: &StatementNode) -> Box<Vec<String>> {
         let mut output = Vec::new();
-        output.push("while (true) {".to_string());
+        if range.is_some() {
+            if let ExpressionNodeType::Range { identifier, range_type, start, end } = &range.as_ref().unwrap().node_type {
+                let mut header = String::new();
+                header.push_str("for (");
+                match range_type {
+                    ValueType::Float => header.push_str(format!("float {} = {}; {} <= {}; {} += 1.0f) {{", identifier, start.visit().join(""), identifier, end.visit().join(""), identifier).as_str()),
+                    _ => panic!("(compiler) Expected a float or integer range type"),
+                }
+                output.push(header);
+                output.append(body.visit().as_mut());
+                output.push("}".to_string());
+                return Box::new(output);
+            } else {
+                panic!("Expected a range expression node for loop statement");
+            }
+        } else {
+            output.push("while (true) {".to_string());
+        }
         output.append(body.visit().as_mut());
         output.push("}".to_string());
         Box::new(output)
