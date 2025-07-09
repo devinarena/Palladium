@@ -69,6 +69,9 @@ impl Visit for ExpressionNode {
             TokenType::Decimal(value) => {
                 output.push_str(format!("{}f", value).as_str());
             },
+            TokenType::Integer(value) => {
+                output.push_str(value.to_string().as_str());
+            }
             TokenType::True => output.push_str("true"),
             TokenType::False => output.push_str("false"),
             _ => panic!("Expected a literal token"),
@@ -172,6 +175,7 @@ impl Visit for StatementNode {
         let mut output = String::new();
         match type_token.token_type {
             TokenType::F32 => output.push_str("float "),
+            TokenType::I32 => output.push_str("int "),
             TokenType::Str => output.push_str("String "),
             TokenType::Bool => output.push_str("boolean "),
             _ => panic!("(compiler) Expected a type token for let statement"),
@@ -202,21 +206,20 @@ impl Visit for StatementNode {
                 let mut header = String::new();
                 header.push_str("for (");
                 match range_type {
-                    ValueType::Float => header.push_str(format!("float {} = {}; {} <= {}; {} += 1.0f) {{", identifier, start.visit().join(""), identifier, end.visit().join(""), identifier).as_str()),
+                    ValueType::Float => header.push_str(format!("float {} = {}; {} <= {}; {} += 1.0f)", identifier, start.visit().join(""), identifier, end.visit().join(""), identifier).as_str()),
+                    ValueType::Integer => header.push_str(format!("int {} = {}; {} <= {}; {} += 1)", identifier, start.visit().join(""), identifier, end.visit().join(""), identifier).as_str()),
                     _ => panic!("(compiler) Expected a float or integer range type"),
                 }
                 output.push(header);
                 output.append(body.visit().as_mut());
-                output.push("}".to_string());
                 return Box::new(output);
             } else {
                 panic!("Expected a range expression node for loop statement");
             }
         } else {
-            output.push("while (true) {".to_string());
+            output.push("while (true)".to_string());
         }
         output.append(body.visit().as_mut());
-        output.push("}".to_string());
         Box::new(output)
     }
 

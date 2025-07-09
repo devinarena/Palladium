@@ -36,9 +36,12 @@ impl Lexer {
                         current.push(current_char);
                         current_char = self.next();
                     }
+                    let decimal_value: f64 = current.parse().unwrap();
+                    self.output.push(Token::new(TokenType::Decimal(decimal_value), line_number));
+                } else {
+                    let integer_value: i64 = current.parse().unwrap();
+                    self.output.push(Token::new(TokenType::Integer(integer_value), line_number));
                 }
-                let decimal_value: f64 = current.parse().unwrap();
-                self.output.push(Token::new(TokenType::Decimal(decimal_value), line_number));
             } else if current_char.is_alphanumeric() || current_char == '_' {
                 let mut current= String::new();
                 while current_char.is_alphanumeric() || current_char == '_' {
@@ -49,6 +52,7 @@ impl Lexer {
                     "output" => self.output.push(Token::new(TokenType::Output, line_number)),
                     "let" => self.output.push(Token::new(TokenType::Let, line_number)),
                     "f32" => self.output.push(Token::new(TokenType::F32, line_number)),
+                    "i32" => self.output.push(Token::new(TokenType::I32, line_number)),
                     "str" => self.output.push(Token::new(TokenType::Str, line_number)),
                     "bool" => self.output.push(Token::new(TokenType::Bool, line_number)),
                     "true" => self.output.push(Token::new(TokenType::True, line_number)),
@@ -59,6 +63,7 @@ impl Lexer {
                     "loop" => self.output.push(Token::new(TokenType::Loop, line_number)),
                     "if" => self.output.push(Token::new(TokenType::If, line_number)),
                     "else" => self.output.push(Token::new(TokenType::Else, line_number)),
+                    "as" => self.output.push(Token::new(TokenType::As, line_number)),
                     _ => self.output.push(Token::new(TokenType::Identifier(current), line_number)),
                 }
             } else if current_char == '\"' {

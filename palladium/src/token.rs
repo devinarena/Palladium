@@ -24,6 +24,7 @@ pub enum TokenType {
     Output,
     Let,
     F32,
+    I32,
     Str,
     Bool,
     True,
@@ -32,6 +33,7 @@ pub enum TokenType {
     Break,
     If,
     Else,
+    As,
     // Operators
     LeftParen,
     RightParen,
@@ -81,6 +83,7 @@ impl Token {
             TokenType::F32 => ValueType::Float,
             TokenType::Str => ValueType::String,
             TokenType::Bool => ValueType::Boolean,
+            TokenType::I32 => ValueType::Integer,
             _ => panic!("Token does not have a value type declaration")
         }
     }

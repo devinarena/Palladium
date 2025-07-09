@@ -130,6 +130,7 @@ impl Parser<'_> {
         let mut lhs = match self.peek().token_type {
             TokenType::StringLiteral(_)=> ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::String ),
             TokenType::Decimal(_) => ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::Float ),
+            TokenType::Integer(_) => ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::Integer ),
             TokenType::True | TokenType::False => ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::Boolean ),
             TokenType::Identifier(ref name) => ExpressionNode::new(ExpressionNodeType::Variable { 
                 identifier: self.peek().get_value() }, 
@@ -170,11 +171,11 @@ impl Parser<'_> {
             match op.token_type {
                 TokenType::Plus | TokenType::Minus | TokenType::Star | TokenType::Slash => {
                     let mut value_type: ValueType = ValueType::Float;
-                    if lhs.value_type == ValueType::String {
+                    if lhs.value_type == ValueType::Integer && rhs.value_type == ValueType::Integer {
+                        value_type = ValueType::Integer;
+                    } else if lhs.value_type == ValueType::String || rhs.value_type == ValueType::String {
                         value_type = ValueType::String;
-                    } else if rhs.value_type == ValueType::String {
-                        value_type = ValueType::String;
-                    }
+                    } 
                     lhs = ExpressionNode::new(ExpressionNodeType::Binary { left: Box::new(lhs), operator: Box::new(op), right: Box::new(rhs), }, value_type );
                 }
                 TokenType::GreaterThan | TokenType::LessThan | TokenType::GreaterEqualTo | TokenType::LessEqualTo => {
@@ -259,14 +260,14 @@ impl Parser<'_> {
             }
         }
         let type_token = self.peek().clone();
-        if matches!(type_token.token_type, TokenType::F32 | TokenType::Str | TokenType::Bool) {
+        if matches!(type_token.token_type, TokenType::F32 | TokenType::I32 | TokenType::Str | TokenType::Bool) {
             self.consume();
         } else {
-            parse_error!(self.peek().line_number, "Expected type declaration (currently supported: f32, str, bool)");
+            parse_error!(self.peek().line_number, "Expected type declaration (currently supported: f32, i32, str, bool)");
         }
         if matches!(self.peek().token_type, TokenType::Equals) {
             self.consume(); // consume the equals sign
-        } else{ 
+        } else{
             parse_error!(self.peek().line_number, "Expected '=' after identifier");
         }
         let expression_node = self.expression(0);
@@ -303,27 +304,36 @@ impl Parser<'_> {
         let mut body = None;
         if !matches!(self.peek().token_type, TokenType::LeftBrace) {
             let start = self.expression(0);
-            if start.value_type != ValueType::Float {
-                parse_error!(self.peek().line_number, "Expected float expression in loop condition");
+            let expected_type =start.value_type.clone();
+            if expected_type != ValueType::Float && expected_type != ValueType::Integer {
+                parse_error!(self.peek().line_number, "Expected float or int expression in loop condition");
             }
             if !matches!(self.peek().token_type, TokenType::DoubleDot) {
                 parse_error!(self.peek().line_number, format!("Expected '..' after loop condition but got {:?}", self.peek()).as_str());
             }
             self.consume(); // consume the double dot
             let end = self.expression(0);
-            if end.value_type != ValueType::Float {
-                parse_error!(self.peek().line_number, "Expected float expression in loop condition");
+            if end.value_type != expected_type {
+                parse_error!(self.peek().line_number, "Expected same type expression in loop condition");
             }
-            let identifier = format!("__palladium__loop__{}", self.loop_counter);
+            let identifier = if matches!(self.peek().token_type, TokenType::As) {
+                self.consume(); // consume the 'as' keyword
+                if !matches!(self.peek().token_type, TokenType::Identifier(_)) {
+                    parse_error!(self.peek().line_number, "Expected identifier after 'as'");
+                }
+                self.consume().get_value()
+            } else {
+                format!("__palladium__loop__{}", self.loop_counter)
+            };
             range = Some(ExpressionNode::new(ExpressionNodeType::Range { 
                 identifier: identifier.clone(),
-                range_type: ValueType::Float, 
+                range_type: expected_type.clone(), 
                 start: Box::new(start), 
                 end: Box::new(end) 
-            }, ValueType::Float));
+            }, expected_type.clone()));
             self.loop_counter += 1;
             self.new_scope();
-            self.scope.identifiers.insert(identifier, ValueType::Float);
+            self.scope.identifiers.insert(identifier, expected_type);
             body = Some(self.unscoped_block());
             self.pop_scope();
         } else {
@@ -332,6 +342,7 @@ impl Parser<'_> {
         let loop_node = StatementNode::Loop { range, body: Box::new(body.expect("Expected loop body")) };
         program.add_child(loop_node);
     }
+    
 
     fn if_statement(&mut self, program: &mut StatementNode) {
         if !matches!(self.peek().token_type, TokenType::LeftParen) {
@@ -358,10 +369,12 @@ impl Parser<'_> {
     }
 
     fn assignment_statement(&mut self, program: &mut StatementNode) {
-        let identifier = self.peek().get_value();
-        self.consume();
+        if !matches!(self.peek().token_type, TokenType::Identifier(_)) {
+            parse_error!(self.peek().line_number, "Expected identifier for assignment");
+        }
+        let identifier = self.consume().get_value();
         if !matches!(self.peek().token_type, TokenType::Equals) {
-            parse_error!(self.peek().line_number, "Expected '=' after identifier");
+            parse_error!(self.peek().line_number, format!("Expected '=' after identifier but got {:?}", self.peek()).as_str());
         }
         self.consume(); // consume the equals sign
         let expression_node = self.expression(0);
@@ -369,8 +382,8 @@ impl Parser<'_> {
         if value_type.is_none() {
             // todo: write lookup function
             parse_error!(self.peek().line_number, format!("Unknown identifier: {}", identifier).as_str());
-        } else if expression_node.value_type != value_type.unwrap() {
-            parse_error!(self.peek().line_number, format!("Expected expression of type {:?} but got expression of type {:?}", self.scope.identifiers.get(&identifier).unwrap(), expression_node.value_type).as_str());
+        } else if Some(expression_node.value_type.clone()) != value_type {
+            parse_error!(self.peek().line_number, format!("Expected expression of type {:?} but got expression of type {:?}", value_type, expression_node.value_type).as_str());
         }
         let assignment_node = StatementNode::Assignment { identifier: identifier.clone(), expression: expression_node };
         program.add_child(assignment_node);

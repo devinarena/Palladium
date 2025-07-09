@@ -1,17 +1,12 @@
 public class Input {
   public static void main(String[] args) {
-    float x = 1f;
-    float y = 1f;
-    while (true) {
-      {
-        float z = x + y;
-        x = y;
-        y = z;
-        System.out.println(z);
-        if (z >= 144f) {
-          break;
-        }
+    int x = 1;
+    for (int __palladium__loop__0 = 1; __palladium__loop__0 <= 10; __palladium__loop__0 += 1) {
+      for (int i = 1; i <= 5; i += 1) {
+        x = x + i;
       }
+      x = x * 2;
     }
+    System.out.println(x);
   }
 }

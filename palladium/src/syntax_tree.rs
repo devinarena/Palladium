@@ -28,7 +28,8 @@ pub enum ValueType {
     Null,
     Float,
     String,
-    Boolean
+    Boolean,
+    Integer
 }
 
 #[derive(Debug)]

@@ -1,14 +1,11 @@
 
-let x :: f32 = 1
-let y :: f32 = 1
+let x :: i32 = 1
 
-loop {
-    let z :: f32 = x + y
-    x = y
-    y = z
-    output(z)
-
-    if (z >= 144) {
-        break
+loop 1..10 {
+    loop 1..5 as i {
+        x = x + i
     }
+    x = x * 2
 }
+
+output(x)
