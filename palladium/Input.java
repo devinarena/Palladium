@@ -1,12 +1,15 @@
+import java.util.Scanner;
+
 public class Input {
+  private static Scanner __palladium_scanner__ = new Scanner(System.in);
+
+  private static String __palladium_input__(String prompt) {
+    System.out.print(prompt);
+    return __palladium_scanner__.nextLine();
+  }
+
   public static void main(String[] args) {
-    int x = 1;
-    for (int __palladium__loop__0 = 1; __palladium__loop__0 <= 10; __palladium__loop__0 += 1) {
-      for (int i = 1; i <= 5; i += 1) {
-        x = x + i;
-      }
-      x = x * 2;
-    }
-    System.out.println(x);
+    String name = __palladium_input__("What is your name? ");
+    __palladium_scanner__.close();
   }
 }

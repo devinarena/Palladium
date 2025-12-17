@@ -21,7 +21,6 @@ pub enum TokenType {
     Decimal(f64),
     StringLiteral(String),
     // Keywords
-    Output,
     Let,
     F32,
     I32,
@@ -42,6 +41,7 @@ pub enum TokenType {
     Colon,
     Dot,
     DoubleDot,
+    Comma,
     Plus,
     Minus,
     Star,

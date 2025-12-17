@@ -1,20 +1,19 @@
 public class Test {
 public static void main(String[] args)
 {
-float x = 1f;
-float y = 1f;
-while (true) {
+int x = 1;
+int y = 1;
+while (true)
 {
-float z = x + y;
+int z = x + y;
 x = y;
 y = z;
 System.out.println(z);
 if (
-z >= 144f
+z >= 144
 )
 {
 break;
-}
 }
 }
 }

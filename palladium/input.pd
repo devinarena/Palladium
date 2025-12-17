@@ -1,11 +1,2 @@
 
-let x :: i32 = 1
-
-loop 1..10 {
-    loop 1..5 as i {
-        x = x + i
-    }
-    x = x * 2
-}
-
-output(x)
+let name :: str = input("What is your name? ")

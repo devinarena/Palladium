@@ -1,4 +1,4 @@
 
 loop 1..10 {
-    output(__palladium__loop__0)
+    log(__palladium__loop__0)
 }

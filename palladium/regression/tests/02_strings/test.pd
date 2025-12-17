@@ -2,6 +2,6 @@
 
 let test :: str = "hello"
 
-output(test)
+log(test)
 
-output(test + " world")
+log(test + " world")

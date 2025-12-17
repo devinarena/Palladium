@@ -49,7 +49,6 @@ impl Lexer {
                     current_char = self.next();
                 }
                 match current.as_str() {
-                    "output" => self.output.push(Token::new(TokenType::Output, line_number)),
                     "let" => self.output.push(Token::new(TokenType::Let, line_number)),
                     "f32" => self.output.push(Token::new(TokenType::F32, line_number)),
                     "i32" => self.output.push(Token::new(TokenType::I32, line_number)),
@@ -98,6 +97,9 @@ impl Lexer {
                 } else {
                     self.output.push(Token::new(TokenType::Dot, line_number));
                 }
+            } else if current_char == ',' {
+                self.output.push(Token::new(TokenType::Comma, line_number));
+                self.next();
             } else if current_char == '+' {
                 self.output.push(Token::new(TokenType::Plus, line_number));
                 self.next();
