@@ -179,10 +179,8 @@ impl Parser<'_> {
                     lhs = ExpressionNode::new(ExpressionNodeType::Binary { left: Box::new(lhs), operator: Box::new(op), right: Box::new(rhs), }, value_type );
                 }
                 TokenType::GreaterThan | TokenType::LessThan | TokenType::GreaterEqualTo | TokenType::LessEqualTo => {
-                    if lhs.value_type != ValueType::Float {
-                        parse_error!(self.peek().line_number, "Expected float expression on left side of comparison");
-                    } else if rhs.value_type != ValueType::Float {
-                        parse_error!(self.peek().line_number, "Expected float expression on right side of comparison");
+                    if self.check_comparison_types(&lhs.value_type, &rhs.value_type) == false {
+                        parse_error!(self.peek().line_number, "Mismatched types in comparison expression");
                     }
                     lhs = ExpressionNode::new(ExpressionNodeType::Binary { left: Box::new(lhs), operator: Box::new(op), right: Box::new(rhs), }, ValueType::Boolean );
                 }
@@ -202,6 +200,16 @@ impl Parser<'_> {
             }
         }
         lhs
+    }
+
+    fn check_comparison_types(&self, left: &ValueType, right: &ValueType) -> bool {
+        match left {
+            ValueType::Float => matches!(right, ValueType::Float),
+            ValueType::Integer => matches!(right, ValueType::Integer),
+            ValueType::String => matches!(right, ValueType::String),
+            ValueType::Boolean => matches!(right, ValueType::Boolean),
+            _ => false
+        }
     }
 
     fn infix_binding_power(&self, op: &Token) -> (u8, u8) {
