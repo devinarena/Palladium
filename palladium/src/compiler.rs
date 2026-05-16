@@ -36,8 +36,45 @@ impl Compiler {
             program.push_str("private static String __palladium_input__(String prompt) { System.out.print(prompt); return __palladium_scanner__.nextLine(); }\n");
         }
 
-        let body_lines = self.emit_statement(self.file_ctx.body.as_ref().unwrap());
-        program.push_str(&body_lines.join("\n"));
+        // Emit functions at class level and other statements inside `main`
+        let root_stmt = self.file_ctx.body.as_ref().unwrap();
+        if let StatementNode::Main { body } = root_stmt {
+            if let StatementNode::Block { children } = &**body {
+                // First emit any class-level functions
+                for child in children {
+                    if let StatementNode::Function { .. } = child {
+                        let func_lines = self.emit_statement(child);
+                        program.push_str(&func_lines.join("\n"));
+                        program.push_str("\n");
+                    }
+                }
+
+                // Then emit the main method with non-function children
+                program.push_str("public static void main(String[] args)\n{");
+                for child in children {
+                    if let StatementNode::Function { .. } = child {
+                        continue;
+                    }
+                    let mut lines = self.emit_statement(child);
+                    // Append each statement line inside main
+                    for line in lines.drain(..) {
+                        program.push_str("\n");
+                        program.push_str(&line);
+                    }
+                }
+                if self.file_ctx.imports.contains(&"java.util.Scanner".to_string()) {
+                    program.push_str("\n__palladium_scanner__.close();");
+                }
+                program.push_str("\n}");
+            } else {
+                // Fallback to previous behavior
+                let body_lines = self.emit_statement(root_stmt);
+                program.push_str(&body_lines.join("\n"));
+            }
+        } else {
+            let body_lines = self.emit_statement(root_stmt);
+            program.push_str(&body_lines.join("\n"));
+        }
         program.push_str("\n}");
 
         let output_path = Path::new(&self.directory).join(format!("{}.java", self.file_ctx.file_name));
@@ -208,10 +245,37 @@ impl Compiler {
             StatementNode::Assignment { identifier, expression } => {
                 vec![format!("{} = {};", identifier, self.emit_expression(expression))]
             }
-            StatementNode::CallStatement { call } => {
+            StatementNode::Call { call } => {
                 vec![format!("{};", self.emit_expression(call))]
             }
+            StatementNode::Return { expression } => {
+                vec![format!("return {};", self.emit_expression(expression))]
+            }
             StatementNode::Break => vec!["break;".to_string()],
+            StatementNode::Function { identifier, parameters, return_type, body } => {
+                let mut out = Vec::new();
+                let params_str = parameters.iter().map(|(name, ty)| {
+                    let ty_str = match ty {
+                        ValueType::Float => "float",
+                        ValueType::Integer => "int",
+                        ValueType::String => "String",
+                        ValueType::Boolean => "boolean",
+                        _ => panic!("(compiler) Unsupported parameter type in function declaration"),
+                    };
+                    format!("{} {}", ty_str, name)
+                }).collect::<Vec<String>>().join(", ");
+                let return_str = match return_type {
+                    ValueType::Float => "float",
+                    ValueType::Integer => "int",
+                    ValueType::String => "String",
+                    ValueType::Boolean => "boolean",
+                    ValueType::Null => "void",
+                    _ => panic!("(compiler) Unsupported return type in function declaration"),
+                };
+                out.push(format!("public static {} {}({})", return_str, identifier, params_str));
+                out.append(&mut self.emit_statement(body));
+                out
+            }
         }
     }
 }

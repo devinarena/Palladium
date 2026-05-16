@@ -20,6 +20,8 @@ pub trait Visit {
     fn visit_if_statement(&self, _condition: &ExpressionNode, _body: &StatementNode, _else_body: &Option<Box<StatementNode>>) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_assignment_statement(&self, _identifier: &String, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_call_statement(&self, _call: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_return_statement(&self, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_function_statement(&self, _identifier: &String, _parameters: &Vec<(String, ValueType)>, _return_type: &ValueType, _body: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
 }
 
 impl std::fmt::Debug for dyn Visit {
@@ -114,9 +116,18 @@ pub enum StatementNode {
         expression: ExpressionNode
     },
     Break,
-    CallStatement {
+    Call {
         call: ExpressionNode
     },
+    Return {
+        expression: ExpressionNode
+    },
+    Function {
+        identifier: String,
+        parameters: Vec<(String, ValueType)>,
+        return_type: ValueType,
+        body: Box<StatementNode>
+    }
 }
 
 #[derive(Debug)]

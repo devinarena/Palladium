@@ -50,6 +50,7 @@ impl Lexer {
                 }
                 match current.as_str() {
                     "let" => self.output.push(Token::new(TokenType::Let, line_number)),
+                    "fn" => self.output.push(Token::new(TokenType::Fn, line_number)),
                     "f32" => self.output.push(Token::new(TokenType::F32, line_number)),
                     "i32" => self.output.push(Token::new(TokenType::I32, line_number)),
                     "str" => self.output.push(Token::new(TokenType::Str, line_number)),
@@ -63,6 +64,7 @@ impl Lexer {
                     "if" => self.output.push(Token::new(TokenType::If, line_number)),
                     "else" => self.output.push(Token::new(TokenType::Else, line_number)),
                     "as" => self.output.push(Token::new(TokenType::As, line_number)),
+                    "return" => self.output.push(Token::new(TokenType::Return, line_number)),
                     _ => self.output.push(Token::new(TokenType::Identifier(current), line_number)),
                 }
             } else if current_char == '\"' {

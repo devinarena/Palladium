@@ -10,3 +10,4 @@ A programming language that compiles into Java, written in Rust
 - [X] Loops
 - [X] Loops with ranges (compile to for loops)
 - [X] If statements
+- [X] Functions and builtins
