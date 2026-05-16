@@ -22,6 +22,7 @@ pub enum TokenType {
     StringLiteral(String),
     // Keywords
     Let,
+    Fn,
     F32,
     I32,
     Str,
@@ -30,6 +31,7 @@ pub enum TokenType {
     False,
     Loop,
     Break,
+    Return,
     If,
     Else,
     As,
@@ -84,6 +86,7 @@ impl Token {
             TokenType::Str => ValueType::String,
             TokenType::Bool => ValueType::Boolean,
             TokenType::I32 => ValueType::Integer,
+            TokenType::Fn => ValueType::Function,
             _ => panic!("Token does not have a value type declaration")
         }
     }

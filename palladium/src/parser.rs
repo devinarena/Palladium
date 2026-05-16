@@ -194,7 +194,20 @@ impl Parser<'_> {
                     ValueType::Function // or function return type
                 );
             } else {
-                parse_error!(self.peek().line_number, format!("Unknown function: {}", identifier).as_str());
+                let value_type = self.lookup_value(identifier, &self.scope);
+                if value_type.is_none() {
+                    parse_error!(self.peek().line_number, format!("Unknown function: {}", identifier).as_str());
+                } else if value_type.unwrap() != ValueType::Function {
+                    parse_error!(self.peek().line_number, format!("Identifier '{}' is not a function", identifier).as_str());
+                }
+                return ExpressionNode::new(
+                    ExpressionNodeType::FunctionCall {
+                        callee: Box::new(callee),
+                        arguments: args,
+                        return_type: ValueType::Function // we don't actually know the return type here, but we'll figure it out in the compiler
+                    },
+                    ValueType::Function
+                );
             }
         }
 
@@ -330,6 +343,11 @@ impl Parser<'_> {
                 self.consume();
                 program.add_child(StatementNode::Break);
             }
+            TokenType::Return => {
+                self.consume();
+                let expression = self.expression(0);
+                program.add_child(StatementNode::Return { expression });
+            }
             _ => {
                 parse_error!(self.peek().line_number, "Expected statement");
             }
@@ -350,36 +368,105 @@ impl Parser<'_> {
             }
         }
         let type_token = self.peek().clone();
-        if matches!(type_token.token_type, TokenType::F32 | TokenType::I32 | TokenType::Str | TokenType::Bool) {
-            self.consume();
-        } else {
-            parse_error!(self.peek().line_number, "Expected type declaration (currently supported: f32, i32, str, bool)");
-        }
-        if matches!(self.peek().token_type, TokenType::Equals) {
-            self.consume(); // consume the equals sign
-        } else{
-            parse_error!(self.peek().line_number, "Expected '=' after identifier");
-        }
-        let expression_node = self.expression(0);
-        if expression_node.value_type == ValueType::Function {
-            if let ExpressionNodeType::FunctionCall { ref return_type, .. } = expression_node.node_type {
-                if return_type != &type_token.get_value_type_declaration() {
-                    parse_error!(self.peek().line_number, format!("Expected function to return type {:?} but got function that returns type {:?}", type_token.get_value_type_declaration(), return_type).as_str());
-                }
-            } else {
-                parse_error!(self.peek().line_number, "Expected function call expression");
+        if matches!(type_token.token_type, TokenType::Fn) {
+            self.consume(); // consume the 'fn' keyword
+            if !matches!(self.peek().token_type, TokenType::LessThan) {
+                parse_error!(self.peek().line_number, "Expected '<' after 'fn'");
             }
-        } else if expression_node.value_type != type_token.get_value_type_declaration() {
-            parse_error!(self.peek().line_number, format!("Expected expression of type {:?} but got expression of type {:?}", type_token.get_value_type_declaration(), expression_node.value_type).as_str());
+            self.consume(); // consume the less than sign
+            let return_type_token = self.peek().clone();
+            if matches!(return_type_token.token_type, TokenType::F32 | TokenType::I32 | TokenType::Str | TokenType::Bool) {
+                self.consume();
+            } else {
+                parse_error!(self.peek().line_number, "Expected return type declaration (currently supported: f32, i32, str, bool)");
+            }
+            if !matches!(self.peek().token_type, TokenType::GreaterThan) {
+                parse_error!(self.peek().line_number, "Expected '>' after return type declaration");
+            }
+            self.consume(); // consume the greater than sign
+            if !matches!(self.peek().token_type, TokenType::Equals) {
+                parse_error!(self.peek().line_number, "Expected '=' after function declaration");
+            }
+            self.consume(); // consume the equals sign
+            if !matches!(self.peek().token_type, TokenType::LeftParen) {
+                parse_error!(self.peek().line_number, "Expected '(' after function return type declaration");
+            }
+            let mut parameters: Vec<(String, ValueType)> = Vec::new();
+            self.consume(); // consume the left parenthesis
+            if !matches!(self.peek().token_type, TokenType::RightParen) {
+                loop {
+                    if !matches!(self.peek().token_type, TokenType::Identifier(_)) {
+                        parse_error!(self.peek().line_number, "Expected parameter name in function declaration");
+                    }
+                    let param_name = self.consume().get_value();
+                    if !matches!(self.peek().token_type, TokenType::Colon) {
+                        parse_error!(self.peek().line_number, "Expected ':' after parameter name in function declaration");
+                    }
+                    self.consume(); // consume the colon
+                    let param_type_token = self.peek().clone();
+                    if matches!(param_type_token.token_type, TokenType::F32 | TokenType::I32 | TokenType::Str | TokenType::Bool) {
+                        self.consume();
+                    } else {
+                        parse_error!(self.peek().line_number, "Expected parameter type declaration (currently supported: f32, i32, str, bool)");
+                    }
+                    parameters.push((param_name, param_type_token.get_value_type_declaration()));
+                    if matches!(self.peek().token_type, TokenType::Comma) {
+                        self.consume();
+                    } else {
+                        break;
+                    }
+                }
+            }            
+            if !matches!(self.peek().token_type, TokenType::RightParen) {
+                parse_error!(self.peek().line_number, "Expected ')' after function parameters");
+            }
+            self.consume(); // consume the right parenthesis
+            self.new_scope();
+            for (param_name, param_type) in parameters.iter() {
+                self.scope.identifiers.insert(param_name.clone(), param_type.clone());
+            }
+            let body = self.unscoped_block();
+            self.pop_scope();
+            let function_node = StatementNode::Function {
+                identifier: identifier.clone(),
+                return_type: return_type_token.get_value_type_declaration(),
+                parameters,
+                body: Box::new(body)
+            };
+            program.add_child(function_node);
+            self.scope.identifiers.insert(identifier, ValueType::Function);
+        } else {
+            if matches!(type_token.token_type, TokenType::F32 | TokenType::I32 | TokenType::Str | TokenType::Bool) {
+                self.consume();
+            } else {
+                parse_error!(self.peek().line_number, "Expected type declaration (currently supported: f32, i32, str, bool)");
+            }
+            if matches!(self.peek().token_type, TokenType::Equals) {
+                self.consume(); // consume the equals sign
+            } else{
+                parse_error!(self.peek().line_number, "Expected '=' after identifier");
+            }
+            let expression_node = self.expression(0);
+            if expression_node.value_type == ValueType::Function {
+                if let ExpressionNodeType::FunctionCall { ref return_type, .. } = expression_node.node_type {
+                    if return_type != &type_token.get_value_type_declaration() {
+                        parse_error!(self.peek().line_number, format!("Expected function to return type {:?} but got function that returns type {:?}", type_token.get_value_type_declaration(), return_type).as_str());
+                    }
+                } else {
+                    parse_error!(self.peek().line_number, "Expected function call expression");
+                }
+            } else if expression_node.value_type != type_token.get_value_type_declaration() {
+                parse_error!(self.peek().line_number, format!("Expected expression of type {:?} but got expression of type {:?}", type_token.get_value_type_declaration(), expression_node.value_type).as_str());
+            }
+            let declared_type = type_token.get_value_type_declaration();
+            let let_node = StatementNode::Let {
+                identifier: identifier.clone(),
+                type_token: type_token,
+                expression: expression_node,
+            };
+            program.add_child(let_node);
+            self.scope.identifiers.insert(identifier, declared_type);
         }
-        let declared_type = type_token.get_value_type_declaration();
-        let let_node = StatementNode::Let {
-            identifier: identifier.clone(),
-            type_token: type_token,
-            expression: expression_node,
-        };
-        program.add_child(let_node);
-        self.scope.identifiers.insert(identifier, declared_type);
     }
 
     fn loop_statement(&mut self, program: &mut StatementNode) {
@@ -485,7 +572,7 @@ impl Parser<'_> {
         let callee = ExpressionNode::new(ExpressionNodeType::Variable { identifier: self.peek().get_value() }, ValueType::Function);
         self.consume(); // consume the identifier
         let call_node = self.parse_call(callee);
-        let call_statement_node = StatementNode::CallStatement { call: call_node };
+        let call_statement_node = StatementNode::Call { call: call_node };
         program.add_child(call_statement_node);
     }
 }
