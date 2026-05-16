@@ -1,8 +1,8 @@
 
 
-output(1 < 2)
-output(1 <= 2)
-output(1 > 2)
-output(1 >= 2)
-output(1 == 2)
-output(1 == 1)
+log(1 < 2)
+log(1 <= 2)
+log(1 > 2)
+log(1 >= 2)
+log(1 == 2)
+log(1 == 1)

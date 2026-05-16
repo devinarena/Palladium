@@ -1,112 +1,114 @@
-use std::{fs::File, io::Write, path::Path, time::{Duration, Instant}};
+use std::{collections::HashMap, fs::File, io::Write, path::Path, sync::Arc, time::{Duration, Instant}};
 
-use crate::{syntax_tree::{ExpressionNode, ExpressionNodeType, StatementNode, Visit}, token::{Token, TokenType}};
+use crate::{builtins::Builtin, parser::FileContext, syntax_tree::{ExpressionNode, ExpressionNodeType, StatementNode, ValueType}, token::{Token, TokenType}};
 
 
 pub struct Compiler {
-    pub main_file_name: String,
+    pub file_ctx: FileContext,
     pub directory: String,
-    pub compile_time: Duration
+    pub compile_time: Duration,
+    builtins: Arc<HashMap<String, Builtin>>
 }
 
 impl Compiler {
-    pub fn new(main_file_name: String, directory: String) -> Compiler {
+    pub fn new(file_ctx: FileContext, directory: String, builtins: Arc<HashMap<String, Builtin>>) -> Compiler {
         Compiler { 
-            main_file_name: main_file_name.replace(".java", ""),
+            file_ctx,
             directory,
-            compile_time: Duration::new(0, 0)
+            compile_time: Duration::new(0, 0),
+            builtins
         }
     }
 
-    pub fn compile(&mut self, main: StatementNode) {
-        if !main.has_body() {
+    pub fn compile(&mut self) {
+        if self.file_ctx.body.is_none() {
             panic!("Expected node with body");
         }
         let start_time = Instant::now();
         let mut program: String = String::new();
-        program.push_str(format!("public class {} {{\n", self.main_file_name).as_str());
-        program.push_str(main.visit().join("\n").as_str());
+        for import in &self.file_ctx.imports {
+            program.push_str(format!("import {};\n", import).as_str());
+        }
+        program.push_str(format!("public class {} {{\n", self.file_ctx.file_name).as_str());
+
+        if self.file_ctx.imports.contains(&"java.util.Scanner".to_string()) {
+            program.push_str("private static Scanner __palladium_scanner__ = new Scanner(System.in);\n");
+            program.push_str("private static String __palladium_input__(String prompt) { System.out.print(prompt); return __palladium_scanner__.nextLine(); }\n");
+        }
+
+        let body_lines = self.emit_statement(self.file_ctx.body.as_ref().unwrap());
+        program.push_str(&body_lines.join("\n"));
         program.push_str("\n}");
-        let output_path = Path::new(&self.directory).join(format!("{}.java", self.main_file_name));
+
+        let output_path = Path::new(&self.directory).join(format!("{}.java", self.file_ctx.file_name));
         let mut output = File::create(output_path).expect("Failed to create output file");
         output.write_all(program.as_bytes()).expect("Failed to write to output file");
         self.compile_time = start_time.elapsed();
     }
-}
 
-fn operator_precedence(operator: &Token) -> u8 {
-    match operator.token_type {
-        TokenType::Or => 0,
-        TokenType::And => 2,
-        TokenType::GreaterThan | TokenType::LessThan | TokenType::GreaterEqualTo | TokenType::LessEqualTo | TokenType::DoubleEquals => 4,
-        TokenType::Plus | TokenType::Minus => 6,
-        TokenType::Star | TokenType::Slash => 8,
-        _ => panic!("Expected an operator"),
-    }
-}
-
-impl Visit for ExpressionNode {
-    fn visit(&self) -> Box<Vec<String>> {
-        if let ExpressionNodeType::Literal { ref value_token } = self.node_type {
-            return self.visit_literal(value_token);
-        } else if let ExpressionNodeType::Variable { ref identifier } = self.node_type {
-            return self.visit_variable(identifier);
-        } else if let ExpressionNodeType::Binary { ref left, ref operator, ref right } = self.node_type {
-            return self.visit_binary(left, operator, right, 0);
+    fn emit_expression(&self, expr: &ExpressionNode) -> String {
+        match &expr.node_type {
+            ExpressionNodeType::Literal { value_token } => {
+                match value_token.token_type {
+                    TokenType::StringLiteral(ref value) => format!("\"{}\"", value),
+                    TokenType::Decimal(value) => format!("{}f", value),
+                    TokenType::Integer(value) => value.to_string(),
+                    TokenType::True => "true".to_string(),
+                    TokenType::False => "false".to_string(),
+                    _ => panic!("Expected a literal token"),
+                }
+            }
+            ExpressionNodeType::Variable { identifier } => identifier.clone(),
+            ExpressionNodeType::Binary { left, operator, right } => self.emit_binary(left, operator, right, 0),
+            ExpressionNodeType::FunctionCall { callee, arguments, .. } => {
+                let identifier = if let ExpressionNodeType::Variable { identifier } = &callee.node_type {
+                    identifier.clone()
+                } else {
+                    panic!("(compiler) Expected a variable expression node for function call callee");
+                };
+                let args_out: Vec<String> = arguments.iter().map(|a| self.emit_expression(a)).collect();
+                // Special-case builtins that map to Java library calls or operators
+                if let Some(b) = self.builtins.get(&identifier) {
+                    match b.name.as_str() {
+                        "log" => return format!("System.out.println({})", args_out.join(", ")),
+                        "print" => return format!("System.out.print({})", args_out.join(", ")),
+                        "input" => return format!("__palladium_input__({})", args_out.join(", ")),
+                        "len" => {
+                            // string length: (expr).length()
+                            return format!("({}).length()", args_out.join(", "));
+                        }
+                        "to_string" => return format!("String.valueOf({})", args_out.join(", ")),
+                        "parse_int" => return format!("Integer.parseInt({})", args_out.join(", ")),
+                        "parse_float" => return format!("Float.parseFloat({})", args_out.join(", ")),
+                        "abs" => return format!("(float) Math.abs({})", args_out.join(", ")),
+                        "sqrt" => return format!("(float) Math.sqrt({})", args_out.join(", ")),
+                        "pow" => return format!("(float) Math.pow({}, {})", args_out.get(0).unwrap_or(&"0".to_string()), args_out.get(1).unwrap_or(&"0".to_string())),
+                        "random" => return format!("Math.random()"),
+                        _ => {}
+                    }
+                }
+                format!("{}({})", identifier, args_out.join(", "))
+            }
+            ExpressionNodeType::Range { .. } => panic!("emit_expression: Range should only appear in loop headers"),
         }
-        panic!("Expected a literal or binary expression node");
-
     }
 
-    fn visit_literal(&self, value_token: &Box<Token>) -> Box<Vec<String>> {
-        let mut output = String::new();
-        match value_token.token_type {
-            TokenType::StringLiteral(ref value) => {
-                output.push_str("\"");
-                output.push_str(value);
-                output.push_str("\"");
-            },
-            TokenType::Decimal(value) => {
-                output.push_str(format!("{}f", value).as_str());
-            },
-            TokenType::True => output.push_str("true"),
-            TokenType::False => output.push_str("false"),
-            _ => panic!("Expected a literal token"),
-        }
-        let mut v = Vec::new();
-        v.push(output);
-        Box::new(v)
-    }
-
-    fn visit_variable(&self, _identifier: &String) -> Box<Vec<String>> {
-        let mut output = String::new();
-        match self.node_type {
-            ExpressionNodeType::Variable { ref identifier } => {
-                output.push_str(identifier);
-            },
-            _ => panic!("(compiler) Expected a variable expression node"),
-        }
-        let mut v = Vec::new();
-        v.push(output);
-        Box::new(v)
-    }
-
-    fn visit_binary(&self, left: &Box<ExpressionNode>, operator: &Box<Token>, right: &Box<ExpressionNode>, parent_precedence: u8) -> Box<Vec<String>> {
+    fn emit_binary(&self, left: &Box<ExpressionNode>, operator: &Box<Token>, right: &Box<ExpressionNode>, parent_precedence: u8) -> String {
         let prec = operator_precedence(operator);
 
         let lhs = if let ExpressionNodeType::Binary { ref left, ref operator, ref right } = left.node_type {
-            self.visit_binary(left, operator, right, prec).join("")
+            self.emit_binary(left, operator, right, prec)
         } else {
-            left.visit().join("")
+            self.emit_expression(left)
         };
 
         let rhs = if let ExpressionNodeType::Binary { ref left, ref operator, ref right } = right.node_type {
-            self.visit_binary(left, operator, right, prec + 1).join("")
+            self.emit_binary(left, operator, right, prec + 1)
         } else {
-            right.visit().join("")
+            self.emit_expression(right)
         };
 
-        let operator = match operator.token_type {
+        let op_str = match operator.token_type {
             TokenType::Plus => "+",
             TokenType::Minus => "-",
             TokenType::Star => "*",
@@ -122,114 +124,105 @@ impl Visit for ExpressionNode {
         };
 
         if prec < parent_precedence {
-            Box::new(vec![format!("({} {} {})", lhs, operator, rhs)])
+            format!("({} {} {})", lhs, op_str, rhs)
         } else {
-            Box::new(vec![format!("{} {} {}", lhs, operator, rhs)])
+            format!("{} {} {}", lhs, op_str, rhs)
+        }
+    }
+
+    fn emit_statement(&self, stmt: &StatementNode) -> Vec<String> {
+        match stmt {
+            StatementNode::Main { body } => {
+                let mut out = Vec::new();
+                out.push("public static void main(String[] args)".to_string());
+                out.push("{".to_string());
+                let body_out = self.emit_statement(body);
+                out.append(&mut body_out[1..body_out.len()-1].to_vec());
+                if self.file_ctx.imports.contains(&"java.util.Scanner".to_string()) {
+                    out.push("__palladium_scanner__.close();".to_string());
+                }
+                out.push("}".to_string());
+                out
+            }
+            StatementNode::Let { identifier, type_token, expression } => {
+                let mut output = String::new();
+                match type_token.token_type {
+                    TokenType::F32 => output.push_str("float "),
+                    TokenType::I32 => output.push_str("int "),
+                    TokenType::Str => output.push_str("String "),
+                    TokenType::Bool => output.push_str("boolean "),
+                    _ => panic!("(compiler) Expected a type token for let statement"),
+                }
+                output.push_str(identifier);
+                output.push_str(" = ");
+                output.push_str(&self.emit_expression(expression));
+                output.push_str(";");
+                vec![output]
+            }
+            StatementNode::Block { children } => {
+                let mut out = Vec::new();
+                out.push("{".to_string());
+                for child in children {
+                    out.append(&mut self.emit_statement(child));
+                }
+                out.push("}".to_string());
+                out
+            }
+            StatementNode::Loop { range, condition, body } => {
+                let mut out = Vec::new();
+                if let Some(range_expr) = range {
+                    if let ExpressionNodeType::Range { identifier, range_type, start, end } = &range_expr.node_type {
+                        let header = match range_type {
+                            ValueType::Float => format!("for (float {} = {}; {} <= {}; {} += 1.0f)", identifier, self.emit_expression(start), identifier, self.emit_expression(end), identifier),
+                            ValueType::Integer => format!("for (int {} = {}; {} <= {}; {} += 1)", identifier, self.emit_expression(start), identifier, self.emit_expression(end), identifier),
+                            _ => panic!("(compiler) Expected a float or integer range type"),
+                        };
+                        out.push(header);
+                        out.append(&mut self.emit_statement(body));
+                        return out;
+                    } else {
+                        panic!("Expected a range expression node for loop statement");
+                    }
+                } else if condition.is_some() {
+                    out.push("while (".to_string());
+                    out.push(self.emit_expression(condition.as_ref().unwrap()));
+                    out.push(")".to_string());
+                } else {
+                    out.push("while (true)".to_string());
+                }
+                out.append(&mut self.emit_statement(body));
+                out
+            }
+            StatementNode::If { condition, body, else_body } => {
+                let mut out = Vec::new();
+                out.push("if (".to_string());
+                out.push(self.emit_expression(condition));
+                out.push(")".to_string());
+                out.append(&mut self.emit_statement(body));
+                if let Some(else_b) = else_body {
+                    out.push("else".to_string());
+                    out.append(&mut self.emit_statement(else_b));
+                }
+                out
+            }
+            StatementNode::Assignment { identifier, expression } => {
+                vec![format!("{} = {};", identifier, self.emit_expression(expression))]
+            }
+            StatementNode::CallStatement { call } => {
+                vec![format!("{};", self.emit_expression(call))]
+            }
+            StatementNode::Break => vec!["break;".to_string()],
         }
     }
 }
 
-impl Visit for StatementNode {
-    fn visit(&self) -> Box<Vec<String>> {
-        if let StatementNode::Main { body } = self {
-            return self.visit_main_statement(body);
-        } else if let StatementNode::Output { ref expression } = *self {
-            return self.visit_output_statement(expression);
-        } else if let StatementNode::Let { ref identifier, ref type_token, ref expression } = *self {
-            return self.visit_let_statement(identifier, type_token, expression);
-        } else if let StatementNode::Block { ref children } = *self {
-            return self.visit_block_statement(children);
-        } else if let StatementNode::Loop { ref body } = *self {
-            return self.visit_loop_statement(body);
-        } else if let StatementNode::If { ref condition, ref body, ref else_body } = *self {
-            return self.visit_if_statement(condition, body, else_body);
-        } else if let StatementNode::Assignment { ref identifier, ref expression } = *self {
-            return self.visit_assignment_statement(identifier, expression);
-        } else if let StatementNode::Break = *self {
-            return self.visit_break_statement();
-        }
-        panic!("Unexpected statement node {:?}", self);
-    }
-
-    fn visit_main_statement(&self, body: &StatementNode) -> Box<Vec<String>> {
-        let mut output = Vec::new();
-        output.push("public static void main(String[] args)".to_string());
-        output.append(body.visit().as_mut());
-        Box::new(output)
-    }
-
-    fn visit_output_statement(&self, expression: &ExpressionNode) -> Box<Vec<String>> {
-        let mut output = String::new();
-        output.push_str("System.out.println(");
-        output.push_str(&expression.visit().join(""));
-        output.push_str(");");
-        let mut v = Vec::new();
-        v.push(output);
-        Box::new(v)
-    }
-
-    fn visit_let_statement(&self, identifier: &String, type_token: &Token, expression: &ExpressionNode) -> Box<Vec<String>> {
-        let mut output = String::new();
-        match type_token.token_type {
-            TokenType::F32 => output.push_str("float "),
-            TokenType::Str => output.push_str("String "),
-            TokenType::Bool => output.push_str("boolean "),
-            _ => panic!("(compiler) Expected a type token for let statement"),
-        }
-        output.push_str(identifier);
-        output.push_str(" = ");
-        output.push_str(&expression.visit().join(""));
-        output.push_str(";");
-        let mut v = Vec::new();
-        v.push(output);
-        return Box::new(v);
-    }
-
-    fn visit_block_statement(&self, _children: &Vec<StatementNode>) -> Box<Vec<String>> {
-        let mut output = Vec::new();
-        output.push("{".to_string());
-        for child in _children {
-            output.append(child.visit().as_mut());
-        }
-        output.push("}".to_string());
-        Box::new(output)
-    }
-
-    fn visit_loop_statement(&self, body: &StatementNode) -> Box<Vec<String>> {
-        let mut output = Vec::new();
-        output.push("while (true) {".to_string());
-        output.append(body.visit().as_mut());
-        output.push("}".to_string());
-        Box::new(output)
-    }
-
-    fn visit_break_statement(&self) -> Box<Vec<String>> {
-        let mut output = Vec::new();
-        output.push("break;".to_string());
-        Box::new(output)
-    }
-
-    fn visit_if_statement(&self, condition: &ExpressionNode, body: &StatementNode, else_body: &Option<Box<StatementNode>>) -> Box<Vec<String>> {
-        let mut output = Vec::new();
-        output.push("if (".to_string());
-        output.append(condition.visit().as_mut());
-        output.push(")".to_string());
-        output.append(body.visit().as_mut());
-        if let Some(else_body) = else_body {
-            output.push("else".to_string());
-            output.append(else_body.visit().as_mut());
-        }
-        Box::new(output)
-    }
-
-    fn visit_assignment_statement(&self, identifier: &String, expression: &ExpressionNode) -> Box<Vec<String>> {
-        let mut output = String::new();
-        output.push_str(identifier);
-        output.push_str(" = ");
-        output.push_str(&expression.visit().join(""));
-        output.push_str(";");
-        let mut v = Vec::new();
-        v.push(output);
-        return Box::new(v);
+fn operator_precedence(operator: &Token) -> u8 {
+    match operator.token_type {
+        TokenType::Or => 0,
+        TokenType::And => 2,
+        TokenType::GreaterThan | TokenType::LessThan | TokenType::GreaterEqualTo | TokenType::LessEqualTo | TokenType::DoubleEquals => 4,
+        TokenType::Plus | TokenType::Minus => 6,
+        TokenType::Star | TokenType::Slash => 8,
+        _ => panic!("Expected an operator"),
     }
 }

@@ -1,12 +1,12 @@
 
-let x :: f32 = 1
-let y :: f32 = 1
+let x :: i32 = 1
+let y :: i32 = 1
 
 loop {
-    let z :: f32 = x + y
+    let z :: i32 = x + y
     x = y
     y = z
-    output(z)
+    log(z)
 
     if (z >= 144) {
         break

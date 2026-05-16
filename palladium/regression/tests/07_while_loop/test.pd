@@ -1,0 +1,12 @@
+
+let health :: i32 = 100
+let enemyHealth :: i32 = 60
+
+loop if (health > 0 && enemyHealth > 0) {
+    log("Player Health: " + health)
+    log("Enemy Health: " + enemyHealth)
+    enemyHealth = enemyHealth - 15
+    health = health - 10
+}
+
+log("Battle Over!")

@@ -1,0 +1,10 @@
+let s :: str = "abc"
+log(s)
+log(len(s))
+log(to_string(len(s)))
+let a :: i32 = parse_int("42")
+log(to_string(a))
+let b :: f32 = parse_float("2.5")
+log(to_string(b))
+log(pow(2.0, 3.0))
+log(sqrt(9.0))

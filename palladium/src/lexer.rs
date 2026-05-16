@@ -29,16 +29,19 @@ impl Lexer {
                     current.push(current_char);
                     current_char = self.next();
                 }
-                if current_char == '.' {
+                if current_char == '.' && self.look_ahead(1).is_numeric() {
                     current.push(current_char);
                     current_char = self.next();
                     while current_char.is_numeric() {
                         current.push(current_char);
                         current_char = self.next();
                     }
+                    let decimal_value: f64 = current.parse().unwrap();
+                    self.output.push(Token::new(TokenType::Decimal(decimal_value), line_number));
+                } else {
+                    let integer_value: i64 = current.parse().unwrap();
+                    self.output.push(Token::new(TokenType::Integer(integer_value), line_number));
                 }
-                let decimal_value: f64 = current.parse().unwrap();
-                self.output.push(Token::new(TokenType::Decimal(decimal_value), line_number));
             } else if current_char.is_alphanumeric() || current_char == '_' {
                 let mut current= String::new();
                 while current_char.is_alphanumeric() || current_char == '_' {
@@ -46,9 +49,9 @@ impl Lexer {
                     current_char = self.next();
                 }
                 match current.as_str() {
-                    "output" => self.output.push(Token::new(TokenType::Output, line_number)),
                     "let" => self.output.push(Token::new(TokenType::Let, line_number)),
                     "f32" => self.output.push(Token::new(TokenType::F32, line_number)),
+                    "i32" => self.output.push(Token::new(TokenType::I32, line_number)),
                     "str" => self.output.push(Token::new(TokenType::Str, line_number)),
                     "bool" => self.output.push(Token::new(TokenType::Bool, line_number)),
                     "true" => self.output.push(Token::new(TokenType::True, line_number)),
@@ -59,6 +62,7 @@ impl Lexer {
                     "loop" => self.output.push(Token::new(TokenType::Loop, line_number)),
                     "if" => self.output.push(Token::new(TokenType::If, line_number)),
                     "else" => self.output.push(Token::new(TokenType::Else, line_number)),
+                    "as" => self.output.push(Token::new(TokenType::As, line_number)),
                     _ => self.output.push(Token::new(TokenType::Identifier(current), line_number)),
                 }
             } else if current_char == '\"' {
@@ -84,6 +88,17 @@ impl Lexer {
                 self.next();
             } else if current_char == ':' {
                 self.output.push(Token::new(TokenType::Colon, line_number));
+                self.next();
+            } else if current_char == '.' {
+                current_char = self.next();
+                if current_char == '.' {
+                    self.output.push(Token::new(TokenType::DoubleDot, line_number));
+                    self.next();
+                } else {
+                    self.output.push(Token::new(TokenType::Dot, line_number));
+                }
+            } else if current_char == ',' {
+                self.output.push(Token::new(TokenType::Comma, line_number));
                 self.next();
             } else if current_char == '+' {
                 self.output.push(Token::new(TokenType::Plus, line_number));
@@ -158,6 +173,13 @@ impl Lexer {
             return '\0';
         }
         self.content.chars().nth(self.current).unwrap()
+    }
+
+    fn look_ahead(&self, offset: usize) -> char {
+        if self.current + offset >= self.content.len() {
+            return '\0';
+        }
+        self.content.chars().nth(self.current + offset).unwrap()
     }
 
     fn next(&mut self) -> char {

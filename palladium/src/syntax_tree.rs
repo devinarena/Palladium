@@ -1,3 +1,6 @@
+
+use std::fmt::Display;
+
 use crate::token::Token;
 
 pub trait Visit {
@@ -5,16 +8,18 @@ pub trait Visit {
     fn visit_literal(&self, _value_token: &Box<Token>) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_variable(&self, _identifier: &String) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_binary(&self, _left: &Box<ExpressionNode>, _operator: &Box<Token>, _right: &Box<ExpressionNode> , _parent_precedence: u8) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_call(&self, _callee: &Box<ExpressionNode>, _arguments: &Vec<ExpressionNode>) -> Box<Vec<String>> { Box::new(Vec::new()) }
 
     fn visit_statement(&self, _statement: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_main_statement(&self, _body: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_let_statement(&self, _identifier: &String, _type_token: &Token, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_output_statement(&self, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_block_statement(&self, _children: &Vec<StatementNode>) -> Box<Vec<String>> { Box::new(Vec::new()) }
-    fn visit_loop_statement(&self, _body: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_loop_statement(&self, _range: &Option<ExpressionNode>, _condition: &Option<ExpressionNode>, _body: &StatementNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_break_statement(&self) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_if_statement(&self, _condition: &ExpressionNode, _body: &StatementNode, _else_body: &Option<Box<StatementNode>>) -> Box<Vec<String>> { Box::new(Vec::new()) }
     fn visit_assignment_statement(&self, _identifier: &String, _expression: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
+    fn visit_call_statement(&self, _call: &ExpressionNode) -> Box<Vec<String>> { Box::new(Vec::new()) }
 }
 
 impl std::fmt::Debug for dyn Visit {
@@ -25,9 +30,25 @@ impl std::fmt::Debug for dyn Visit {
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum ValueType {
+    Null,
     Float,
     String,
-    Boolean
+    Boolean,
+    Integer,
+    Function
+}
+
+impl Display for ValueType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ValueType::Null => write!(f, "null"),
+            ValueType::Float => write!(f, "float"),
+            ValueType::String => write!(f, "string"),
+            ValueType::Boolean => write!(f, "boolean"),
+            ValueType::Integer => write!(f, "integer"),
+            ValueType::Function => write!(f, "function")
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -49,6 +70,17 @@ pub enum ExpressionNodeType {
         left: Box<ExpressionNode>,
         operator: Box<Token>,
         right: Box<ExpressionNode>
+    },
+    Range {
+        identifier: String,
+        range_type: ValueType,
+        start: Box<ExpressionNode>,
+        end: Box<ExpressionNode>
+    },
+    FunctionCall {
+        callee: Box<ExpressionNode>,
+        arguments: Vec<ExpressionNode>,
+        return_type: ValueType
     }
 }
 
@@ -59,9 +91,6 @@ pub enum StatementNode {
     Main {
         body: Box<StatementNode>
     },
-    Output {
-        expression: ExpressionNode
-    },
     Let {
         identifier: String,
         type_token: Token,
@@ -71,6 +100,8 @@ pub enum StatementNode {
         children: Vec<StatementNode>
     },
     Loop {
+        range: Option<ExpressionNode>,
+        condition: Option<ExpressionNode>,
         body: Box<StatementNode>
     },
     If {
@@ -82,7 +113,10 @@ pub enum StatementNode {
         identifier: String,
         expression: ExpressionNode
     },
-    Break
+    Break,
+    CallStatement {
+        call: ExpressionNode
+    },
 }
 
 #[derive(Debug)]

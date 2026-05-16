@@ -21,9 +21,9 @@ pub enum TokenType {
     Decimal(f64),
     StringLiteral(String),
     // Keywords
-    Output,
     Let,
     F32,
+    I32,
     Str,
     Bool,
     True,
@@ -32,12 +32,16 @@ pub enum TokenType {
     Break,
     If,
     Else,
+    As,
     // Operators
     LeftParen,
     RightParen,
     LeftBrace,
     RightBrace,
     Colon,
+    Dot,
+    DoubleDot,
+    Comma,
     Plus,
     Minus,
     Star,
@@ -79,6 +83,7 @@ impl Token {
             TokenType::F32 => ValueType::Float,
             TokenType::Str => ValueType::String,
             TokenType::Bool => ValueType::Boolean,
+            TokenType::I32 => ValueType::Integer,
             _ => panic!("Token does not have a value type declaration")
         }
     }

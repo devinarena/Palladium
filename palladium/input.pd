@@ -1,14 +1,2 @@
 
-let x :: f32 = 1
-let y :: f32 = 1
-
-loop {
-    let z :: f32 = x + y
-    x = y
-    y = z
-    output(x)
-
-    if (z >= 144) {
-        break
-    }
-}
+let name :: str = input("What is your name? ")

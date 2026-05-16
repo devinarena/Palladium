@@ -1,14 +1,15 @@
-use std::{env::args, path::Path, process::{exit, Command}, time::Instant};
+use std::{collections::HashMap, env::args, path::Path, process::{Command, exit}, sync::Arc, time::Instant};
 
 use parser::Parser;
 
-use crate::{compiler::Compiler, lexer::Lexer};
+use crate::{builtins::Builtin, compiler::Compiler, lexer::Lexer, syntax_tree::ValueType};
 
 pub mod lexer;
 pub mod parser;
 pub mod compiler;
 pub mod token;
 pub mod syntax_tree;
+pub mod builtins;
 
 struct RunFlags {
     debug: bool,
@@ -68,14 +69,15 @@ fn main() {
     if run_flags.debug {
         println!("TOKENS: {:?}", lexer.get_tokens());
     }
-    let mut parser = Parser::new(output_file, lexer.get_tokens());
-    let tree = parser.parse();
+    let builtins = Arc::new(initialize_builtins());
+    let mut parser = Parser::new(output_file, lexer.get_tokens(), Arc::clone(&builtins));
+    parser.parse();
     if run_flags.debug {
-        println!("TREE: {:?}", tree);
+        println!("TREE: {:?}", parser.file_context.body);
     }
-    let mut compiler = Compiler::new(parser.file_name.clone(), output_path);
-    compiler.compile(tree);
-    let java_output_path = Path::new(&compiler.directory).join(format!("{}.java", compiler.main_file_name));
+    let mut compiler = Compiler::new(parser.file_context, output_path, Arc::clone(&builtins));
+    compiler.compile();
+    let java_output_path = Path::new(&compiler.directory).join(format!("{}.java", compiler.file_ctx.file_name));
     if run_flags.format {
         if cfg!(target_os = "windows") {
             println!("{}", String::from_utf8_lossy(&Command::new("cmd").args(["/C", "java", "-jar", ".\\lib\\google-java-format-1.27.0-all-deps.jar", "-r", java_output_path.to_str().unwrap()]).output().expect("Failed to run shell command").stderr));
@@ -106,7 +108,7 @@ fn main() {
                         args.push("-classpath");
                         args.push(&compiler.directory);
                     }
-                    args.push(compiler.main_file_name.as_str());
+                    args.push(compiler.file_ctx.file_name.as_str());
                     Command::new("cmd").args(args).output().expect("Failed to run shell command")
                 } else { 
                     let mut args = vec!["-c", "java"];
@@ -114,7 +116,7 @@ fn main() {
                         args.push("-classpath");
                         args.push(&compiler.directory);
                     }
-                    args.push(compiler.main_file_name.as_str());
+                    args.push(compiler.file_ctx.file_name.as_str());
                     Command::new("sh").args(args).output().expect("Failed to run shell command")
                 };
                 println!("{}", String::from_utf8_lossy(&output.stdout));
@@ -136,4 +138,38 @@ fn get_output_file_name_and_path(input_file: &str) -> (String, String) {
     }
     let output_path = path.parent().unwrap_or_else(|| Path::new(".")).to_str().unwrap().to_string();
     (output_file, output_path)
+}
+
+fn initialize_builtins() -> HashMap<String, Builtin> {
+    let mut v = HashMap::new();
+    let log = Builtin::new("log".to_string(), vec!["message".to_string()], ValueType::Null);
+    let input = Builtin::new("input".to_string(), vec!["prompt".to_string()], ValueType::String);
+
+    // String utilities
+    let len = Builtin::new("len".to_string(), vec!["s".to_string()], ValueType::Integer);
+    let to_string = Builtin::new("to_string".to_string(), vec!["v".to_string()], ValueType::String);
+    let parse_int = Builtin::new("parse_int".to_string(), vec!["s".to_string()], ValueType::Integer);
+    let parse_float = Builtin::new("parse_float".to_string(), vec!["s".to_string()], ValueType::Float);
+
+    // Math utilities
+    let abs = Builtin::new("abs".to_string(), vec!["v".to_string()], ValueType::Float);
+    let sqrt = Builtin::new("sqrt".to_string(), vec!["v".to_string()], ValueType::Float);
+    let pow = Builtin::new("pow".to_string(), vec!["a".to_string(), "b".to_string()], ValueType::Float);
+    let random = Builtin::new("random".to_string(), vec![], ValueType::Float);
+
+    // Basic aliases
+    let print = Builtin::new("print".to_string(), vec!["message".to_string()], ValueType::Null);
+
+    v.insert("log".to_string(), log);
+    v.insert("input".to_string(), input);
+    v.insert("len".to_string(), len);
+    v.insert("to_string".to_string(), to_string);
+    v.insert("parse_int".to_string(), parse_int);
+    v.insert("parse_float".to_string(), parse_float);
+    v.insert("abs".to_string(), abs);
+    v.insert("sqrt".to_string(), sqrt);
+    v.insert("pow".to_string(), pow);
+    v.insert("random".to_string(), random);
+    v.insert("print".to_string(), print);
+    v
 }
