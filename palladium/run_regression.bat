@@ -1,5 +1,5 @@
 @echo off
-cargo run
+cargo build
 cd regression
 python regression.py
 cd ..

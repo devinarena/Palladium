@@ -3,8 +3,14 @@ public static int square(int x)
 {
 return x * x;
 }
+public static void a()
+{
+System.out.println("Hello, world!");
+}
 public static void main(String[] args)
 {
-System.out.println(square(5));
+int a = 5;
+System.out.println(square(a));
+a();
 }
 }

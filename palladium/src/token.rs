@@ -26,6 +26,7 @@ pub enum TokenType {
     F32,
     I32,
     Str,
+    Null,
     Bool,
     True,
     False,
@@ -86,6 +87,7 @@ impl Token {
             TokenType::Str => ValueType::String,
             TokenType::Bool => ValueType::Boolean,
             TokenType::I32 => ValueType::Integer,
+            TokenType::Null => ValueType::Null,
             TokenType::Fn => ValueType::Function,
             _ => panic!("Token does not have a value type declaration")
         }

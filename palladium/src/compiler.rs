@@ -29,53 +29,43 @@ impl Compiler {
         for import in &self.file_ctx.imports {
             program.push_str(format!("import {};\n", import).as_str());
         }
-        program.push_str(format!("public class {} {{\n", self.file_ctx.file_name).as_str());
+        program.push_str(format!("public class {} ", self.file_ctx.file_name).as_str());
 
         if self.file_ctx.imports.contains(&"java.util.Scanner".to_string()) {
             program.push_str("private static Scanner __palladium_scanner__ = new Scanner(System.in);\n");
             program.push_str("private static String __palladium_input__(String prompt) { System.out.print(prompt); return __palladium_scanner__.nextLine(); }\n");
         }
 
-        // Emit functions at class level and other statements inside `main`
-        let root_stmt = self.file_ctx.body.as_ref().unwrap();
-        if let StatementNode::Main { body } = root_stmt {
-            if let StatementNode::Block { children } = &**body {
-                // First emit any class-level functions
-                for child in children {
-                    if let StatementNode::Function { .. } = child {
-                        let func_lines = self.emit_statement(child);
-                        program.push_str(&func_lines.join("\n"));
-                        program.push_str("\n");
+        match self.file_ctx.body.as_ref().unwrap() {
+            StatementNode::Block { children } => {
+                let main_exists = children.iter().any(|child| child.is_main());
+                if !main_exists {
+                    program.push_str("{\n");
+                    // If no main function is defined, write all the functions first and then generate a default main that calls them (in order of appearance)
+                    for child in children {
+                        if let StatementNode::Function { .. } = child {
+                            let func_lines = self.emit_statement(child);
+                            program.push_str(&func_lines.join("\n"));
+                            program.push_str("\n");
+                        }
                     }
-                }
-
-                // Then emit the main method with non-function children
-                program.push_str("public static void main(String[] args)\n{");
-                for child in children {
-                    if let StatementNode::Function { .. } = child {
-                        continue;
+                    program.push_str("public static void main(String[] args)\n{\n");
+                    for child in children {
+                        if !matches!(child, StatementNode::Function { .. }) {
+                            let func_lines = self.emit_statement(child);
+                            program.push_str(&func_lines.join("\n"));
+                            program.push_str("\n");
+                        }
                     }
-                    let mut lines = self.emit_statement(child);
-                    // Append each statement line inside main
-                    for line in lines.drain(..) {
-                        program.push_str("\n");
-                        program.push_str(&line);
-                    }
+                    program.push_str("}\n");
+                    program.push_str("}");
+                } else {
+                    let body_lines = self.emit_statement(self.file_ctx.body.as_ref().unwrap());
+                    program.push_str(&body_lines.join("\n"));
                 }
-                if self.file_ctx.imports.contains(&"java.util.Scanner".to_string()) {
-                    program.push_str("\n__palladium_scanner__.close();");
-                }
-                program.push_str("\n}");
-            } else {
-                // Fallback to previous behavior
-                let body_lines = self.emit_statement(root_stmt);
-                program.push_str(&body_lines.join("\n"));
-            }
-        } else {
-            let body_lines = self.emit_statement(root_stmt);
-            program.push_str(&body_lines.join("\n"));
+            },
+            _ => panic!("Expected file body to be a block statement node"),
         }
-        program.push_str("\n}");
 
         let output_path = Path::new(&self.directory).join(format!("{}.java", self.file_ctx.file_name));
         let mut output = File::create(output_path).expect("Failed to create output file");

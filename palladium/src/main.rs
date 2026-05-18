@@ -73,7 +73,7 @@ fn main() {
     let mut parser = Parser::new(output_file, lexer.get_tokens(), Arc::clone(&builtins));
     parser.parse();
     if run_flags.debug {
-        println!("TREE: {:?}", parser.file_context.body);
+        println!("\nTREE: {:?}", parser.file_context.body);
     }
     let mut compiler = Compiler::new(parser.file_context, output_path, Arc::clone(&builtins));
     compiler.compile();

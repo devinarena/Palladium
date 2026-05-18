@@ -11,6 +11,7 @@ macro_rules! parse_error {
 
 
 pub struct Scope {
+    functions: Option<HashMap<String, ValueType>>,
     identifiers: HashMap<String, ValueType>,
     parent: Option<Box<Scope>>
 }
@@ -47,7 +48,8 @@ impl Parser<'_> {
             },
             builtins,
             scope: Scope { 
-                parent: None, 
+                parent: None,
+                functions: Some(HashMap::new()),
                 identifiers
             },
             parse_time: Duration::new(0, 0),
@@ -57,7 +59,7 @@ impl Parser<'_> {
 
     pub fn parse(&mut self) {
         let start_time = Instant::now();
-        let mut program = StatementNode::Main { body: Box::new(StatementNode::Block { children: Vec::new() }) };
+        let mut program = StatementNode::Block { children: Vec::new() };
         while !matches!(self.peek().token_type, TokenType::EndOfFile) {
             self.statement(&mut program);
         }
@@ -105,10 +107,28 @@ impl Parser<'_> {
     }
 
 
+    fn lookup_function(&self, name: &String, scope: &Scope) -> Option<ValueType> {
+        if scope.parent.is_none() {
+            if let Some(functions) = &scope.functions {
+                if let Some(value) = functions.get(name) {
+                    return Some(value.clone());
+                }
+            }
+            if self.builtins.contains_key(name) {
+                return Some(self.builtins.get(name).unwrap().return_type.clone());
+            }
+            return None;
+        } else {
+            return self.lookup_function(name, scope.parent.as_ref().unwrap());
+        }
+    }
+
+
     fn new_scope(&mut self) {
         let new_scope = Scope {
             identifiers: HashMap::new(),
-            parent: Some(Box::new(std::mem::replace(&mut self.scope, Scope { identifiers: HashMap::new(), parent: None})))
+            functions: None,
+            parent: Some(Box::new(std::mem::replace(&mut self.scope, Scope { identifiers: HashMap::new(), functions: None, parent: None})))
         };
         self.scope = new_scope;
     }
@@ -194,11 +214,9 @@ impl Parser<'_> {
                     ValueType::Function // or function return type
                 );
             } else {
-                let value_type = self.lookup_value(identifier, &self.scope);
+                let value_type = self.lookup_function(identifier, &self.scope);
                 if value_type.is_none() {
                     parse_error!(self.peek().line_number, format!("Unknown function: {}", identifier).as_str());
-                } else if value_type.unwrap() != ValueType::Function {
-                    parse_error!(self.peek().line_number, format!("Identifier '{}' is not a function", identifier).as_str());
                 }
                 return ExpressionNode::new(
                     ExpressionNodeType::FunctionCall {
@@ -220,10 +238,11 @@ impl Parser<'_> {
             TokenType::Decimal(_) => ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::Float ),
             TokenType::Integer(_) => ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::Integer ),
             TokenType::True | TokenType::False => ExpressionNode::new(ExpressionNodeType::Literal { value_token: Box::new(self.peek().clone()) }, ValueType::Boolean ),
-            TokenType::Identifier(ref name) => ExpressionNode::new(ExpressionNodeType::Variable { 
-                identifier: self.peek().get_value() }, 
+            TokenType::Identifier(ref name) => ExpressionNode::new(ExpressionNodeType::Variable { identifier: self.peek().get_value() }, 
                 self.lookup_value(name, &self.scope).unwrap_or_else(|| {
-                    parse_error!(self.peek().line_number, format!("Unknown identifier: {}", name).as_str());
+                    self.lookup_function(name, &self.scope).unwrap_or_else(|| {
+                        parse_error!(self.peek().line_number, format!("Unknown identifier: {}", name).as_str());
+                    })
                 })
             ),
             TokenType::LeftParen => {
@@ -369,72 +388,7 @@ impl Parser<'_> {
         }
         let type_token = self.peek().clone();
         if matches!(type_token.token_type, TokenType::Fn) {
-            self.consume(); // consume the 'fn' keyword
-            if !matches!(self.peek().token_type, TokenType::LessThan) {
-                parse_error!(self.peek().line_number, "Expected '<' after 'fn'");
-            }
-            self.consume(); // consume the less than sign
-            let return_type_token = self.peek().clone();
-            if matches!(return_type_token.token_type, TokenType::F32 | TokenType::I32 | TokenType::Str | TokenType::Bool) {
-                self.consume();
-            } else {
-                parse_error!(self.peek().line_number, "Expected return type declaration (currently supported: f32, i32, str, bool)");
-            }
-            if !matches!(self.peek().token_type, TokenType::GreaterThan) {
-                parse_error!(self.peek().line_number, "Expected '>' after return type declaration");
-            }
-            self.consume(); // consume the greater than sign
-            if !matches!(self.peek().token_type, TokenType::Equals) {
-                parse_error!(self.peek().line_number, "Expected '=' after function declaration");
-            }
-            self.consume(); // consume the equals sign
-            if !matches!(self.peek().token_type, TokenType::LeftParen) {
-                parse_error!(self.peek().line_number, "Expected '(' after function return type declaration");
-            }
-            let mut parameters: Vec<(String, ValueType)> = Vec::new();
-            self.consume(); // consume the left parenthesis
-            if !matches!(self.peek().token_type, TokenType::RightParen) {
-                loop {
-                    if !matches!(self.peek().token_type, TokenType::Identifier(_)) {
-                        parse_error!(self.peek().line_number, "Expected parameter name in function declaration");
-                    }
-                    let param_name = self.consume().get_value();
-                    if !matches!(self.peek().token_type, TokenType::Colon) {
-                        parse_error!(self.peek().line_number, "Expected ':' after parameter name in function declaration");
-                    }
-                    self.consume(); // consume the colon
-                    let param_type_token = self.peek().clone();
-                    if matches!(param_type_token.token_type, TokenType::F32 | TokenType::I32 | TokenType::Str | TokenType::Bool) {
-                        self.consume();
-                    } else {
-                        parse_error!(self.peek().line_number, "Expected parameter type declaration (currently supported: f32, i32, str, bool)");
-                    }
-                    parameters.push((param_name, param_type_token.get_value_type_declaration()));
-                    if matches!(self.peek().token_type, TokenType::Comma) {
-                        self.consume();
-                    } else {
-                        break;
-                    }
-                }
-            }            
-            if !matches!(self.peek().token_type, TokenType::RightParen) {
-                parse_error!(self.peek().line_number, "Expected ')' after function parameters");
-            }
-            self.consume(); // consume the right parenthesis
-            self.new_scope();
-            for (param_name, param_type) in parameters.iter() {
-                self.scope.identifiers.insert(param_name.clone(), param_type.clone());
-            }
-            let body = self.unscoped_block();
-            self.pop_scope();
-            let function_node = StatementNode::Function {
-                identifier: identifier.clone(),
-                return_type: return_type_token.get_value_type_declaration(),
-                parameters,
-                body: Box::new(body)
-            };
-            program.add_child(function_node);
-            self.scope.identifiers.insert(identifier, ValueType::Function);
+            self.function_declaration(program, &identifier);
         } else {
             if matches!(type_token.token_type, TokenType::F32 | TokenType::I32 | TokenType::Str | TokenType::Bool) {
                 self.consume();
@@ -469,6 +423,97 @@ impl Parser<'_> {
         }
     }
 
+    fn function_declaration(&mut self, program: &mut StatementNode, identifier: &String) {
+        if self.scope.parent.is_some() {
+            parse_error!(self.peek().line_number, "Function declarations cannot be nested inside other scopes");
+        }
+        self.consume();
+        // consume the 'fn' keyword
+        let mut return_type_token = Token::new(TokenType::Null, self.peek().line_number); // default return type is null/void
+        if matches!(self.peek().token_type, TokenType::LessThan) {
+            self.consume();
+            // consume the less than sign
+            return_type_token = self.peek().clone();
+            if matches!(return_type_token.token_type, TokenType::F32 | TokenType::I32 | TokenType::Str | TokenType::Bool | TokenType::Null) {
+                self.consume();
+            } else {
+                parse_error!(self.peek().line_number, "Expected return type declaration (currently supported: f32, i32, str, bool, null/void)");
+            }
+            if !matches!(self.peek().token_type, TokenType::GreaterThan) {
+                parse_error!(self.peek().line_number, "Expected '>' after return type declaration");
+            }
+            self.consume();
+            // consume the greater than sign
+        }
+        if !matches!(self.peek().token_type, TokenType::Equals) {
+            parse_error!(self.peek().line_number, "Expected '=' after function declaration");
+        }
+        self.consume();
+        // consume the equals sign
+        if !matches!(self.peek().token_type, TokenType::LeftParen) {
+            parse_error!(self.peek().line_number, "Expected '(' after function return type declaration");
+        }
+        let mut parameters: Vec<(String, ValueType)> = Vec::new();
+        self.consume();
+        // consume the left parenthesis
+        if !matches!(self.peek().token_type, TokenType::RightParen) {
+            loop {
+                if !matches!(self.peek().token_type, TokenType::Identifier(_)) {
+                    parse_error!(self.peek().line_number, "Expected parameter name in function declaration");
+                }
+                let param_name = self.consume().get_value();
+                if !matches!(self.peek().token_type, TokenType::Colon) {
+                    parse_error!(self.peek().line_number, "Expected ':' after parameter name in function declaration");
+                }
+                self.consume(); // consume the colon
+                let param_type_token = self.peek().clone();
+                if matches!(param_type_token.token_type, TokenType::F32 | TokenType::I32 | TokenType::Str | TokenType::Bool | TokenType::Null) {
+                    self.consume();
+                } else {
+                    parse_error!(self.peek().line_number, "Expected parameter type declaration (currently supported: f32, i32, str, bool, null)");
+                }
+                parameters.push((param_name, param_type_token.get_value_type_declaration()));
+                if matches!(self.peek().token_type, TokenType::Comma) {
+                    self.consume();
+                } else {
+                    break;
+                }
+            }
+        }
+        if !matches!(self.peek().token_type, TokenType::RightParen) {
+            parse_error!(self.peek().line_number, "Expected ')' after function parameters");
+        }
+        if let Some(return_type) = self.lookup_function(&identifier, &self.scope) {
+            parse_error!(self.peek().line_number, format!("Function '{}' is already defined with return type {:?}", identifier, return_type).as_str());
+        }
+        self.scope.functions.as_mut().unwrap().insert(identifier.clone(), return_type_token.get_value_type_declaration());
+        self.consume();
+        // consume the right parenthesis
+        self.new_scope();
+        for (param_name, param_type) in parameters.iter() {
+            self.scope.identifiers.insert(param_name.clone(), param_type.clone());
+        }
+        let body = self.unscoped_block();
+        self.pop_scope();
+        if identifier == "main" {
+            if return_type_token.get_value_type_declaration() != ValueType::Null {
+                parse_error!(self.peek().line_number, "The 'main' function must have a return type of 'null/void'");
+            }
+            let main_node = StatementNode::Main {
+                body: Box::new(body)
+            };
+            program.add_child(main_node);
+        } else {
+            let function_node = StatementNode::Function {
+                identifier: identifier.clone(),
+                return_type: return_type_token.get_value_type_declaration(),
+                parameters,
+                body: Box::new(body)
+            };
+            program.add_child(function_node);
+        }
+    }
+    
     fn loop_statement(&mut self, program: &mut StatementNode) {
         let loop_node = if matches!(self.peek().token_type, TokenType::LeftBrace) {
             StatementNode::Loop { range: None, condition: None, body: Box::new(self.block()) }
