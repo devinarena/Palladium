@@ -1,6 +1,15 @@
 
+
 let square :: fn<i32> = (x: i32) {
     return x * x
 }
 
-log(square(5))
+let a :: fn = () {
+    log("Hello, world!")
+}
+
+let main :: fn = () {
+    let a :: i32 = 5
+    log(square(a))
+    a()
+}

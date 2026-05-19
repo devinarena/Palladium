@@ -55,6 +55,7 @@ impl Lexer {
                     "i32" => self.output.push(Token::new(TokenType::I32, line_number)),
                     "str" => self.output.push(Token::new(TokenType::Str, line_number)),
                     "bool" => self.output.push(Token::new(TokenType::Bool, line_number)),
+                    "null" => self.output.push(Token::new(TokenType::Null, line_number)),
                     "true" => self.output.push(Token::new(TokenType::True, line_number)),
                     "false" => self.output.push(Token::new(TokenType::False, line_number)),
                     "and" => self.output.push(Token::new(TokenType::And, line_number)),
