@@ -21,6 +21,7 @@ pub enum TokenType {
     Decimal(f64),
     StringLiteral(String),
     // Keywords
+    Class,
     Let,
     Fn,
     F32,
@@ -89,6 +90,7 @@ impl Token {
             TokenType::I32 => ValueType::Integer,
             TokenType::Null => ValueType::Null,
             TokenType::Fn => ValueType::Function,
+            TokenType::Identifier(class_name) => ValueType::Custom(class_name.clone()),
             _ => panic!("Token does not have a value type declaration")
         }
     }

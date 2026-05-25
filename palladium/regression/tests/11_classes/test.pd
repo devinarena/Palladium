@@ -1,0 +1,18 @@
+class Rectangle {
+    let width :: i32 = 0
+    let height :: i32 = 0
+
+    let area :: fn<i32> = () {
+        return width * height
+    }
+
+    let perimeter :: fn<i32> = () {
+        return (width + height) * 2
+    }
+}
+
+let main :: fn = () {
+    let rect :: Rectangle = Rectangle { width: 5, height: 10 }
+    log(rect.area())
+    log(rect.perimeter())
+}

@@ -37,7 +37,8 @@ pub enum ValueType {
     String,
     Boolean,
     Integer,
-    Function
+    Function,
+    Custom(String)
 }
 
 impl Display for ValueType {
@@ -48,19 +49,20 @@ impl Display for ValueType {
             ValueType::String => write!(f, "string"),
             ValueType::Boolean => write!(f, "boolean"),
             ValueType::Integer => write!(f, "integer"),
-            ValueType::Function => write!(f, "function")
+            ValueType::Function => write!(f, "function"),
+            ValueType::Custom(name) => write!(f, "{}", name)
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExpressionNode {
     pub node_type: ExpressionNodeType,
     pub value_type: ValueType
 }
 
 // Expressions
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum ExpressionNodeType {
     Literal {
         value_token: Box<Token>,
@@ -83,12 +85,20 @@ pub enum ExpressionNodeType {
         callee: Box<ExpressionNode>,
         arguments: Vec<ExpressionNode>,
         return_type: ValueType
+    },
+    ObjectLiteral {
+        class_name: String,
+        fields: Vec<(String, ExpressionNode)>
+    },
+    MemberAccess {
+        object: Box<ExpressionNode>,
+        member: String
     }
 }
 
 // Statements 
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum StatementNode {
     Main {
         body: Box<StatementNode>
@@ -126,6 +136,11 @@ pub enum StatementNode {
         identifier: String,
         parameters: Vec<(String, ValueType)>,
         return_type: ValueType,
+        body: Box<StatementNode>,
+        is_static: bool
+    },
+    Class {
+        identifier: String,
         body: Box<StatementNode>
     }
 }
@@ -155,12 +170,11 @@ impl ExpressionNodeType {
 
 impl StatementNode {
     pub fn add_child(&mut self, child: StatementNode) {
-        if let StatementNode::Block { children } = self {
-            children.push(child);
-        } else if let StatementNode::Main { body } = self {
-            body.add_child(child);
-        } else {
-            panic!("Cannot add child to non-block statement node");
+        match self {
+            StatementNode::Main { body } => body.add_child(child),
+            StatementNode::Block { children } => children.push(child),
+            StatementNode::Class { body, .. } => body.add_child(child),
+            _ => panic!("Cannot add child to non-block statement node")
         }
     }
 

@@ -1,20 +1,16 @@
 public class Input {
-  public static int fib(int n) {
-    if (n <= 1) {
-      return n;
-    }
-    return fib(n - 1) + fib(n - 2);
+  public int x;
+
+  public Input(int x) {
+    this.x = x;
   }
 
-  public static int factorial(int n) {
-    if (n <= 1) {
-      return 1;
-    }
-    return n * factorial(n - 1);
+  public int square() {
+    return x * x;
   }
 
   public static void main(String[] args) {
-    System.out.println(fib(10));
-    System.out.println(factorial(5));
+    Input input = new Input(5);
+    System.out.println(input.square());
   }
 }

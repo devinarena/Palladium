@@ -25,48 +25,11 @@ impl Compiler {
             panic!("Expected node with body");
         }
         let start_time = Instant::now();
+
         let mut program: String = String::new();
-        for import in &self.file_ctx.imports {
-            program.push_str(format!("import {};\n", import).as_str());
-        }
-        program.push_str(format!("public class {} ", self.file_ctx.file_name).as_str());
-
-        if self.file_ctx.imports.contains(&"java.util.Scanner".to_string()) {
-            program.push_str("private static Scanner __palladium_scanner__ = new Scanner(System.in);\n");
-            program.push_str("private static String __palladium_input__(String prompt) { System.out.print(prompt); return __palladium_scanner__.nextLine(); }\n");
-        }
-
-        match self.file_ctx.body.as_ref().unwrap() {
-            StatementNode::Block { children } => {
-                let main_exists = children.iter().any(|child| child.is_main());
-                if !main_exists {
-                    program.push_str("{\n");
-                    // If no main function is defined, write all the functions first and then generate a default main that calls them (in order of appearance)
-                    for child in children {
-                        if let StatementNode::Function { .. } = child {
-                            let func_lines = self.emit_statement(child);
-                            program.push_str(&func_lines.join("\n"));
-                            program.push_str("\n");
-                        }
-                    }
-                    program.push_str("public static void main(String[] args)\n{\n");
-                    for child in children {
-                        if !matches!(child, StatementNode::Function { .. }) {
-                            let func_lines = self.emit_statement(child);
-                            program.push_str(&func_lines.join("\n"));
-                            program.push_str("\n");
-                        }
-                    }
-                    program.push_str("}\n");
-                    program.push_str("}");
-                } else {
-                    let body_lines = self.emit_statement(self.file_ctx.body.as_ref().unwrap());
-                    program.push_str(&body_lines.join("\n"));
-                }
-            },
-            _ => panic!("Expected file body to be a block statement node"),
-        }
-
+        program.push_str(&self.emit_statement(self.file_ctx.body.as_ref().unwrap()).join("\n"));
+        program = program[1..program.len()-1].to_string(); // Remove the last newline
+        
         let output_path = Path::new(&self.directory).join(format!("{}.java", self.file_ctx.file_name));
         let mut output = File::create(output_path).expect("Failed to create output file");
         output.write_all(program.as_bytes()).expect("Failed to write to output file");
@@ -90,6 +53,11 @@ impl Compiler {
             ExpressionNodeType::FunctionCall { callee, arguments, .. } => {
                 let identifier = if let ExpressionNodeType::Variable { identifier } = &callee.node_type {
                     identifier.clone()
+                } else if let ExpressionNodeType::MemberAccess { object, member } = &callee.node_type {
+                    // Method call on object: object.method()
+                    let obj_expr = self.emit_expression(object);
+                    let args_out: Vec<String> = arguments.iter().map(|a| self.emit_expression(a)).collect();
+                    return format!("{}.{}({})", obj_expr, member, args_out.join(", "));
                 } else {
                     panic!("(compiler) Expected a variable expression node for function call callee");
                 };
@@ -115,6 +83,17 @@ impl Compiler {
                     }
                 }
                 format!("{}({})", identifier, args_out.join(", "))
+            }
+            ExpressionNodeType::ObjectLiteral { class_name, fields } => {
+                // Generate: new ClassName(field1Value, field2Value, ...)
+                let capitalized = class_name[0..1].to_uppercase() + &class_name[1..];
+                let args_out: Vec<String> = fields.iter().map(|(_, expr)| self.emit_expression(expr)).collect();
+                format!("new {}({})", capitalized, args_out.join(", "))
+            }
+            ExpressionNodeType::MemberAccess { object, member } => {
+                // Property access: object.property
+                let obj_expr = self.emit_expression(object);
+                format!("{}.{}", obj_expr, member)
             }
             ExpressionNodeType::Range { .. } => panic!("emit_expression: Range should only appear in loop headers"),
         }
@@ -161,6 +140,11 @@ impl Compiler {
         match stmt {
             StatementNode::Main { body } => {
                 let mut out = Vec::new();
+                out.push("final class Main {".to_string());
+                 if self.file_ctx.imports.contains(&"java.util.Scanner".to_string()) {
+                    out.push("private static Scanner __palladium_scanner__ = new Scanner(System.in);\n".to_string());
+                    out.push("private static String __palladium_input__(String prompt) { System.out.print(prompt); return __palladium_scanner__.nextLine(); }\n".to_string());
+                }
                 out.push("public static void main(String[] args)".to_string());
                 out.push("{".to_string());
                 let body_out = self.emit_statement(body);
@@ -168,6 +152,7 @@ impl Compiler {
                 if self.file_ctx.imports.contains(&"java.util.Scanner".to_string()) {
                     out.push("__palladium_scanner__.close();".to_string());
                 }
+                out.push("}".to_string());
                 out.push("}".to_string());
                 out
             }
@@ -178,6 +163,12 @@ impl Compiler {
                     TokenType::I32 => output.push_str("int "),
                     TokenType::Str => output.push_str("String "),
                     TokenType::Bool => output.push_str("boolean "),
+                    TokenType::Identifier(ref class_name) => {
+                        // Custom class type - capitalize first letter
+                        let capitalized = class_name[0..1].to_uppercase() + &class_name[1..];
+                        output.push_str(&capitalized);
+                        output.push_str(" ");
+                    }
                     _ => panic!("(compiler) Expected a type token for let statement"),
                 }
                 output.push_str(identifier);
@@ -242,7 +233,7 @@ impl Compiler {
                 vec![format!("return {};", self.emit_expression(expression))]
             }
             StatementNode::Break => vec!["break;".to_string()],
-            StatementNode::Function { identifier, parameters, return_type, body } => {
+            StatementNode::Function { identifier, parameters, return_type, body, is_static } => {
                 let mut out = Vec::new();
                 let params_str = parameters.iter().map(|(name, ty)| {
                     let ty_str = match ty {
@@ -262,8 +253,74 @@ impl Compiler {
                     ValueType::Null => "void",
                     _ => panic!("(compiler) Unsupported return type in function declaration"),
                 };
-                out.push(format!("public static {} {}({})", return_str, identifier, params_str));
+                out.push(format!("public {}{} {}({})", if *is_static { "static " } else { "" }, return_str, identifier, params_str));
                 out.append(&mut self.emit_statement(body));
+                out
+            },
+            StatementNode::Class { identifier, body } => {
+                let mut out = Vec::new();
+
+                for import in &self.file_ctx.imports {
+                    out.push(format!("import {};\n", import));
+                }
+
+                out.push(format!("public class {}", identifier[0..1].to_uppercase() + &identifier[1..].to_string()));
+                out.push("{".to_string());
+
+                // Collect fields and methods from the class body
+                if let StatementNode::Block { children } = &**body {
+                    let mut fields = Vec::new();
+                    let mut methods = Vec::new();
+                    let mut field_types = Vec::new();
+
+                    for child in children {
+                        match child {
+                            StatementNode::Let { identifier: field_name, type_token, .. } => {
+                                let type_str = match type_token.token_type {
+                                    TokenType::F32 => "float",
+                                    TokenType::I32 => "int",
+                                    TokenType::Str => "String",
+                                    TokenType::Bool => "boolean",
+                                    _ => panic!("(compiler) Unsupported field type"),
+                                };
+                                fields.push(format!("public {} {};", type_str, field_name));
+                                field_types.push((field_name.clone(), type_str.to_string()));
+                            }
+                            StatementNode::Function { .. } => {
+                                methods.push(child.clone());
+                            }
+                            _ => {}
+                        }
+                    }
+
+                    // Emit fields
+                    for field in fields {
+                        out.push(field);
+                    }
+
+                    // Generate constructor
+                    let ctor_class_name = identifier[0..1].to_uppercase() + &identifier[1..].to_string();
+                    let params: Vec<String> = field_types.iter()
+                        .map(|(name, ty)| format!("{} {}", ty, name))
+                        .collect();
+                    let param_str = params.join(", ");
+                    
+                    out.push(format!("public {}({})", ctor_class_name, param_str));
+                    out.push("{".to_string());
+                    
+                    for (field_name, _) in &field_types {
+                        out.push(format!("this.{} = {};", field_name, field_name));
+                    }
+                    
+                    out.push("}".to_string());
+
+                    // Emit methods
+                    for method in methods {
+                        out.append(&mut self.emit_statement(&method));
+                    }
+                }
+
+                out.push("}".to_string());
                 out
             }
         }

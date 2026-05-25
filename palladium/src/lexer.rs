@@ -49,6 +49,7 @@ impl Lexer {
                     current_char = self.next();
                 }
                 match current.as_str() {
+                    "class" => self.output.push(Token::new(TokenType::Class, line_number)),
                     "let" => self.output.push(Token::new(TokenType::Let, line_number)),
                     "fn" => self.output.push(Token::new(TokenType::Fn, line_number)),
                     "f32" => self.output.push(Token::new(TokenType::F32, line_number)),

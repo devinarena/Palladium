@@ -1,13 +1,15 @@
 
+class input {
+    let x :: i32 = 0
 
-let fib :: fn<i32> = (n: i32) {
-    if (n <= 1) {
-        return n
+    let square :: fn<i32> = () {
+        return x * x
     }
-    return fib(n - 1) + fib(n - 2)
 }
 
 let main :: fn = () {
-    log(fib(10))
-    log(factorial(5))
+    let in :: input = input { x: 20 }
+    let in2 :: input = input { x: 10 }
+    log(in.square())
+    log(in2.square())
 }

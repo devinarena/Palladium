@@ -28,6 +28,7 @@ pub struct Parser<'a> {
 
 pub struct FileContext {
     pub imports: Vec<String>,
+    pub main_class: Option<StatementNode>,
     pub body: Option<StatementNode>,
     pub file_name: String,
 }
@@ -43,6 +44,7 @@ impl Parser<'_> {
             index: 0 ,
             file_context: FileContext {
                 imports: Vec::new(),
+                main_class: None,
                 body: None,
                 file_name: file_name
             },
@@ -63,6 +65,20 @@ impl Parser<'_> {
         while !matches!(self.peek().token_type, TokenType::EndOfFile) {
             self.statement(&mut program);
         }
+        if let StatementNode::Block { ref children } = program {
+            let main = children.iter().find(|node| matches!(node, StatementNode::Main { .. }));
+            let class = children.iter().find(|node| matches!(node, StatementNode::Class { .. }));
+            // if theres no class declaration, we need to create one to compile to Java
+            if class.is_none() {
+                // if theres no main node but there is statement nodes, we need to create a main node and move all the statements into it
+                if main.is_none() {
+
+                } else {
+                    program = StatementNode::Block { children: vec![main.unwrap().clone()] };
+                }
+            }
+        }
+
         self.parse_time = start_time.elapsed();
         self.file_context.body = Some(program);
     }
@@ -108,19 +124,18 @@ impl Parser<'_> {
 
 
     fn lookup_function(&self, name: &String, scope: &Scope) -> Option<ValueType> {
-        if scope.parent.is_none() {
-            if let Some(functions) = &scope.functions {
-                if let Some(value) = functions.get(name) {
-                    return Some(value.clone());
-                }
+        if let Some(functions) = &scope.functions {
+            if let Some(value) = functions.get(name) {
+                return Some(value.clone());
             }
-            if self.builtins.contains_key(name) {
-                return Some(self.builtins.get(name).unwrap().return_type.clone());
-            }
-            return None;
-        } else {
-            return self.lookup_function(name, scope.parent.as_ref().unwrap());
         }
+        if let Some(parent) = &scope.parent {
+            return self.lookup_function(name, parent);
+        }
+        if self.builtins.contains_key(name) {
+            return Some(self.builtins.get(name).unwrap().return_type.clone());
+        }
+        return None;
     }
 
 
@@ -265,6 +280,67 @@ impl Parser<'_> {
                     lhs = self.parse_call(lhs);
                     continue;
                 }
+                TokenType::LeftBrace => {
+                    // Object instantiation
+                    if let ExpressionNodeType::Variable { ref identifier } = lhs.node_type {
+                        let class_name = identifier.clone();
+                        self.consume(); // consume {
+                        let mut fields = Vec::new();
+                        
+                        if !matches!(self.peek().token_type, TokenType::RightBrace) {
+                            loop {
+                                if !matches!(self.peek().token_type, TokenType::Identifier(_)) {
+                                    parse_error!(self.peek().line_number, "Expected field name");
+                                }
+                                let field_name = self.consume().get_value();
+                                if !matches!(self.peek().token_type, TokenType::Colon) {
+                                    parse_error!(self.peek().line_number, "Expected ':' after field name");
+                                }
+                                self.consume(); // consume :
+                                let field_value = self.expression(0);
+                                fields.push((field_name, field_value));
+                                
+                                if matches!(self.peek().token_type, TokenType::Comma) {
+                                    self.consume();
+                                } else {
+                                    break;
+                                }
+                            }
+                        }
+                        
+                        if !matches!(self.peek().token_type, TokenType::RightBrace) {
+                            parse_error!(self.peek().line_number, "Expected '}'");
+                        }
+                        self.consume(); // consume }
+                        
+                        // For now, use a placeholder value type - should be the class type
+                        lhs = ExpressionNode::new(
+                            ExpressionNodeType::ObjectLiteral { class_name, fields },
+                            ValueType::Function // placeholder, will be improved later
+                        );
+                    } else {
+                        parse_error!(self.peek().line_number, "Cannot instantiate non-class");
+                    }
+                    continue;
+                }
+                TokenType::Dot => {
+                    // Member access
+                    self.consume(); // consume .
+                    if !matches!(self.peek().token_type, TokenType::Identifier(_)) {
+                        parse_error!(self.peek().line_number, "Expected identifier after '.'");
+                    }
+                    let member = self.consume().get_value();
+                    
+                    // For now, use placeholder value type
+                    lhs = ExpressionNode::new(
+                        ExpressionNodeType::MemberAccess {
+                            object: Box::new(lhs),
+                            member
+                        },
+                        ValueType::Function // placeholder
+                    );
+                    continue;
+                }
                 _ => {}
             }
             let op = self.peek().clone();
@@ -366,6 +442,10 @@ impl Parser<'_> {
                 self.consume();
                 let expression = self.expression(0);
                 program.add_child(StatementNode::Return { expression });
+            },
+            TokenType::Class => {
+                self.consume();
+                self.class_declaration(program);
             }
             _ => {
                 parse_error!(self.peek().line_number, "Expected statement");
@@ -424,7 +504,7 @@ impl Parser<'_> {
     }
 
     fn function_declaration(&mut self, program: &mut StatementNode, identifier: &String) {
-        if self.scope.parent.is_some() {
+        if !matches!(program, StatementNode::Class { .. }) && self.scope.parent.is_some() {
             parse_error!(self.peek().line_number, "Function declarations cannot be nested inside other scopes");
         }
         self.consume();
@@ -508,7 +588,8 @@ impl Parser<'_> {
                 identifier: identifier.clone(),
                 return_type: return_type_token.get_value_type_declaration(),
                 parameters,
-                body: Box::new(body)
+                body: Box::new(body),
+                is_static: !matches!(program, StatementNode::Class { .. })
             };
             program.add_child(function_node);
         }
@@ -619,5 +700,40 @@ impl Parser<'_> {
         let call_node = self.parse_call(callee);
         let call_statement_node = StatementNode::Call { call: call_node };
         program.add_child(call_statement_node);
+    }
+
+    fn class_declaration(&mut self, program: &mut StatementNode) {
+        if !matches!(self.peek().token_type, TokenType::Identifier(_)) {
+            parse_error!(self.peek().line_number, "Expected identifier for class name");
+        }
+        let class_name = self.consume().get_value();
+        if self.scope.parent.is_some() {
+            parse_error!(self.peek().line_number, "Class declarations cannot be nested inside other scopes");
+        }
+        if self.file_context.main_class.is_some() {
+            parse_error!(self.peek().line_number, "Only one class declaration is allowed per file");
+        }
+        if !matches!(self.peek().token_type, TokenType::LeftBrace) {
+            parse_error!(self.peek().line_number, format!("Expected '{{' after class name but got {:?}", self.peek()).as_str());
+        }
+        self.consume(); // consume the left brace
+        self.new_scope();
+        self.scope.functions = Some(HashMap::new());
+        let mut class_node = StatementNode::Class { identifier: class_name, body: Box::new(StatementNode::Block { children: Vec::new() }) };
+        while !matches!(self.peek().token_type, TokenType::RightBrace) {
+            match self.peek().token_type {
+                TokenType::Let => {
+                    self.consume();
+                    self.let_statement(&mut class_node);
+                }
+                _ => {
+                    parse_error!(self.peek().line_number, format!("Unexpected token in class declaration: {:?}", self.peek()).as_str());
+                }
+            }
+        }
+        self.consume(); // consume the right brace
+        self.file_context.main_class = Some(class_node);
+        program.add_child(self.file_context.main_class.as_ref().unwrap().clone());
+        self.pop_scope();
     }
 }

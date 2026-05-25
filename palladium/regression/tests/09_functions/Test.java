@@ -1,12 +1,5 @@
-public class Test {
-public static int square(int x)
-{
-return x * x;
-}
-public static void a()
-{
-System.out.println("Hello, world!");
-}
+
+final class Main {
 public static void main(String[] args)
 {
 int a = 5;

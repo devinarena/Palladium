@@ -1,0 +1,27 @@
+
+public class Rectangle
+{
+public int width;
+public int height;
+public Rectangle(int width, int height)
+{
+this.width = width;
+this.height = height;
+}
+public int area()
+{
+return width * height;
+}
+public int perimeter()
+{
+return (width + height) * 2;
+}
+}
+final class Main {
+public static void main(String[] args)
+{
+Rectangle rect = new Rectangle(5, 10);
+System.out.println(rect.area());
+System.out.println(rect.perimeter());
+}
+}

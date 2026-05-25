@@ -1,4 +1,5 @@
-public class Test {
+
+final class Main {
 public static void main(String[] args)
 {
 String s = "abc";
